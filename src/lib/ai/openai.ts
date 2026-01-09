@@ -95,4 +95,70 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
   }
 }
 
+export async function categorizeKnowledgeContent(
+  title: string,
+  content: string
+): Promise<{ category: string; confidence: number; reason: string }> {
+  const systemPrompt = `Du bist ein Kategorisierungs-Experte für das Palacios Institut.
+
+Das Institut bietet Ausbildungen in Hypnose, Meditation und Life Coaching an.
+
+Deine Aufgabe ist es, Inhalte in eine der folgenden Kategorien einzuordnen:
+- "help_article": Allgemeine Hilfe-Artikel, Anleitungen, How-To Guides
+- "faq": Häufig gestellte Fragen und deren Antworten
+- "course_info": Informationen über Kurse, Preise, Termine, Ausbildungen
+- "email": E-Mail-Vorlagen oder typische Korrespondenz
+
+Analysiere den Titel und Inhalt sorgfältig und wähle die passendste Kategorie.`
+
+  const userPrompt = `TITEL: ${title}
+
+INHALT:
+${content.substring(0, 2000)}${content.length > 2000 ? '...' : ''}
+
+Antworte NUR im folgenden JSON-Format:
+{
+  "category": "help_article|faq|course_info|email",
+  "confidence": 0.0-1.0,
+  "reason": "Kurze Begründung auf Deutsch"
+}`
+
+  const openai = getOpenAI()
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 200,
+  })
+
+  const responseText = response.choices[0].message.content || ''
+
+  try {
+    // Extract JSON from response (handle markdown code blocks)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      const validCategories = ['help_article', 'faq', 'course_info', 'email']
+
+      return {
+        category: validCategories.includes(parsed.category) ? parsed.category : 'help_article',
+        confidence: Math.min(Math.max(parsed.confidence || 0.5, 0), 1),
+        reason: parsed.reason || 'Automatisch kategorisiert',
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse categorization response:', e)
+  }
+
+  // Fallback
+  return {
+    category: 'help_article',
+    confidence: 0.5,
+    reason: 'Konnte nicht automatisch kategorisiert werden',
+  }
+}
+
 export { getOpenAI }

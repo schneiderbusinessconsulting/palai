@@ -58,12 +58,16 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
+    // Only fetch emails from the last 7 days
+    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+
     // Fetch recent emails from HubSpot
     const hubspotResponse = await fetch(
-      'https://api.hubapi.com/crm/v3/objects/emails?limit=50&properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_email_thread_id,hs_email_direction',
+      `https://api.hubapi.com/crm/v3/objects/emails?limit=100&properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction&filterGroups=[{"filters":[{"propertyName":"hs_email_direction","operator":"EQ","value":"INCOMING_EMAIL"}]}]`,
       {
         headers: {
           Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
         },
       }
     )
@@ -84,8 +88,26 @@ export async function POST(request: NextRequest) {
     let skipped = 0
 
     for (const email of emails) {
-      // Only import incoming emails
-      if (email.properties.hs_email_direction === 'EMAIL') {
+      const props = email.properties
+
+      // Parse timestamp - try multiple formats
+      let receivedAt: Date
+      const timestamp = props.hs_timestamp || props.hs_createdate || email.createdAt
+
+      if (timestamp) {
+        // If it's a number string (milliseconds)
+        if (/^\d+$/.test(String(timestamp))) {
+          receivedAt = new Date(parseInt(String(timestamp)))
+        } else {
+          // If it's already an ISO string
+          receivedAt = new Date(timestamp)
+        }
+      } else {
+        receivedAt = new Date()
+      }
+
+      // Skip if invalid date or older than 7 days
+      if (isNaN(receivedAt.getTime()) || receivedAt.getTime() < sevenDaysAgo) {
         skipped++
         continue
       }
@@ -102,8 +124,6 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const props = email.properties
-
       // Insert new email
       const { error: insertError } = await supabase
         .from('incoming_emails')
@@ -117,9 +137,7 @@ export async function POST(request: NextRequest) {
           subject: props.hs_email_subject || 'Kein Betreff',
           body_text: props.hs_email_text || '',
           body_html: props.hs_email_html,
-          received_at: props.hs_timestamp
-            ? new Date(parseInt(props.hs_timestamp)).toISOString()
-            : new Date().toISOString(),
+          received_at: receivedAt.toISOString(),
           status: 'pending',
         })
 

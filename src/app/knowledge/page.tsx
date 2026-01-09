@@ -35,7 +35,14 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -119,6 +126,10 @@ export default function KnowledgePage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // AI Categorization state
+  const [isCategorizing, setIsCategorizing] = useState(false)
+  const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number; reason: string } | null>(null)
+
   // Fetch knowledge items
   const fetchItems = async () => {
     setIsLoading(true)
@@ -183,6 +194,8 @@ export default function KnowledgePage() {
           setTitle('')
           setContent('')
           setSelectedFile(null)
+          setAiSuggestion(null)
+          setSourceType('help_article')
           setIsDialogOpen(false)
           setUploadStatus('idle')
           fetchItems()
@@ -197,6 +210,41 @@ export default function KnowledgePage() {
       setUploadMessage('Upload fehlgeschlagen')
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  // AI Categorization
+  const handleAiCategorize = async () => {
+    if (!title.trim() && !content.trim()) {
+      setUploadStatus('error')
+      setUploadMessage('Bitte Titel oder Inhalt eingeben für AI-Kategorisierung')
+      return
+    }
+
+    setIsCategorizing(true)
+    setAiSuggestion(null)
+
+    try {
+      const response = await fetch('/api/knowledge/categorize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAiSuggestion(result)
+        setSourceType(result.category)
+      } else {
+        setUploadStatus('error')
+        setUploadMessage('AI-Kategorisierung fehlgeschlagen')
+      }
+    } catch (error) {
+      console.error('Categorization error:', error)
+      setUploadStatus('error')
+      setUploadMessage('AI-Kategorisierung fehlgeschlagen')
+    } finally {
+      setIsCategorizing(false)
     }
   }
 
@@ -395,10 +443,39 @@ export default function KnowledgePage() {
               />
             </div>
 
-            {/* Source Type */}
+            {/* Source Type with AI Categorization */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Kategorie</label>
-              <Select value={sourceType} onValueChange={setSourceType}>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Kategorie</label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1.5 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        onClick={handleAiCategorize}
+                        disabled={isCategorizing}
+                      >
+                        {isCategorizing ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="h-3.5 w-3.5" />
+                        )}
+                        AI-Kategorisierung
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Kategorie automatisch per AI erkennen</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Select value={sourceType} onValueChange={(value) => {
+                setSourceType(value)
+                setAiSuggestion(null) // Clear suggestion when manually changed
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -409,6 +486,25 @@ export default function KnowledgePage() {
                   <SelectItem value="email">E-Mail Vorlage</SelectItem>
                 </SelectContent>
               </Select>
+              {aiSuggestion && (
+                <div className="flex items-start gap-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-md text-sm">
+                  <Sparkles className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-amber-700 dark:text-amber-400">
+                      AI Vorschlag: <span className="font-medium">{
+                        aiSuggestion.category === 'help_article' ? 'Help Center' :
+                        aiSuggestion.category === 'faq' ? 'FAQ' :
+                        aiSuggestion.category === 'course_info' ? 'Kurs-Info' :
+                        'E-Mail Vorlage'
+                      }</span>
+                      <span className="opacity-70"> ({Math.round(aiSuggestion.confidence * 100)}% sicher)</span>
+                    </p>
+                    <p className="text-amber-600/80 dark:text-amber-500/80 text-xs mt-0.5">
+                      {aiSuggestion.reason}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Content or File */}

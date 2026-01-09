@@ -21,6 +21,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   Search,
   Filter,
@@ -33,6 +35,7 @@ import {
   BookOpen,
   CheckCircle,
   Edit,
+  EyeOff,
 } from 'lucide-react'
 
 interface EmailDraft {
@@ -99,6 +102,7 @@ export default function InboxPage() {
   const [emails, setEmails] = useState<Email[]>([])
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
@@ -238,6 +242,8 @@ export default function InboxPage() {
   }
 
   const filteredEmails = emails.filter((email) => {
+    // Hide sent/closed emails if toggle is on
+    if (hideSent && email.status === 'sent') return false
     if (filter !== 'all' && email.status !== filter) return false
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -283,6 +289,17 @@ export default function InboxPage() {
             <SelectItem value="sent">Gesendet</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
+          <Switch
+            id="hide-sent"
+            checked={hideSent}
+            onCheckedChange={setHideSent}
+          />
+          <Label htmlFor="hide-sent" className="text-sm cursor-pointer flex items-center gap-1.5">
+            <EyeOff className="h-3.5 w-3.5" />
+            Geschlossene ausblenden
+          </Label>
+        </div>
         <Button
           variant="outline"
           className="gap-2"

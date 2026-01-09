@@ -49,6 +49,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { KnowledgeAIAssistant } from '@/components/knowledge/ai-assistant'
 
 interface KnowledgeItem {
   title: string
@@ -129,6 +130,9 @@ export default function KnowledgePage() {
   // AI Categorization state
   const [isCategorizing, setIsCategorizing] = useState(false)
   const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number; reason: string } | null>(null)
+
+  // AI Assistant state
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false)
 
   // Fetch knowledge items
   const fetchItems = async () => {
@@ -353,6 +357,14 @@ export default function KnowledgePage() {
         <Button variant="outline" className="gap-2" onClick={fetchItems}>
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Aktualisieren
+        </Button>
+        <Button
+          variant="outline"
+          className="gap-2 text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+          onClick={() => setIsAssistantOpen(true)}
+        >
+          <Sparkles className="h-4 w-4" />
+          AI Assistent
         </Button>
         <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
           <Plus className="h-4 w-4" />
@@ -604,6 +616,18 @@ export default function KnowledgePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* AI Assistant Dialog */}
+      <KnowledgeAIAssistant
+        open={isAssistantOpen}
+        onOpenChange={setIsAssistantOpen}
+        onApplySuggestion={(suggestion) => {
+          if (suggestion.title) setTitle(suggestion.title)
+          if (suggestion.category) setSourceType(suggestion.category)
+          if (suggestion.content) setContent(suggestion.content)
+          setIsDialogOpen(true) // Open upload dialog with suggested values
+        }}
+      />
     </div>
   )
 }

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
   Select,
@@ -13,6 +14,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   Search,
   Plus,
@@ -23,7 +31,10 @@ import {
   BookOpen,
   MoreVertical,
   Trash2,
-  Edit,
+  Upload,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -32,57 +43,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-// Mock data
-const mockKnowledgeItems = [
-  {
-    id: '1',
-    title: 'Hypnose-Ausbildung Übersicht',
-    source_type: 'help_article',
-    chunks: 3,
-    updated_at: '2026-01-07T10:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Preisliste 2026',
-    source_type: 'faq',
-    chunks: 5,
-    updated_at: '2026-01-02T14:30:00Z',
-  },
-  {
-    id: '3',
-    title: 'Support-Antwort: Ratenzahlung',
-    source_type: 'email',
-    chunks: 1,
-    updated_at: '2026-01-06T09:15:00Z',
-  },
-  {
-    id: '4',
-    title: 'Meditation Coach Ausbildung',
-    source_type: 'help_article',
-    chunks: 4,
-    updated_at: '2026-01-04T16:45:00Z',
-  },
-  {
-    id: '5',
-    title: 'Life Coach Zertifizierung',
-    source_type: 'course_info',
-    chunks: 6,
-    updated_at: '2026-01-01T11:00:00Z',
-  },
-  {
-    id: '6',
-    title: 'Anmeldeprozess FAQ',
-    source_type: 'faq',
-    chunks: 2,
-    updated_at: '2025-12-28T08:00:00Z',
-  },
-]
-
-const stats = {
-  total_chunks: 127,
-  help_articles: 45,
-  faqs: 23,
-  emails: 59,
+interface KnowledgeItem {
+  title: string
+  source_type: string
+  chunks: number
+  updated_at: string
+  ids: string[]
 }
 
 function getSourceIcon(type: string) {
@@ -137,16 +103,136 @@ function formatDate(dateString: string) {
 }
 
 export default function KnowledgePage() {
+  const [items, setItems] = useState<KnowledgeItem[]>([])
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [uploadMessage, setUploadMessage] = useState('')
 
-  const filteredItems = mockKnowledgeItems.filter((item) => {
-    if (filter !== 'all' && item.source_type !== filter) return false
+  // Upload form state
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [sourceType, setSourceType] = useState('help_article')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Fetch knowledge items
+  const fetchItems = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/knowledge?source_type=${filter}`)
+      if (response.ok) {
+        const data = await response.json()
+        setItems(data.items || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch knowledge:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchItems()
+  }, [filter])
+
+  // Handle upload
+  const handleUpload = async () => {
+    if (!title.trim()) {
+      setUploadStatus('error')
+      setUploadMessage('Bitte Titel eingeben')
+      return
+    }
+
+    if (!content.trim() && !selectedFile) {
+      setUploadStatus('error')
+      setUploadMessage('Bitte Text eingeben oder Datei hochladen')
+      return
+    }
+
+    setIsUploading(true)
+    setUploadStatus('idle')
+
+    try {
+      const formData = new FormData()
+      formData.append('title', title)
+      formData.append('source_type', sourceType)
+
+      if (selectedFile) {
+        formData.append('file', selectedFile)
+      } else {
+        formData.append('content', content)
+      }
+
+      const response = await fetch('/api/knowledge', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setUploadStatus('success')
+        setUploadMessage(`${data.chunksCreated} Chunks erstellt`)
+
+        // Reset form
+        setTimeout(() => {
+          setTitle('')
+          setContent('')
+          setSelectedFile(null)
+          setIsDialogOpen(false)
+          setUploadStatus('idle')
+          fetchItems()
+        }, 1500)
+      } else {
+        setUploadStatus('error')
+        setUploadMessage(data.error || 'Upload fehlgeschlagen')
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadStatus('error')
+      setUploadMessage('Upload fehlgeschlagen')
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async (itemTitle: string) => {
+    if (!confirm(`"${itemTitle}" wirklich löschen?`)) return
+
+    try {
+      const response = await fetch('/api/knowledge', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: itemTitle }),
+      })
+
+      if (response.ok) {
+        fetchItems()
+      }
+    } catch (error) {
+      console.error('Delete error:', error)
+    }
+  }
+
+  const filteredItems = items.filter((item) => {
     if (searchQuery) {
       return item.title.toLowerCase().includes(searchQuery.toLowerCase())
     }
     return true
   })
+
+  // Calculate stats
+  const stats = {
+    total_chunks: items.reduce((sum, item) => sum + item.chunks, 0),
+    help_articles: items.filter((i) => i.source_type === 'help_article').length,
+    faqs: items.filter((i) => i.source_type === 'faq').length,
+    course_info: items.filter((i) => i.source_type === 'course_info').length,
+  }
 
   return (
     <div className="space-y-6">
@@ -185,9 +271,9 @@ export default function KnowledgePage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{stats.emails}</p>
+            <p className="text-2xl font-bold text-amber-600">{stats.course_info}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              E-Mail Vorlagen
+              Kurs-Infos
             </p>
           </CardContent>
         </Card>
@@ -216,11 +302,11 @@ export default function KnowledgePage() {
             <SelectItem value="course_info">Kurs-Info</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="gap-2">
-          <RefreshCw className="h-4 w-4" />
-          HubSpot Sync
+        <Button variant="outline" className="gap-2" onClick={fetchItems}>
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Aktualisieren
         </Button>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           Hinzufügen
         </Button>
@@ -229,65 +315,199 @@ export default function KnowledgePage() {
       {/* Knowledge Items List */}
       <Card>
         <CardContent className="p-0">
-          <div className="divide-y divide-slate-200 dark:divide-slate-700">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-              >
-                <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
-                  {getSourceIcon(item.source_type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-slate-900 dark:text-white truncate">
-                    {item.title}
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    {getSourceBadge(item.source_type)}
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {item.chunks} Chunks
-                    </span>
-                    <span className="text-xs text-slate-400">•</span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      Aktualisiert {formatDate(item.updated_at)}
-                    </span>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="text-center py-12">
+              <BookOpen className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+              <p className="text-slate-500 dark:text-slate-400">
+                Noch keine Einträge vorhanden
+              </p>
+              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+                Klicke auf "Hinzufügen" um Wissen hochzuladen
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200 dark:divide-slate-700">
+              {filteredItems.map((item, index) => (
+                <div
+                  key={`${item.title}-${index}`}
+                  className="flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+                    {getSourceIcon(item.source_type)}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-slate-900 dark:text-white truncate">
+                      {item.title}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      {getSourceBadge(item.source_type)}
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {item.chunks} Chunks
+                      </span>
+                      <span className="text-xs text-slate-400">•</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        Aktualisiert {formatDate(item.updated_at)}
+                      </span>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={() => handleDelete(item.title)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Löschen
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Bearbeiten
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Löschen
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {filteredItems.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-slate-500 dark:text-slate-400">
-            Keine Einträge gefunden
-          </p>
-        </div>
-      )}
+      {/* Upload Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Wissen hinzufügen</DialogTitle>
+          </DialogHeader>
 
-      {/* Sync Info */}
-      <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
-        Letzter HubSpot Sync: vor 6 Stunden
-      </p>
+          <div className="space-y-4 py-4">
+            {/* Title */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Titel *</label>
+              <Input
+                placeholder="z.B. Hypnose-Ausbildung Preise 2026"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+
+            {/* Source Type */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Kategorie</label>
+              <Select value={sourceType} onValueChange={setSourceType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="help_article">Help Center</SelectItem>
+                  <SelectItem value="faq">FAQ</SelectItem>
+                  <SelectItem value="course_info">Kurs-Info</SelectItem>
+                  <SelectItem value="email">E-Mail Vorlage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Content or File */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Inhalt</label>
+              <Textarea
+                placeholder="Text hier eingeben oder Datei hochladen..."
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={6}
+                disabled={!!selectedFile}
+              />
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Oder Datei hochladen</label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors ${
+                  selectedFile
+                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
+                    : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) {
+                      setSelectedFile(file)
+                      setContent('')
+                    }
+                  }}
+                />
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    <span>{selectedFile.name}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedFile(null)
+                      }}
+                    >
+                      Entfernen
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-slate-500 dark:text-slate-400">
+                    <Upload className="h-8 w-8 mx-auto mb-2" />
+                    <p>PDF oder TXT Datei hier ablegen</p>
+                    <p className="text-xs mt-1">oder klicken zum Auswählen</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Status */}
+            {uploadStatus !== 'idle' && (
+              <div
+                className={`flex items-center gap-2 p-3 rounded-lg ${
+                  uploadStatus === 'success'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                }`}
+              >
+                {uploadStatus === 'success' ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <span>{uploadMessage}</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleUpload} disabled={isUploading}>
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verarbeite...
+                </>
+              ) : (
+                'Hochladen'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

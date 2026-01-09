@@ -18,10 +18,17 @@ import {
   ChevronRight,
   Menu,
   X,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+
+const dashboards = [
+  { name: 'Intelligence', href: '/', current: true },
+  { name: 'Analytics', href: 'https://analytics.palacios-institut.com/', current: false },
+]
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -39,6 +46,7 @@ export function Sidebar() {
   const { theme, toggleTheme } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [switcherOpen, setSwitcherOpen] = useState(false)
 
   return (
     <>
@@ -66,33 +74,95 @@ export function Sidebar() {
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-200 dark:border-slate-800">
-          <div
-            className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: '#B9965A' }}
+        {/* Logo & Dashboard Switcher */}
+        <div className="relative px-3 py-4 border-b border-slate-200 dark:border-slate-800">
+          <button
+            onClick={() => !collapsed && setSwitcherOpen(!switcherOpen)}
+            className={cn(
+              'flex items-center gap-3 w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors',
+              collapsed ? 'p-2 justify-center' : 'px-3 py-2.5'
+            )}
           >
-            <span
-              className="text-white text-xl font-bold"
-              style={{ fontFamily: 'Georgia, Times, serif' }}
+            <div
+              className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center"
+              style={{ backgroundColor: '#B9965A' }}
             >
-              P
-            </span>
-          </div>
-          {!collapsed && (
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-900 dark:text-white">
-                Intelligence
-              </span>
-              <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
-                BETA
+              <span
+                className="text-white text-lg font-bold"
+                style={{ fontFamily: 'Georgia, Times, serif' }}
+              >
+                P
               </span>
             </div>
+            {!collapsed && (
+              <>
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-slate-900 dark:text-white text-sm">
+                      Intelligence
+                    </span>
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
+                      BETA
+                    </span>
+                  </div>
+                </div>
+                <ChevronsUpDown className="h-4 w-4 text-slate-400" />
+              </>
+            )}
+          </button>
+
+          {/* Switcher Dropdown */}
+          {switcherOpen && !collapsed && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setSwitcherOpen(false)}
+              />
+              <div className="absolute left-3 right-3 top-full mt-1 z-20 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg overflow-hidden">
+                {dashboards.map((dashboard) => (
+                  <a
+                    key={dashboard.name}
+                    href={dashboard.href}
+                    onClick={() => setSwitcherOpen(false)}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors',
+                      dashboard.current && 'bg-slate-50 dark:bg-slate-700/50'
+                    )}
+                  >
+                    <div
+                      className="flex-shrink-0 w-8 h-8 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: '#B9965A' }}
+                    >
+                      <span
+                        className="text-white text-lg font-bold"
+                        style={{ fontFamily: 'Georgia, Times, serif' }}
+                      >
+                        P
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900 dark:text-white text-sm">
+                          {dashboard.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
+                          BETA
+                        </span>
+                      </div>
+                    </div>
+                    {dashboard.current && (
+                      <Check className="h-4 w-4 text-blue-500" />
+                    )}
+                  </a>
+                ))}
+              </div>
+            </>
           )}
+
           {/* Mobile Close Button */}
           <button
             onClick={() => setMobileOpen(false)}
-            className="lg:hidden ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="lg:hidden absolute top-4 right-3 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5 text-slate-500" />
           </button>

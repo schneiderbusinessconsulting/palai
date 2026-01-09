@@ -50,6 +50,11 @@ export async function POST(
       threadId: email.hubspot_thread_id,
     })
 
+    // Check if email was actually sent
+    if (!sentEmail.actualSent) {
+      console.log('Email logged to HubSpot but not actually sent - RESEND_API_KEY not configured')
+    }
+
     // 3. Assign owner to sent email if specified
     if (ownerId) {
       try {
@@ -99,6 +104,10 @@ export async function POST(
     return NextResponse.json({
       success: true,
       hubspotEmailId: sentEmail.id,
+      actualSent: sentEmail.actualSent,
+      message: sentEmail.actualSent
+        ? 'E-Mail erfolgreich gesendet'
+        : 'E-Mail in HubSpot gespeichert (RESEND_API_KEY nicht konfiguriert)',
     })
   } catch (error) {
     console.error('Send email error:', error)

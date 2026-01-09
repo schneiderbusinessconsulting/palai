@@ -1,4 +1,16 @@
+import { Resend } from 'resend'
+
 const HUBSPOT_API_BASE = 'https://api.hubapi.com'
+
+// Lazy init Resend to avoid build errors
+let resendClient: Resend | null = null
+function getResend(): Resend | null {
+  if (!process.env.RESEND_API_KEY) return null
+  if (!resendClient) {
+    resendClient = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resendClient
+}
 
 interface HubSpotEmail {
   id: string
@@ -107,22 +119,56 @@ class HubSpotClient {
     }
   }
 
-  // Send email reply via Engagements API
+  // Send email reply via Resend + log to HubSpot
   async sendEmail(params: {
     to: string
     subject: string
     body: string
     threadId?: string
     contactId?: string
-  }): Promise<{ id: string }> {
-    // First, find or create contact by email
+    fromEmail?: string
+    fromName?: string
+  }): Promise<{ id: string; actualSent: boolean }> {
+    const fromEmail = params.fromEmail || process.env.RESEND_FROM_EMAIL || 'info@palacios-relations.ch'
+    const fromName = params.fromName || 'Palacios Institut'
+
+    // First, find contact by email
     let contactId = params.contactId
     if (!contactId) {
       const contact = await this.getContactByEmail(params.to)
       contactId = contact?.id
     }
 
-    // Create email engagement using v1 API (more reliable for sending)
+    let actualSent = false
+    let emailId = ''
+
+    // Try to send via Resend if configured
+    const resend = getResend()
+    if (resend) {
+      try {
+        const { data, error } = await resend.emails.send({
+          from: `${fromName} <${fromEmail}>`,
+          to: [params.to],
+          subject: params.subject,
+          text: params.body,
+          html: params.body.replace(/\n/g, '<br>'),
+        })
+
+        if (error) {
+          console.error('Resend error:', error)
+        } else {
+          actualSent = true
+          emailId = data?.id || ''
+          console.log('Email sent via Resend:', emailId)
+        }
+      } catch (e) {
+        console.error('Resend send error:', e)
+      }
+    } else {
+      console.log('Resend not configured - email will only be logged to HubSpot')
+    }
+
+    // Log email to HubSpot as engagement (regardless of whether it was actually sent)
     const engagementData = {
       engagement: {
         active: true,
@@ -130,12 +176,11 @@ class HubSpotClient {
         timestamp: Date.now(),
       },
       metadata: {
-        from: {
-          email: 'info@palacios-relations.ch', // Will be overwritten by HubSpot
-        },
+        from: { email: fromEmail },
         to: [{ email: params.to }],
         subject: params.subject,
         text: params.body,
+        status: actualSent ? 'SENT' : 'DRAFT',
       },
       associations: {
         contactIds: contactId ? [parseInt(contactId)] : [],
@@ -146,15 +191,20 @@ class HubSpotClient {
       },
     }
 
-    const response = await this.request<{ engagement: { id: number } }>(
-      '/engagements/v1/engagements',
-      {
-        method: 'POST',
-        body: JSON.stringify(engagementData),
-      }
-    )
+    try {
+      const response = await this.request<{ engagement: { id: number } }>(
+        '/engagements/v1/engagements',
+        {
+          method: 'POST',
+          body: JSON.stringify(engagementData),
+        }
+      )
+      emailId = emailId || String(response.engagement.id)
+    } catch (e) {
+      console.error('Failed to log email to HubSpot:', e)
+    }
 
-    return { id: String(response.engagement.id) }
+    return { id: emailId, actualSent }
   }
 
   // Get knowledge base articles (if available)

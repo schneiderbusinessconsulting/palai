@@ -36,7 +36,16 @@ import {
   CheckCircle,
   Edit,
   EyeOff,
+  Copy,
+  Check,
+  FileUp,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from '@/components/ui/tooltip'
 
 interface EmailDraft {
   id: string
@@ -118,6 +127,10 @@ export default function InboxPage() {
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>('')
+
+  // Copy and Draft states
+  const [isCopied, setIsCopied] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   // Fetch emails
   const fetchEmails = async () => {
@@ -233,11 +246,52 @@ export default function InboxPage() {
     }
   }
 
+  // Copy to clipboard
+  const handleCopy = async () => {
+    if (!selectedEmail?.email_drafts?.[0]) return
+    const draft = selectedEmail.email_drafts[0]
+    const text = isEditing ? editedResponse : (draft.edited_response || draft.ai_generated_response)
+
+    await navigator.clipboard.writeText(text)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }
+
+  // Save draft to HubSpot only (no actual send)
+  const handleSaveDraft = async () => {
+    if (!selectedEmail || !selectedEmail.email_drafts?.[0]) return
+
+    setIsSavingDraft(true)
+    try {
+      const draft = selectedEmail.email_drafts[0]
+      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftId: draft.id,
+          finalText: isEditing ? editedResponse : undefined,
+          ownerId: selectedOwnerId || undefined,
+          draftOnly: true, // Only save to HubSpot, don't send via Resend
+        }),
+      })
+
+      if (response.ok) {
+        setIsDetailOpen(false)
+        fetchEmails()
+      }
+    } catch (error) {
+      console.error('Save draft failed:', error)
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
   // Open email detail
   const openEmailDetail = (email: Email) => {
     setSelectedEmail(email)
     setIsDetailOpen(true)
     setIsEditing(false)
+    setIsCopied(false)
     setEditedResponse(email.email_drafts?.[0]?.ai_generated_response || '')
   }
 
@@ -457,11 +511,34 @@ export default function InboxPage() {
                       <Sparkles className="h-4 w-4 text-amber-500" />
                       <h4 className="font-medium">AI Antwortvorschlag</h4>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-500">Confidence:</span>
-                      <Badge className={getConfidenceColor(confidence)}>
-                        {Math.round(confidence * 100)}%
-                      </Badge>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-slate-500">Confidence:</span>
+                        <Badge className={getConfidenceColor(confidence)}>
+                          {Math.round(confidence * 100)}%
+                        </Badge>
+                      </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={handleCopy}
+                            >
+                              {isCopied ? (
+                                <Check className="h-4 w-4 text-green-600" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{isCopied ? 'Kopiert!' : 'In Zwischenablage kopieren'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
                   </div>
 
@@ -473,7 +550,7 @@ export default function InboxPage() {
                       className="font-mono text-sm"
                     />
                   ) : (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg relative">
                       <p className="text-sm whitespace-pre-wrap">
                         {currentDraft.edited_response || currentDraft.ai_generated_response}
                       </p>
@@ -529,7 +606,7 @@ export default function InboxPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
                 <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
                   Schliessen
                 </Button>
@@ -547,6 +624,33 @@ export default function InboxPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   {isEditing ? 'Vorschau' : 'Bearbeiten'}
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        onClick={handleSaveDraft}
+                        disabled={isSavingDraft}
+                      >
+                        {isSavingDraft ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Speichere...
+                          </>
+                        ) : (
+                          <>
+                            <FileUp className="h-4 w-4 mr-2" />
+                            In HubSpot
+                          </>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Als Entwurf in HubSpot speichern (ohne zu senden)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button onClick={handleSend} disabled={isSending}>
                   {isSending ? (
                     <>

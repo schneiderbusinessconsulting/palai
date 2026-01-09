@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { emailId } = await params
-    const { draftId, finalText, ownerId } = await request.json()
+    const { draftId, finalText, ownerId, draftOnly } = await request.json()
 
     const supabase = await createClient()
 
@@ -39,24 +39,36 @@ export async function POST(
       )
     }
 
-    // 2. Send via HubSpot
+    // 2. Send or save draft
     const hubspot = createHubSpotClient()
     const responseText = finalText || draft.edited_response || draft.ai_generated_response
 
-    const sentEmail = await hubspot.sendEmail({
-      to: email.from_email,
-      subject: `Re: ${email.subject}`,
-      body: responseText,
-      threadId: email.hubspot_thread_id,
-    })
+    let sentEmail: { id: string; actualSent: boolean }
 
-    // Check if email was actually sent
-    if (!sentEmail.actualSent) {
-      console.log('Email logged to HubSpot but not actually sent - RESEND_API_KEY not configured')
+    if (draftOnly) {
+      // Only save to HubSpot as draft (no Resend)
+      sentEmail = await hubspot.saveDraftToHubSpot({
+        to: email.from_email,
+        subject: `Re: ${email.subject}`,
+        body: responseText,
+      })
+    } else {
+      // Full send via Resend + HubSpot
+      sentEmail = await hubspot.sendEmail({
+        to: email.from_email,
+        subject: `Re: ${email.subject}`,
+        body: responseText,
+        threadId: email.hubspot_thread_id,
+      })
+
+      // Check if email was actually sent
+      if (!sentEmail.actualSent) {
+        console.log('Email logged to HubSpot but not actually sent - RESEND_API_KEY not configured')
+      }
     }
 
-    // 3. Assign owner to sent email if specified
-    if (ownerId) {
+    // 3. Assign owner to sent email if specified (skip for draft only)
+    if (ownerId && !draftOnly) {
       try {
         await hubspot.assignOwnerToEmail(sentEmail.id, ownerId)
         // Also mark original incoming email as replied in HubSpot
@@ -73,9 +85,9 @@ export async function POST(
     await supabase
       .from('email_drafts')
       .update({
-        status: finalText ? 'edited' : 'approved',
+        status: draftOnly ? 'saved_to_hubspot' : (finalText ? 'edited' : 'approved'),
         edited_response: finalText || null,
-        sent_at: new Date().toISOString(),
+        sent_at: draftOnly ? null : new Date().toISOString(),
         hubspot_sent_email_id: sentEmail.id,
       })
       .eq('id', draftId)
@@ -84,7 +96,7 @@ export async function POST(
     await supabase
       .from('incoming_emails')
       .update({
-        status: 'sent',
+        status: draftOnly ? 'draft_saved' : 'sent',
         assigned_owner_id: ownerId || null,
       })
       .eq('id', emailId)
@@ -93,21 +105,24 @@ export async function POST(
     await supabase.from('audit_log').insert({
       email_id: emailId,
       draft_id: draftId,
-      action: 'sent',
+      action: draftOnly ? 'saved_to_hubspot' : 'sent',
       details: {
         hubspot_sent_email_id: sentEmail.id,
         was_edited: !!finalText,
         assigned_owner_id: ownerId,
+        draft_only: draftOnly,
       },
     })
 
     return NextResponse.json({
       success: true,
       hubspotEmailId: sentEmail.id,
-      actualSent: sentEmail.actualSent,
-      message: sentEmail.actualSent
-        ? 'E-Mail erfolgreich gesendet'
-        : 'E-Mail in HubSpot gespeichert (RESEND_API_KEY nicht konfiguriert)',
+      actualSent: draftOnly ? false : sentEmail.actualSent,
+      message: draftOnly
+        ? 'Entwurf in HubSpot gespeichert'
+        : sentEmail.actualSent
+          ? 'E-Mail erfolgreich gesendet'
+          : 'E-Mail in HubSpot gespeichert (RESEND_API_KEY nicht konfiguriert)',
     })
   } catch (error) {
     console.error('Send email error:', error)

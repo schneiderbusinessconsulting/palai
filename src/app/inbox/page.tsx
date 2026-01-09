@@ -128,9 +128,8 @@ export default function InboxPage() {
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>('')
 
-  // Copy and Draft states
+  // Copy state
   const [isCopied, setIsCopied] = useState(false)
-  const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   // Fetch emails
   const fetchEmails = async () => {
@@ -169,6 +168,26 @@ export default function InboxPage() {
     fetchEmails()
     fetchOwners()
   }, [filter])
+
+  // Auto-sync every 30 seconds
+  useEffect(() => {
+    const autoSync = async () => {
+      try {
+        await fetch('/api/emails', { method: 'POST' })
+        fetchEmails()
+      } catch (e) {
+        console.error('Auto-sync failed:', e)
+      }
+    }
+
+    // Initial sync
+    autoSync()
+
+    // Set up interval
+    const interval = setInterval(autoSync, 30000) // 30 seconds
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Sync from HubSpot
   const handleSync = async () => {
@@ -218,34 +237,6 @@ export default function InboxPage() {
     }
   }
 
-  // Send email
-  const handleSend = async () => {
-    if (!selectedEmail || !selectedEmail.email_drafts?.[0]) return
-
-    setIsSending(true)
-    try {
-      const draft = selectedEmail.email_drafts[0]
-      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draftId: draft.id,
-          finalText: isEditing ? editedResponse : undefined,
-          ownerId: selectedOwnerId || undefined,
-        }),
-      })
-
-      if (response.ok) {
-        setIsDetailOpen(false)
-        fetchEmails()
-      }
-    } catch (error) {
-      console.error('Send failed:', error)
-    } finally {
-      setIsSending(false)
-    }
-  }
-
   // Copy to clipboard
   const handleCopy = async () => {
     if (!selectedEmail?.email_drafts?.[0]) return
@@ -257,22 +248,14 @@ export default function InboxPage() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
-  // Save draft to HubSpot only (no actual send)
-  const handleSaveDraft = async () => {
-    if (!selectedEmail || !selectedEmail.email_drafts?.[0]) return
+  // Mark as sent (just update status, no actual sending)
+  const handleMarkAsSent = async () => {
+    if (!selectedEmail) return
 
-    setIsSavingDraft(true)
+    setIsSending(true)
     try {
-      const draft = selectedEmail.email_drafts[0]
-      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
+      const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draftId: draft.id,
-          finalText: isEditing ? editedResponse : undefined,
-          ownerId: selectedOwnerId || undefined,
-          draftOnly: true, // Only save to HubSpot, don't send via Resend
-        }),
       })
 
       if (response.ok) {
@@ -280,9 +263,9 @@ export default function InboxPage() {
         fetchEmails()
       }
     } catch (error) {
-      console.error('Save draft failed:', error)
+      console.error('Mark as sent failed:', error)
     } finally {
-      setIsSavingDraft(false)
+      setIsSending(false)
     }
   }
 
@@ -624,43 +607,20 @@ export default function InboxPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   {isEditing ? 'Vorschau' : 'Bearbeiten'}
                 </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                        onClick={handleSaveDraft}
-                        disabled={isSavingDraft}
-                      >
-                        {isSavingDraft ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Speichere...
-                          </>
-                        ) : (
-                          <>
-                            <FileUp className="h-4 w-4 mr-2" />
-                            In HubSpot
-                          </>
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Als Entwurf in HubSpot speichern (ohne zu senden)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button onClick={handleSend} disabled={isSending}>
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={handleMarkAsSent}
+                  disabled={isSending}
+                >
                   {isSending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sende...
+                      Markiere...
                     </>
                   ) : (
                     <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Senden
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Als gesendet markieren
                     </>
                   )}
                 </Button>

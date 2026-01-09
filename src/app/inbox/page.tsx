@@ -39,6 +39,8 @@ import {
   Copy,
   Check,
   FileUp,
+  RotateCcw,
+  MessageSquare,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -53,6 +55,7 @@ interface EmailDraft {
   edited_response?: string
   confidence_score: number
   status: string
+  formality?: 'sie' | 'du'
 }
 
 interface Email {
@@ -130,6 +133,12 @@ export default function InboxPage() {
 
   // Copy state
   const [isCopied, setIsCopied] = useState(false)
+
+  // Formality and regeneration state
+  const [formality, setFormality] = useState<'sie' | 'du'>('sie')
+  const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
+  const [regenerateFeedback, setRegenerateFeedback] = useState('')
+  const [isRegenerating, setIsRegenerating] = useState(false)
 
   // Fetch emails
   const fetchEmails = async () => {
@@ -212,11 +221,21 @@ export default function InboxPage() {
   }
 
   // Generate AI draft
-  const handleGenerateDraft = async (emailId: string) => {
-    setIsGenerating(true)
+  const handleGenerateDraft = async (emailId: string, regenerate = false) => {
+    if (regenerate) {
+      setIsRegenerating(true)
+    } else {
+      setIsGenerating(true)
+    }
     try {
       const response = await fetch(`/api/emails/${emailId}/generate-draft`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          formality,
+          feedback: regenerate ? regenerateFeedback : undefined,
+          regenerate,
+        }),
       })
       if (response.ok) {
         const data = await response.json()
@@ -227,13 +246,21 @@ export default function InboxPage() {
             status: 'draft_ready',
             email_drafts: [data.draft],
           })
+          // Update formality from detected
+          if (data.detectedFormality) {
+            setFormality(data.detectedFormality)
+          }
         }
         fetchEmails()
+        // Close regenerate dialog
+        setShowRegenerateDialog(false)
+        setRegenerateFeedback('')
       }
     } catch (error) {
       console.error('Generate draft failed:', error)
     } finally {
       setIsGenerating(false)
+      setIsRegenerating(false)
     }
   }
 
@@ -276,6 +303,14 @@ export default function InboxPage() {
     setIsEditing(false)
     setIsCopied(false)
     setEditedResponse(email.email_drafts?.[0]?.ai_generated_response || '')
+    // Set formality from draft if available
+    if (email.email_drafts?.[0]?.formality) {
+      setFormality(email.email_drafts[0].formality)
+    } else {
+      setFormality('sie') // Default to formal
+    }
+    setRegenerateFeedback('')
+    setShowRegenerateDialog(false)
   }
 
   const filteredEmails = emails.filter((email) => {
@@ -489,18 +524,58 @@ export default function InboxPage() {
               {/* AI Draft */}
               {currentDraft ? (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-amber-500" />
                       <h4 className="font-medium">AI Antwortvorschlag</h4>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {/* Formality Toggle */}
+                      <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md">
+                        <button
+                          onClick={() => setFormality('sie')}
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            formality === 'sie'
+                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
+                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                          }`}
+                        >
+                          Sie
+                        </button>
+                        <button
+                          onClick={() => setFormality('du')}
+                          className={`px-2 py-1 text-xs rounded transition-colors ${
+                            formality === 'du'
+                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
+                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                          }`}
+                        >
+                          Du
+                        </button>
+                      </div>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-slate-500">Confidence:</span>
                         <Badge className={getConfidenceColor(confidence)}>
                           {Math.round(confidence * 100)}%
                         </Badge>
                       </div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setShowRegenerateDialog(true)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Neu generieren mit Feedback</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -524,6 +599,59 @@ export default function InboxPage() {
                       </TooltipProvider>
                     </div>
                   </div>
+
+                  {/* Regenerate Dialog */}
+                  {showRegenerateDialog && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <div className="flex items-start gap-2 mb-3">
+                        <MessageSquare className="h-4 w-4 text-amber-600 mt-0.5" />
+                        <div>
+                          <h5 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                            Was soll verbessert werden?
+                          </h5>
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            Beschreibe, was an der Antwort geändert werden soll
+                          </p>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={regenerateFeedback}
+                        onChange={(e) => setRegenerateFeedback(e.target.value)}
+                        placeholder="z.B. 'Freundlicher formulieren', 'Mehr Details zu Preisen', 'Kürzer fassen'..."
+                        rows={2}
+                        className="text-sm mb-3"
+                      />
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setShowRegenerateDialog(false)
+                            setRegenerateFeedback('')
+                          }}
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleGenerateDraft(selectedEmail!.id, true)}
+                          disabled={isRegenerating}
+                        >
+                          {isRegenerating ? (
+                            <>
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Generiere...
+                            </>
+                          ) : (
+                            <>
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Neu generieren
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
 
                   {isEditing ? (
                     <Textarea

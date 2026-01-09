@@ -41,7 +41,7 @@ async function generateDraftForEmail(
     const chunkIds = chunks?.map((c: { id: string }) => c.id) || []
 
     // Generate draft using AI
-    const { response, confidence } = await generateEmailDraft(
+    const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
       fromName || undefined
@@ -55,6 +55,7 @@ async function generateDraftForEmail(
         ai_generated_response: response,
         confidence_score: confidence,
         relevant_chunks: chunkIds,
+        formality: detectedFormality,
         status: 'pending',
       })
 

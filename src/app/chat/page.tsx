@@ -54,18 +54,39 @@ export default function ChatPage() {
     setInput('')
     setIsLoading(true)
 
-    // Simulate AI response (will be replaced with actual API call)
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage.content }),
+      })
+
+      if (!response.ok) throw new Error('API error')
+
+      const data = await response.json()
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.response,
+        sources: data.sources?.map((s: { title: string }) => s.title) || [],
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (error) {
+      console.error('Chat error:', error)
+      // Fallback to simulated response if API fails
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: getSimulatedResponse(userMessage.content),
-        sources: ['Hypnose-Ausbildung Übersicht', 'Preisliste 2026'],
+        sources: [],
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, assistantMessage])
+    } finally {
       setIsLoading(false)
-    }, 1500)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

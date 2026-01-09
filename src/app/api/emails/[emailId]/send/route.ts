@@ -8,7 +8,7 @@ export async function POST(
 ) {
   try {
     const { emailId } = await params
-    const { draftId, finalText } = await request.json()
+    const { draftId, finalText, ownerId } = await request.json()
 
     const supabase = await createClient()
 
@@ -50,7 +50,21 @@ export async function POST(
       threadId: email.hubspot_thread_id,
     })
 
-    // 3. Update draft status
+    // 3. Assign owner to sent email if specified
+    if (ownerId) {
+      try {
+        await hubspot.assignOwnerToEmail(sentEmail.id, ownerId)
+        // Also mark original incoming email as replied in HubSpot
+        if (email.hubspot_email_id) {
+          await hubspot.updateEmailStatus(email.hubspot_email_id, 'REPLIED')
+          await hubspot.assignOwnerToEmail(email.hubspot_email_id, ownerId)
+        }
+      } catch (e) {
+        console.error('Failed to assign owner:', e)
+      }
+    }
+
+    // 4. Update draft status
     await supabase
       .from('email_drafts')
       .update({
@@ -61,13 +75,16 @@ export async function POST(
       })
       .eq('id', draftId)
 
-    // 4. Update email status
+    // 5. Update email status
     await supabase
       .from('incoming_emails')
-      .update({ status: 'sent' })
+      .update({
+        status: 'sent',
+        assigned_owner_id: ownerId || null,
+      })
       .eq('id', emailId)
 
-    // 5. Log to audit
+    // 6. Log to audit
     await supabase.from('audit_log').insert({
       email_id: emailId,
       draft_id: draftId,
@@ -75,6 +92,7 @@ export async function POST(
       details: {
         hubspot_sent_email_id: sentEmail.id,
         was_edited: !!finalText,
+        assigned_owner_id: ownerId,
       },
     })
 

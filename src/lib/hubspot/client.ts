@@ -23,6 +23,13 @@ interface HubSpotContact {
   }
 }
 
+interface HubSpotOwner {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+}
+
 class HubSpotClient {
   private accessToken: string
 
@@ -156,10 +163,53 @@ class HubSpotClient {
       return []
     }
   }
+
+  // Get all HubSpot owners (team members)
+  async getOwners(): Promise<HubSpotOwner[]> {
+    try {
+      const response = await this.request<{ results: HubSpotOwner[] }>(
+        '/crm/v3/owners?limit=100'
+      )
+      return response.results
+    } catch (e) {
+      console.error('Failed to get owners:', e)
+      return []
+    }
+  }
+
+  // Assign owner to an email
+  async assignOwnerToEmail(emailId: string, ownerId: string): Promise<void> {
+    await this.request(
+      `/crm/v3/objects/emails/${emailId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            hubspot_owner_id: ownerId,
+          },
+        }),
+      }
+    )
+  }
+
+  // Update email engagement (e.g., mark as completed/replied)
+  async updateEmailStatus(emailId: string, status: 'SENT' | 'REPLIED'): Promise<void> {
+    await this.request(
+      `/crm/v3/objects/emails/${emailId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          properties: {
+            hs_email_status: status,
+          },
+        }),
+      }
+    )
+  }
 }
 
 export function createHubSpotClient(): HubSpotClient {
   return new HubSpotClient()
 }
 
-export type { HubSpotEmail, HubSpotContact }
+export type { HubSpotEmail, HubSpotContact, HubSpotOwner }

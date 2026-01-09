@@ -53,41 +53,50 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Manual sync from HubSpot
+// Manual sync from HubSpot - fetches ALL incoming emails
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // Only fetch emails from the last 7 days
-    const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000)
+    let allEmails: any[] = []
+    let after: string | undefined = undefined
 
-    // Fetch recent emails from HubSpot
-    const hubspotResponse = await fetch(
-      `https://api.hubapi.com/crm/v3/objects/emails?limit=100&properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction&filterGroups=[{"filters":[{"propertyName":"hs_email_direction","operator":"EQ","value":"INCOMING_EMAIL"}]}]`,
-      {
+    // Paginate through ALL incoming emails from HubSpot
+    do {
+      const url = new URL('https://api.hubapi.com/crm/v3/objects/emails')
+      url.searchParams.set('limit', '100')
+      url.searchParams.set('properties', 'hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction')
+      if (after) {
+        url.searchParams.set('after', after)
+      }
+
+      const hubspotResponse = await fetch(url.toString(), {
         headers: {
           Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
         },
+      })
+
+      if (!hubspotResponse.ok) {
+        const error = await hubspotResponse.text()
+        console.error('HubSpot API error:', error)
+        break
       }
-    )
 
-    if (!hubspotResponse.ok) {
-      const error = await hubspotResponse.text()
-      console.error('HubSpot API error:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch from HubSpot' },
-        { status: 500 }
+      const hubspotData = await hubspotResponse.json()
+      const emails = (hubspotData.results || []).filter(
+        (e: any) => e.properties.hs_email_direction === 'INCOMING_EMAIL'
       )
-    }
+      allEmails = allEmails.concat(emails)
 
-    const hubspotData = await hubspotResponse.json()
-    const emails = hubspotData.results || []
+      // Get next page cursor
+      after = hubspotData.paging?.next?.after
+    } while (after && allEmails.length < 500) // Safety limit
 
     let imported = 0
     let skipped = 0
 
-    for (const email of emails) {
+    for (const email of allEmails) {
       const props = email.properties
 
       // Parse timestamp - try multiple formats
@@ -95,19 +104,17 @@ export async function POST(request: NextRequest) {
       const timestamp = props.hs_timestamp || props.hs_createdate || email.createdAt
 
       if (timestamp) {
-        // If it's a number string (milliseconds)
         if (/^\d+$/.test(String(timestamp))) {
           receivedAt = new Date(parseInt(String(timestamp)))
         } else {
-          // If it's already an ISO string
           receivedAt = new Date(timestamp)
         }
       } else {
         receivedAt = new Date()
       }
 
-      // Skip if invalid date or older than 7 days
-      if (isNaN(receivedAt.getTime()) || receivedAt.getTime() < sevenDaysAgo) {
+      // Skip if invalid date
+      if (isNaN(receivedAt.getTime())) {
         skipped++
         continue
       }
@@ -152,7 +159,7 @@ export async function POST(request: NextRequest) {
       success: true,
       imported,
       skipped,
-      total: emails.length,
+      total: allEmails.length,
     })
   } catch (error) {
     console.error('Sync error:', error)

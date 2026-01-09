@@ -34,11 +34,59 @@ export async function generateChatResponse(
   return response.choices[0].message.content || ''
 }
 
+// Detect formality (Sie/Du) from email content
+export function detectFormality(text: string): 'sie' | 'du' {
+  const lowerText = text.toLowerCase()
+
+  // Patterns for formal "Sie"
+  const siePatterns = [
+    /\bsie\b/gi,
+    /\bihnen\b/gi,
+    /\bihrer?\b/gi,
+    /\bihre[nms]?\b/gi,
+  ]
+
+  // Patterns for informal "Du"
+  const duPatterns = [
+    /\bdu\b/gi,
+    /\bdir\b/gi,
+    /\bdein(?:e[nrms]?)?\b/gi,
+    /\bdich\b/gi,
+  ]
+
+  let sieCount = 0
+  let duCount = 0
+
+  for (const pattern of siePatterns) {
+    const matches = lowerText.match(pattern)
+    if (matches) sieCount += matches.length
+  }
+
+  for (const pattern of duPatterns) {
+    const matches = lowerText.match(pattern)
+    if (matches) duCount += matches.length
+  }
+
+  // Default to "Sie" if unclear (more professional)
+  return duCount > sieCount ? 'du' : 'sie'
+}
+
+export type Formality = 'sie' | 'du'
+
 export async function generateEmailDraft(
   emailContent: string,
   relevantContext: string[],
-  senderName?: string
-): Promise<{ response: string; confidence: number }> {
+  senderName?: string,
+  formality?: Formality,
+  regenerationFeedback?: string
+): Promise<{ response: string; confidence: number; detectedFormality: Formality }> {
+  // Auto-detect formality if not provided
+  const detectedFormality = formality || detectFormality(emailContent)
+
+  const formalityInstruction = detectedFormality === 'du'
+    ? `- Verwende die informelle "Du"-Form (du, dir, dein)`
+    : `- Verwende die formelle "Sie"-Form (Sie, Ihnen, Ihr)`
+
   const systemPrompt = `Du bist ein freundlicher Support-Mitarbeiter des Palacios Instituts.
 
 Das Palacios Institut bietet Ausbildungen in den Bereichen Hypnose, Meditation und Life Coaching an. Gründer ist Gabriel Palacios.
@@ -49,6 +97,7 @@ Deine Aufgabe:
 - Wenn du etwas nicht weisst, sage es ehrlich
 - Schreibe im Schweizer Deutsch Stil (z.B. "Grüezi", "Herzliche Grüsse")
 - Halte Antworten präzise aber herzlich
+${formalityInstruction}
 
 Formatierung:
 - Beginne mit einer persönlichen Anrede
@@ -59,11 +108,15 @@ Wichtig:
 - Erfinde KEINE Preise, Daten oder Fakten
 - Wenn die Knowledge Base keine Antwort liefert, bitte den Kunden höflich um Geduld und sage, dass sich jemand persönlich melden wird`
 
+  const feedbackSection = regenerationFeedback
+    ? `\n\nFEEDBACK ZUR VERBESSERUNG:\n${regenerationFeedback}\n\nBitte berücksichtige dieses Feedback bei der Erstellung der Antwort.`
+    : ''
+
   const userPrompt = `KUNDENANFRAGE:
 ${emailContent}
 
 RELEVANTE INFORMATIONEN AUS UNSERER KNOWLEDGE BASE:
-${relevantContext.length > 0 ? relevantContext.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n') : 'Keine spezifischen Informationen gefunden.'}
+${relevantContext.length > 0 ? relevantContext.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n') : 'Keine spezifischen Informationen gefunden.'}${feedbackSection}
 
 Bitte erstelle eine passende Antwort auf diese Anfrage.`
 
@@ -92,6 +145,7 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
   return {
     response: generatedResponse,
     confidence,
+    detectedFormality,
   }
 }
 

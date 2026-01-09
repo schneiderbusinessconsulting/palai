@@ -71,6 +71,8 @@ create table if not exists email_drafts (
   edited_response text, -- Falls bearbeitet
   confidence_score float, -- 0.0 - 1.0
   relevant_chunks jsonb, -- IDs der genutzten Knowledge Chunks
+  formality text default 'sie', -- 'sie' oder 'du' - erkannte Anredeform
+  regeneration_count int default 0, -- Wie oft wurde der Draft neu generiert
   status text default 'pending', -- 'pending', 'approved', 'edited', 'rejected'
   reviewed_by uuid references auth.users(id),
   reviewed_at timestamp with time zone,
@@ -79,6 +81,19 @@ create table if not exists email_drafts (
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+-- Feedback für Draft-Regenerierung (zum Lernen)
+create table if not exists draft_feedback (
+  id uuid primary key default gen_random_uuid(),
+  email_id uuid references incoming_emails(id) on delete cascade,
+  feedback_text text not null, -- Was soll verbessert werden
+  formality_preference text, -- Gewünschte Anredeform
+  created_at timestamp with time zone default now()
+);
+
+-- Index für Draft Feedback
+create index if not exists draft_feedback_email_id_idx
+  on draft_feedback (email_id);
 
 -- Index für Email-Draft Beziehung
 create index if not exists email_drafts_email_id_idx
@@ -274,6 +289,7 @@ create trigger update_chat_conversations_updated_at
 alter table knowledge_chunks enable row level security;
 alter table incoming_emails enable row level security;
 alter table email_drafts enable row level security;
+alter table draft_feedback enable row level security;
 alter table chat_conversations enable row level security;
 alter table chat_messages enable row level security;
 alter table email_templates enable row level security;
@@ -309,6 +325,17 @@ create policy "Drafts are editable by authenticated users"
   on email_drafts for all
   to authenticated
   using (true);
+
+-- Draft Feedback: Alle können lesen/erstellen
+create policy "Draft feedback is viewable by authenticated users"
+  on draft_feedback for select
+  to authenticated
+  using (true);
+
+create policy "Draft feedback is creatable by authenticated users"
+  on draft_feedback for insert
+  to authenticated
+  with check (true);
 
 -- Chat: Nur eigene Konversationen
 create policy "Users can view own conversations"

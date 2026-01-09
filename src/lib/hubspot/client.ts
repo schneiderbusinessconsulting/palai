@@ -207,6 +207,53 @@ class HubSpotClient {
     return { id: emailId, actualSent }
   }
 
+  // Save draft to HubSpot only (no actual sending)
+  async saveDraftToHubSpot(params: {
+    to: string
+    subject: string
+    body: string
+  }): Promise<{ id: string; actualSent: boolean }> {
+    // Find contact by email
+    const contact = await this.getContactByEmail(params.to)
+    const contactId = contact?.id
+
+    // Create email engagement as DRAFT
+    const engagementData = {
+      engagement: {
+        active: true,
+        type: 'EMAIL',
+        timestamp: Date.now(),
+      },
+      metadata: {
+        from: { email: process.env.RESEND_FROM_EMAIL || 'info@palacios-relations.ch' },
+        to: [{ email: params.to }],
+        subject: params.subject,
+        text: params.body,
+        status: 'DRAFT',
+      },
+      associations: {
+        contactIds: contactId ? [parseInt(contactId)] : [],
+        companyIds: [],
+        dealIds: [],
+        ownerIds: [],
+        ticketIds: [],
+      },
+    }
+
+    const response = await this.request<{ engagement: { id: number } }>(
+      '/engagements/v1/engagements',
+      {
+        method: 'POST',
+        body: JSON.stringify(engagementData),
+      }
+    )
+
+    return {
+      id: String(response.engagement.id),
+      actualSent: false,
+    }
+  }
+
   // Get knowledge base articles (if available)
   async getKnowledgeArticles(): Promise<unknown[]> {
     try {

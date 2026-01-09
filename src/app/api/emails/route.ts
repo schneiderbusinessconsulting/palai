@@ -1,5 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createEmbedding, generateEmailDraft } from '@/lib/ai/openai'
+
+// Helper function to generate draft for an email (runs in background)
+async function generateDraftForEmail(
+  emailId: string,
+  subject: string,
+  bodyText: string,
+  fromName?: string | null
+) {
+  try {
+    const supabase = await createClient()
+
+    // Check if draft already exists
+    const { data: existingDraft } = await supabase
+      .from('email_drafts')
+      .select('id')
+      .eq('email_id', emailId)
+      .single()
+
+    if (existingDraft) {
+      return // Already has a draft
+    }
+
+    // Create embedding for the email content
+    const emailContent = `${subject}\n\n${bodyText}`
+    const embedding = await createEmbedding(emailContent)
+
+    // Search for relevant knowledge chunks
+    const { data: chunks } = await supabase.rpc(
+      'match_knowledge_chunks',
+      {
+        query_embedding: embedding,
+        match_threshold: 0.65,
+        match_count: 5,
+      }
+    )
+
+    const relevantChunks = chunks?.map((c: { content: string }) => c.content) || []
+    const chunkIds = chunks?.map((c: { id: string }) => c.id) || []
+
+    // Generate draft using AI
+    const { response, confidence, detectedFormality } = await generateEmailDraft(
+      emailContent,
+      relevantChunks,
+      fromName || undefined
+    )
+
+    // Store the draft
+    await supabase
+      .from('email_drafts')
+      .insert({
+        email_id: emailId,
+        ai_generated_response: response,
+        confidence_score: confidence,
+        relevant_chunks: chunkIds,
+        formality: detectedFormality,
+        status: 'pending',
+      })
+
+    // Update email status
+    await supabase
+      .from('incoming_emails')
+      .update({ status: 'draft_ready' })
+      .eq('id', emailId)
+
+    console.log(`Auto-generated draft for email ${emailId}`)
+  } catch (error) {
+    console.error(`Failed to auto-generate draft for email ${emailId}:`, error)
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -152,27 +222,38 @@ export async function POST(request: NextRequest) {
         receivedAt = new Date()
       }
 
-      // Insert email
-      const { error: insertError } = await supabase
+      // Insert email and get the new ID
+      const fromName = [props.hs_email_from_firstname, props.hs_email_from_lastname]
+        .filter(Boolean)
+        .join(' ') || null
+      const subject = props.hs_email_subject || 'Kein Betreff'
+      const bodyText = props.hs_email_text || ''
+
+      const { data: newEmail, error: insertError } = await supabase
         .from('incoming_emails')
         .insert({
           hubspot_email_id: String(email.id),
           hubspot_thread_id: props.hs_email_thread_id || null,
           from_email: props.hs_email_from_email || 'unknown@example.com',
-          from_name: [props.hs_email_from_firstname, props.hs_email_from_lastname]
-            .filter(Boolean)
-            .join(' ') || null,
-          subject: props.hs_email_subject || 'Kein Betreff',
-          body_text: props.hs_email_text || '',
+          from_name: fromName,
+          subject: subject,
+          body_text: bodyText,
           body_html: props.hs_email_html || null,
           received_at: receivedAt.toISOString(),
           status: 'pending',
         })
+        .select('id')
+        .single()
 
       if (insertError) {
         console.error('Failed to insert email:', insertError)
       } else {
         imported++
+        // Trigger auto-draft generation in background (don't await)
+        if (newEmail?.id) {
+          generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
+            .catch(err => console.error('Background draft generation failed:', err))
+        }
       }
     }
 

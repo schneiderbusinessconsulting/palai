@@ -55,6 +55,12 @@ interface Email {
   email_drafts?: EmailDraft[]
 }
 
+interface HubSpotOwner {
+  id: string
+  email: string
+  name: string
+}
+
 function getConfidenceColor(confidence: number) {
   if (confidence >= 0.85) return 'bg-green-500'
   if (confidence >= 0.7) return 'bg-amber-500'
@@ -105,6 +111,10 @@ export default function InboxPage() {
   const [editedResponse, setEditedResponse] = useState('')
   const [isEditing, setIsEditing] = useState(false)
 
+  // Owner selection
+  const [owners, setOwners] = useState<HubSpotOwner[]>([])
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string>('')
+
   // Fetch emails
   const fetchEmails = async () => {
     setIsLoading(true)
@@ -121,8 +131,26 @@ export default function InboxPage() {
     }
   }
 
+  // Fetch owners on mount
+  const fetchOwners = async () => {
+    try {
+      const response = await fetch('/api/hubspot/owners')
+      if (response.ok) {
+        const data = await response.json()
+        setOwners(data.owners || [])
+        // Auto-select first owner if available
+        if (data.owners?.length > 0 && !selectedOwnerId) {
+          setSelectedOwnerId(data.owners[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch owners:', error)
+    }
+  }
+
   useEffect(() => {
     fetchEmails()
+    fetchOwners()
   }, [filter])
 
   // Sync from HubSpot
@@ -186,6 +214,7 @@ export default function InboxPage() {
         body: JSON.stringify({
           draftId: draft.id,
           finalText: isEditing ? editedResponse : undefined,
+          ownerId: selectedOwnerId || undefined,
         }),
       })
 
@@ -463,37 +492,58 @@ export default function InboxPage() {
           )}
 
           {currentDraft && (
-            <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
-                Schliessen
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditing(!isEditing)
-                  if (!isEditing) {
-                    setEditedResponse(
-                      currentDraft.edited_response || currentDraft.ai_generated_response
-                    )
-                  }
-                }}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                {isEditing ? 'Vorschau' : 'Bearbeiten'}
-              </Button>
-              <Button onClick={handleSend} disabled={isSending}>
-                {isSending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Sende...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Senden
-                  </>
-                )}
-              </Button>
+            <DialogFooter className="flex-col sm:flex-row gap-3">
+              {/* Owner Selection */}
+              {owners.length > 0 && (
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="text-sm text-slate-500 whitespace-nowrap">Senden als:</span>
+                  <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Owner wählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {owners.map((owner) => (
+                        <SelectItem key={owner.id} value={owner.id}>
+                          {owner.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="flex gap-2 w-full sm:w-auto justify-end">
+                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+                  Schliessen
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(!isEditing)
+                    if (!isEditing) {
+                      setEditedResponse(
+                        currentDraft.edited_response || currentDraft.ai_generated_response
+                      )
+                    }
+                  }}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  {isEditing ? 'Vorschau' : 'Bearbeiten'}
+                </Button>
+                <Button onClick={handleSend} disabled={isSending}>
+                  {isSending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Sende...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4 mr-2" />
+                      Senden
+                    </>
+                  )}
+                </Button>
+              </div>
             </DialogFooter>
           )}
         </DialogContent>

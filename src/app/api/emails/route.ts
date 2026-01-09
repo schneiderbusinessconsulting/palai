@@ -53,71 +53,42 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Manual sync from HubSpot - fetches recent incoming emails (last 30 days)
+// Manual sync from HubSpot Conversations Inbox (OPEN conversations only)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // Only fetch emails from the last 30 days
-    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
-
-    let allEmails: any[] = []
-    let after: string | undefined = undefined
-
-    // Paginate through incoming emails from HubSpot
-    do {
-      const url = new URL('https://api.hubapi.com/crm/v3/objects/emails')
-      url.searchParams.set('limit', '100')
-      url.searchParams.set('properties', 'hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction')
-      if (after) {
-        url.searchParams.set('after', after)
-      }
-
-      const hubspotResponse = await fetch(url.toString(), {
+    // Fetch OPEN conversations from HubSpot Inbox
+    const inboxResponse = await fetch(
+      'https://api.hubapi.com/conversations/v3/conversations?limit=100',
+      {
         headers: {
           Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
           'Content-Type': 'application/json',
         },
-      })
-
-      if (!hubspotResponse.ok) {
-        const error = await hubspotResponse.text()
-        console.error('HubSpot API error:', error)
-        break
       }
+    )
 
-      const hubspotData = await hubspotResponse.json()
-      const emails = (hubspotData.results || []).filter(
-        (e: any) => e.properties.hs_email_direction === 'INCOMING_EMAIL'
+    if (!inboxResponse.ok) {
+      const error = await inboxResponse.text()
+      console.error('HubSpot Conversations API error:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch from HubSpot Inbox', details: error },
+        { status: 500 }
       )
-      allEmails = allEmails.concat(emails)
+    }
 
-      // Get next page cursor
-      after = hubspotData.paging?.next?.after
-    } while (after && allEmails.length < 200) // Reduced limit
+    const inboxData = await inboxResponse.json()
+    const conversations = inboxData.results || []
+
+    console.log(`Found ${conversations.length} conversations in HubSpot Inbox`)
 
     let imported = 0
     let skipped = 0
 
-    for (const email of allEmails) {
-      const props = email.properties
-
-      // Parse timestamp - try multiple formats
-      let receivedAt: Date
-      const timestamp = props.hs_timestamp || props.hs_createdate || email.createdAt
-
-      if (timestamp) {
-        if (/^\d+$/.test(String(timestamp))) {
-          receivedAt = new Date(parseInt(String(timestamp)))
-        } else {
-          receivedAt = new Date(timestamp)
-        }
-      } else {
-        receivedAt = new Date()
-      }
-
-      // Skip if invalid date or older than 30 days
-      if (isNaN(receivedAt.getTime()) || receivedAt.getTime() < thirtyDaysAgo) {
+    for (const convo of conversations) {
+      // Skip closed conversations
+      if (convo.status === 'CLOSED') {
         skipped++
         continue
       }
@@ -126,7 +97,7 @@ export async function POST(request: NextRequest) {
       const { data: existing } = await supabase
         .from('incoming_emails')
         .select('id')
-        .eq('hubspot_email_id', email.id)
+        .eq('hubspot_thread_id', String(convo.id))
         .single()
 
       if (existing) {
@@ -134,25 +105,62 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Insert new email
+      // Get the latest message from this conversation
+      const messagesResponse = await fetch(
+        `https://api.hubapi.com/conversations/v3/conversations/${convo.id}/messages?limit=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
+          },
+        }
+      )
+
+      let subject = convo.subject || 'Kein Betreff'
+      let bodyText = ''
+      let fromEmail = 'unknown@example.com'
+      let fromName = ''
+      let receivedAt = new Date()
+
+      if (messagesResponse.ok) {
+        const messagesData = await messagesResponse.json()
+        const latestMessage = messagesData.results?.[0]
+
+        if (latestMessage) {
+          bodyText = latestMessage.text || latestMessage.richText || ''
+          fromEmail = latestMessage.senders?.[0]?.email || latestMessage.from?.email || fromEmail
+          fromName = latestMessage.senders?.[0]?.name || latestMessage.from?.name || ''
+
+          if (latestMessage.createdAt) {
+            receivedAt = new Date(latestMessage.createdAt)
+          }
+        }
+      }
+
+      // Use conversation data as fallback
+      if (!bodyText && convo.preview) {
+        bodyText = convo.preview
+      }
+
+      if (convo.latestMessageTimestamp) {
+        receivedAt = new Date(convo.latestMessageTimestamp)
+      }
+
+      // Insert conversation as email
       const { error: insertError } = await supabase
         .from('incoming_emails')
         .insert({
-          hubspot_email_id: email.id,
-          hubspot_thread_id: props.hs_email_thread_id,
-          from_email: props.hs_email_from_email || 'unknown@example.com',
-          from_name: [props.hs_email_from_firstname, props.hs_email_from_lastname]
-            .filter(Boolean)
-            .join(' ') || null,
-          subject: props.hs_email_subject || 'Kein Betreff',
-          body_text: props.hs_email_text || '',
-          body_html: props.hs_email_html,
+          hubspot_email_id: String(convo.id),
+          hubspot_thread_id: String(convo.id),
+          from_email: fromEmail,
+          from_name: fromName || null,
+          subject: subject,
+          body_text: bodyText,
           received_at: receivedAt.toISOString(),
           status: 'pending',
         })
 
       if (insertError) {
-        console.error('Failed to insert email:', insertError)
+        console.error('Failed to insert conversation:', insertError)
       } else {
         imported++
       }
@@ -162,7 +170,7 @@ export async function POST(request: NextRequest) {
       success: true,
       imported,
       skipped,
-      total: allEmails.length,
+      total: conversations.length,
     })
   } catch (error) {
     console.error('Sync error:', error)

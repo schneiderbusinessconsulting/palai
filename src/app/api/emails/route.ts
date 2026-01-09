@@ -53,15 +53,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Manual sync from HubSpot - fetches ALL incoming emails
+// Manual sync from HubSpot - fetches recent incoming emails (last 30 days)
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
+    // Only fetch emails from the last 30 days
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
+
     let allEmails: any[] = []
     let after: string | undefined = undefined
 
-    // Paginate through ALL incoming emails from HubSpot
+    // Paginate through incoming emails from HubSpot
     do {
       const url = new URL('https://api.hubapi.com/crm/v3/objects/emails')
       url.searchParams.set('limit', '100')
@@ -91,7 +94,7 @@ export async function POST(request: NextRequest) {
 
       // Get next page cursor
       after = hubspotData.paging?.next?.after
-    } while (after && allEmails.length < 500) // Safety limit
+    } while (after && allEmails.length < 200) // Reduced limit
 
     let imported = 0
     let skipped = 0
@@ -113,8 +116,8 @@ export async function POST(request: NextRequest) {
         receivedAt = new Date()
       }
 
-      // Skip if invalid date
-      if (isNaN(receivedAt.getTime())) {
+      // Skip if invalid date or older than 30 days
+      if (isNaN(receivedAt.getTime()) || receivedAt.getTime() < thirtyDaysAgo) {
         skipped++
         continue
       }

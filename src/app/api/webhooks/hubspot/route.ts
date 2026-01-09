@@ -57,13 +57,16 @@ export async function POST(request: NextRequest) {
     for (const event of events) {
       console.log('Processing HubSpot event:', event.subscriptionType, event.objectId)
 
-      // Handle email events
-      if (event.subscriptionType === 'email.received' ||
-          event.subscriptionType === 'conversation.newMessage') {
+      // Handle conversation/email events (multiple possible event types)
+      const isConversationEvent =
+        event.subscriptionType.includes('conversation') ||
+        event.subscriptionType.includes('email') ||
+        event.subscriptionType.includes('message')
 
-        // Fetch email details from HubSpot
+      if (isConversationEvent) {
+        // Fetch email/conversation details from HubSpot
         const emailResponse = await fetch(
-          `https://api.hubapi.com/crm/v3/objects/emails/${event.objectId}?properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_email_thread_id`,
+          `https://api.hubapi.com/crm/v3/objects/emails/${event.objectId}?properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction`,
           {
             headers: {
               Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
@@ -79,6 +82,12 @@ export async function POST(request: NextRequest) {
         const emailData = await emailResponse.json()
         const props = emailData.properties
 
+        // Only process incoming emails
+        if (props.hs_email_direction !== 'INCOMING_EMAIL') {
+          console.log('Skipping non-incoming email:', event.objectId)
+          continue
+        }
+
         // Check if email already exists
         const { data: existingEmail } = await supabase
           .from('incoming_emails')
@@ -89,6 +98,25 @@ export async function POST(request: NextRequest) {
         if (existingEmail) {
           console.log('Email already exists:', event.objectId)
           continue
+        }
+
+        // Parse timestamp correctly
+        let receivedAt: Date
+        const timestamp = props.hs_timestamp || props.hs_createdate || emailData.createdAt
+
+        if (timestamp) {
+          if (/^\d+$/.test(String(timestamp))) {
+            receivedAt = new Date(parseInt(String(timestamp)))
+          } else {
+            receivedAt = new Date(timestamp)
+          }
+        } else {
+          receivedAt = new Date()
+        }
+
+        // Validate date
+        if (isNaN(receivedAt.getTime())) {
+          receivedAt = new Date()
         }
 
         // Store email in database
@@ -104,9 +132,7 @@ export async function POST(request: NextRequest) {
             subject: props.hs_email_subject || 'Kein Betreff',
             body_text: props.hs_email_text || '',
             body_html: props.hs_email_html,
-            received_at: props.hs_timestamp
-              ? new Date(parseInt(props.hs_timestamp)).toISOString()
-              : new Date().toISOString(),
+            received_at: receivedAt.toISOString(),
             status: 'pending',
           })
 

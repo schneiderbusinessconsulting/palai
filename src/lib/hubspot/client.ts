@@ -107,7 +107,7 @@ class HubSpotClient {
     }
   }
 
-  // Send email reply
+  // Send email reply via Engagements API
   async sendEmail(params: {
     to: string
     subject: string
@@ -115,40 +115,46 @@ class HubSpotClient {
     threadId?: string
     contactId?: string
   }): Promise<{ id: string }> {
-    // Create email engagement
-    const emailData = {
-      properties: {
-        hs_email_direction: 'EMAIL',
-        hs_email_status: 'SENT',
-        hs_email_subject: params.subject,
-        hs_email_text: params.body,
-        hs_email_to_email: params.to,
-        hs_timestamp: Date.now(),
-        ...(params.threadId && { hs_email_thread_id: params.threadId }),
+    // First, find or create contact by email
+    let contactId = params.contactId
+    if (!contactId) {
+      const contact = await this.getContactByEmail(params.to)
+      contactId = contact?.id
+    }
+
+    // Create email engagement using v1 API (more reliable for sending)
+    const engagementData = {
+      engagement: {
+        active: true,
+        type: 'EMAIL',
+        timestamp: Date.now(),
+      },
+      metadata: {
+        from: {
+          email: 'info@palacios-relations.ch', // Will be overwritten by HubSpot
+        },
+        to: [{ email: params.to }],
+        subject: params.subject,
+        text: params.body,
+      },
+      associations: {
+        contactIds: contactId ? [parseInt(contactId)] : [],
+        companyIds: [],
+        dealIds: [],
+        ownerIds: [],
+        ticketIds: [],
       },
     }
 
-    const response = await this.request<{ id: string }>(
-      '/crm/v3/objects/emails',
+    const response = await this.request<{ engagement: { id: number } }>(
+      '/engagements/v1/engagements',
       {
         method: 'POST',
-        body: JSON.stringify(emailData),
+        body: JSON.stringify(engagementData),
       }
     )
 
-    // Associate with contact if provided
-    if (params.contactId) {
-      try {
-        await this.request(
-          `/crm/v3/objects/emails/${response.id}/associations/contacts/${params.contactId}/email_to_contact`,
-          { method: 'PUT' }
-        )
-      } catch (e) {
-        console.error('Failed to associate email with contact:', e)
-      }
-    }
-
-    return response
+    return { id: String(response.engagement.id) }
   }
 
   // Get knowledge base articles (if available)

@@ -19,12 +19,12 @@ export async function POST(request: NextRequest) {
     // 1. Create embedding for the user message
     const embedding = await createEmbedding(message)
 
-    // 2. Search for relevant knowledge chunks
+    // 2. Search for relevant knowledge chunks (threshold 0.5 for broader matching)
     const { data: chunks, error: searchError } = await supabase.rpc(
       'match_knowledge_chunks',
       {
         query_embedding: embedding,
-        match_threshold: 0.7,
+        match_threshold: 0.5,
         match_count: 5,
       }
     )
@@ -32,6 +32,10 @@ export async function POST(request: NextRequest) {
     if (searchError) {
       console.error('Knowledge search error:', searchError)
     }
+
+    // Debug: Log what was found
+    console.log(`[Chat] Query: "${message.substring(0, 50)}..."`)
+    console.log(`[Chat] Found ${chunks?.length || 0} chunks:`, chunks?.map((c: { source_title: string; similarity: number }) => `${c.source_title} (${(c.similarity * 100).toFixed(1)}%)`))
 
     const relevantChunks = chunks?.map((c: { content: string }) => c.content) || []
     const sources = chunks?.map((c: { source_title: string; source_type: string }) => ({

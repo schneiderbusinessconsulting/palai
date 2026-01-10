@@ -248,14 +248,32 @@ export async function classifyEmail(
 
   // Always system alerts - just check from address (no keyword needed)
   const alwaysSystemFrom = [
+    // DevOps & Hosting
     'railway.app', 'notify.railway', 'vercel.com', 'netlify.com', 'github.com', 'gitlab.com',
+    'heroku.com', 'digitalocean.com', 'aws.amazon.com', 'azure.com',
     'sentry.io', 'bugsnag.com', 'datadog.com', 'newrelic.com',
-    'stripe.com', 'paypal.com', 'mollie.com',
-    'mailchimp.com', 'sendgrid.com', 'postmark',
-    'slack.com', 'notion.so', 'linear.app', 'asana.com',
-    'hubspot.com', 'salesforce.com', 'zendesk.com',
-    'google.com', 'microsoft.com', 'apple.com',
+    // Payments & E-Commerce
+    'stripe.com', 'paypal.com', 'mollie.com', 'klarna.com',
+    'twint.ch', 'twintpay.ch', // TWINT
+    'myablefy.com', 'ablefy.com', 'elopage.com', // ablefy (ehemals elopage)
+    'digistore24.com', 'copecart.com', 'thrivecart.com',
+    'shopify.com', 'woocommerce.com',
+    // Course & Marketing Platforms
+    'kajabi.com', 'kajabimail.net', 'm.kajabimail.net', // Kajabi
+    'teachable.com', 'thinkific.com', 'podia.com',
+    'mailchimp.com', 'sendgrid.com', 'postmark', 'sendinblue.com', 'brevo.com',
+    'activecampaign.com', 'mailerlite.com', 'convertkit.com',
+    // Productivity & Communication
+    'slack.com', 'notion.so', 'linear.app', 'asana.com', 'trello.com', 'monday.com',
+    'zoom.us', 'zoom.com', 'calendly.com', 'cal.com',
+    // CRM & Support
+    'hubspot.com', 'salesforce.com', 'zendesk.com', 'intercom.com', 'freshdesk.com',
+    // Big Tech
+    'google.com', 'microsoft.com', 'apple.com', 'facebook.com', 'meta.com', 'instagram.com',
+    'linkedin.com', 'twitter.com', 'x.com',
+    // Generic system prefixes (these catch no-reply@*, noreply@*, etc.)
     'no-reply@', 'noreply@', 'donotreply@', 'notifications@', 'alerts@', 'system@', 'mailer@',
+    'bounce@', 'postmaster@', 'daemon@', 'autoresponder@',
   ]
 
   if (alwaysSystemFrom.some(p => lowerFrom.includes(p))) {
@@ -299,6 +317,30 @@ export async function classifyEmail(
       emailType: 'notification',
       needsResponse: false,
       reason: 'Build/Deployment Benachrichtigung',
+    }
+  }
+
+  // Transaction/Payment notifications (content-based)
+  const transactionKeywords = ['transaktion', 'transaction', 'purchase', 'zahlung', 'payment',
+    'rechnung', 'invoice', 'quittung', 'receipt', 'storno', 'refund', 'rückbuchung',
+    'congratulations! new purchase', 'new sale', 'neue bestellung', 'order confirmation']
+  const hasTransactionKeyword = transactionKeywords.some(k =>
+    lowerSubject.includes(k) || lowerBody.substring(0, 500).includes(k)
+  )
+
+  if (hasTransactionKeyword) {
+    // Double-check: Is there an actual customer question hidden?
+    const hasQuestion = lowerBody.includes('?') && (
+      lowerBody.includes('frage') || lowerBody.includes('wie kann') ||
+      lowerBody.includes('können sie') || lowerBody.includes('bitte um')
+    )
+
+    if (!hasQuestion) {
+      return {
+        emailType: 'notification',
+        needsResponse: false,
+        reason: 'Transaktions-/Zahlungsbenachrichtigung',
+      }
     }
   }
 

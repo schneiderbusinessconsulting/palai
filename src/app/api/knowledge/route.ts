@@ -188,3 +188,91 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete' }, { status: 500 })
   }
 }
+
+// Update knowledge item (title, content, category)
+export async function PATCH(request: NextRequest) {
+  try {
+    const { oldTitle, newTitle, content, sourceType } = await request.json()
+
+    if (!oldTitle) {
+      return NextResponse.json({ error: 'Old title required' }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+
+    // If only updating title/sourceType without new content
+    if (!content) {
+      const { error } = await supabase
+        .from('knowledge_chunks')
+        .update({
+          source_title: newTitle || oldTitle,
+          source_type: sourceType,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('source_title', oldTitle)
+
+      if (error) {
+        console.error('Update error:', error)
+        return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
+      }
+
+      return NextResponse.json({ success: true, updated: true })
+    }
+
+    // If updating content, delete old chunks and create new ones
+    const { error: deleteError } = await supabase
+      .from('knowledge_chunks')
+      .delete()
+      .eq('source_title', oldTitle)
+
+    if (deleteError) {
+      console.error('Delete error:', deleteError)
+      return NextResponse.json({ error: 'Failed to delete old content' }, { status: 500 })
+    }
+
+    // Split into chunks
+    const chunks = chunkText(content)
+    const title = newTitle || oldTitle
+    const storedChunks = []
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i]
+
+      try {
+        const embedding = await createEmbedding(chunk)
+
+        const { data, error } = await supabase
+          .from('knowledge_chunks')
+          .insert({
+            content: chunk,
+            embedding,
+            source_type: sourceType || 'help_article',
+            source_title: title,
+            metadata: {
+              chunk_index: i,
+              total_chunks: chunks.length,
+            },
+          })
+          .select()
+          .single()
+
+        if (error) {
+          console.error('Error storing chunk:', error)
+        } else {
+          storedChunks.push(data)
+        }
+      } catch (embeddingError) {
+        console.error('Error creating embedding:', embeddingError)
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      title,
+      chunksCreated: storedChunks.length,
+    })
+  } catch (error) {
+    console.error('Update error:', error)
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
+  }
+}

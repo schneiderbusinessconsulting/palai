@@ -183,9 +183,9 @@ export default function InboxPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
 
-  // Fetch emails
-  const fetchEmails = async () => {
-    setIsLoading(true)
+  // Fetch emails (with optional loading indicator)
+  const fetchEmails = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true)
     try {
       const response = await fetch(`/api/emails?status=${filter}`)
       if (response.ok) {
@@ -195,7 +195,7 @@ export default function InboxPage() {
     } catch (error) {
       console.error('Failed to fetch emails:', error)
     } finally {
-      setIsLoading(false)
+      if (showLoading) setIsLoading(false)
     }
   }
 
@@ -221,22 +221,28 @@ export default function InboxPage() {
     fetchOwners()
   }, [filter])
 
-  // Auto-sync every 30 seconds
+  // Auto-sync every 60 seconds (background, no loading indicator)
   useEffect(() => {
     const autoSync = async () => {
       try {
-        await fetch('/api/emails', { method: 'POST' })
-        fetchEmails()
+        // Sync in background
+        const response = await fetch('/api/emails', { method: 'POST' })
+        const data = await response.json()
+
+        // Only refresh UI if there are new emails
+        if (data.imported > 0) {
+          fetchEmails(false) // Silent refresh
+        }
       } catch (e) {
         console.error('Auto-sync failed:', e)
       }
     }
 
-    // Initial sync
+    // Initial sync (with loading on first load)
     autoSync()
 
-    // Set up interval
-    const interval = setInterval(autoSync, 30000) // 30 seconds
+    // Set up interval - every 60 seconds
+    const interval = setInterval(autoSync, 60000)
 
     return () => clearInterval(interval)
   }, [])
@@ -263,7 +269,7 @@ export default function InboxPage() {
           messages.push(`${statusData.closedEmails} geschlossen`)
         }
         setSyncMessage(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
-        fetchEmails()
+        fetchEmails(false) // Silent refresh - button already shows loading state
       } else {
         setSyncMessage(importData.error || 'Sync fehlgeschlagen')
       }
@@ -285,7 +291,7 @@ export default function InboxPage() {
       const data = await response.json()
       if (response.ok) {
         setSyncMessage(data.message || `${data.classified} E-Mails klassifiziert`)
-        fetchEmails()
+        fetchEmails(false) // Silent refresh
       } else {
         setSyncMessage(data.error || 'Klassifizierung fehlgeschlagen')
       }

@@ -291,11 +291,73 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Re-classify existing emails that don't have email_type set
-export async function PATCH() {
+// Re-classify existing emails AND sync HubSpot conversation status
+export async function PATCH(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action') || 'classify'
+
     const supabase = await createClient()
 
+    // Action: sync-status - Check HubSpot for closed conversations
+    if (action === 'sync-status') {
+      // Get all pending emails with thread IDs
+      const { data: pendingEmails, error: fetchError } = await supabase
+        .from('incoming_emails')
+        .select('id, hubspot_thread_id')
+        .in('status', ['pending', 'draft_ready'])
+        .not('hubspot_thread_id', 'is', null)
+
+      if (fetchError) {
+        return NextResponse.json({ error: 'Failed to fetch emails' }, { status: 500 })
+      }
+
+      // Get unique thread IDs
+      const threadIds = [...new Set(pendingEmails?.map(e => e.hubspot_thread_id).filter(Boolean))]
+      let closedCount = 0
+
+      // Check each thread's status in HubSpot
+      for (const threadId of threadIds) {
+        try {
+          // Try Conversations API first
+          const response = await fetch(
+            `https://api.hubapi.com/conversations/v3/conversations/threads/${threadId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
+              },
+            }
+          )
+
+          if (response.ok) {
+            const thread = await response.json()
+            // HubSpot thread status: OPEN, CLOSED
+            if (thread.status === 'CLOSED') {
+              // Mark all emails in this thread as sent
+              const { data: updated } = await supabase
+                .from('incoming_emails')
+                .update({ status: 'sent' })
+                .eq('hubspot_thread_id', threadId)
+                .in('status', ['pending', 'draft_ready'])
+                .select('id')
+
+              closedCount += updated?.length || 0
+            }
+          }
+        } catch (err) {
+          console.error(`Failed to check thread ${threadId}:`, err)
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        checkedThreads: threadIds.length,
+        closedEmails: closedCount,
+        message: `${closedCount} E-Mails als geschlossen markiert`,
+      })
+    }
+
+    // Default action: classify
     // Get all emails without classification
     const { data: unclassifiedEmails, error: fetchError } = await supabase
       .from('incoming_emails')
@@ -342,9 +404,9 @@ export async function PATCH() {
       message: `${classified} E-Mails klassifiziert, davon ${systemMails} System-Mails`,
     })
   } catch (error) {
-    console.error('Classification error:', error)
+    console.error('PATCH error:', error)
     return NextResponse.json(
-      { error: 'Classification failed' },
+      { error: 'Operation failed' },
       { status: 500 }
     )
   }

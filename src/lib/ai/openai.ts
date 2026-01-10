@@ -244,13 +244,40 @@ export async function classifyEmail(
   // Quick pattern-based classification for obvious cases (saves API calls)
   const lowerFrom = fromEmail.toLowerCase()
   const lowerSubject = subject.toLowerCase()
+  const lowerBody = bodyText.toLowerCase()
 
-  // System alerts - no response needed
+  // Always system alerts - just check from address (no keyword needed)
+  const alwaysSystemFrom = [
+    'railway.app', 'notify.railway', 'vercel.com', 'netlify.com', 'github.com', 'gitlab.com',
+    'sentry.io', 'bugsnag.com', 'datadog.com', 'newrelic.com',
+    'stripe.com', 'paypal.com', 'mollie.com',
+    'mailchimp.com', 'sendgrid.com', 'postmark',
+    'slack.com', 'notion.so', 'linear.app', 'asana.com',
+    'hubspot.com', 'salesforce.com', 'zendesk.com',
+    'google.com', 'microsoft.com', 'apple.com',
+    'no-reply@', 'noreply@', 'donotreply@', 'notifications@', 'alerts@', 'system@', 'mailer@',
+  ]
+
+  if (alwaysSystemFrom.some(p => lowerFrom.includes(p))) {
+    // Check if it might actually be a customer email forwarded or something
+    const mightBeCustomer = lowerSubject.includes('anfrage') || lowerSubject.includes('frage') ||
+      lowerSubject.includes('kontakt') || lowerSubject.includes('interesse')
+
+    if (!mightBeCustomer) {
+      return {
+        emailType: 'system_alert',
+        needsResponse: false,
+        reason: 'Automatische System-Benachrichtigung',
+      }
+    }
+  }
+
+  // System alerts with keyword matching
   const systemPatterns = [
-    { from: ['zapier', 'alerts@', 'no-reply@', 'noreply@', 'notifications@'], keywords: ['alert', 'error', 'warning'] },
-    { from: ['zoom.us', 'zoom.com'], keywords: ['meeting', 'joined', 'recording', 'ready'] },
-    { from: ['kajabi', 'activecampaign'], keywords: ['alert', 'integration', 'error'] },
-    { from: ['justcall', 'aircall'], keywords: ['summary', 'daily', 'report'] },
+    { from: ['zapier', 'make.com', 'integromat'], keywords: ['alert', 'error', 'warning', 'failed', 'success'] },
+    { from: ['zoom.us', 'zoom.com'], keywords: ['meeting', 'joined', 'recording', 'ready', 'scheduled'] },
+    { from: ['kajabi', 'activecampaign', 'mailerlite'], keywords: ['alert', 'integration', 'error', 'report'] },
+    { from: ['justcall', 'aircall', 'twilio'], keywords: ['summary', 'daily', 'report', 'call'] },
   ]
 
   for (const pattern of systemPatterns) {
@@ -262,6 +289,16 @@ export async function classifyEmail(
         needsResponse: false,
         reason: 'Automatische System-Benachrichtigung erkannt',
       }
+    }
+  }
+
+  // Build/deployment notifications
+  if (lowerSubject.includes('build') || lowerSubject.includes('deploy') || lowerSubject.includes('failed') ||
+      lowerSubject.includes('succeeded') || lowerSubject.includes('pipeline')) {
+    return {
+      emailType: 'notification',
+      needsResponse: false,
+      reason: 'Build/Deployment Benachrichtigung',
     }
   }
 

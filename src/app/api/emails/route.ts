@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '100')
     const offset = parseInt(searchParams.get('offset') || '0')
 
     const supabase = await createClient()
@@ -100,7 +100,8 @@ export async function GET(request: NextRequest) {
           ai_generated_response,
           edited_response,
           confidence_score,
-          status
+          status,
+          formality
         )
       `, { count: 'exact' })
       .order('received_at', { ascending: false })
@@ -285,6 +286,65 @@ export async function POST(request: NextRequest) {
     console.error('Sync error:', error)
     return NextResponse.json(
       { error: 'Sync failed' },
+      { status: 500 }
+    )
+  }
+}
+
+// Re-classify existing emails that don't have email_type set
+export async function PATCH() {
+  try {
+    const supabase = await createClient()
+
+    // Get all emails without classification
+    const { data: unclassifiedEmails, error: fetchError } = await supabase
+      .from('incoming_emails')
+      .select('id, from_email, subject, body_text')
+      .is('email_type', null)
+
+    if (fetchError) {
+      console.error('Failed to fetch unclassified emails:', fetchError)
+      return NextResponse.json(
+        { error: 'Failed to fetch emails' },
+        { status: 500 }
+      )
+    }
+
+    let classified = 0
+    let systemMails = 0
+
+    for (const email of unclassifiedEmails || []) {
+      const classification = await classifyEmail(
+        email.from_email,
+        email.subject,
+        email.body_text || ''
+      )
+
+      await supabase
+        .from('incoming_emails')
+        .update({
+          email_type: classification.emailType,
+          needs_response: classification.needsResponse,
+          classification_reason: classification.reason,
+        })
+        .eq('id', email.id)
+
+      classified++
+      if (classification.emailType === 'system_alert' || classification.emailType === 'notification') {
+        systemMails++
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      classified,
+      systemMails,
+      message: `${classified} E-Mails klassifiziert, davon ${systemMails} System-Mails`,
+    })
+  } catch (error) {
+    console.error('Classification error:', error)
+    return NextResponse.json(
+      { error: 'Classification failed' },
       { status: 500 }
     )
   }

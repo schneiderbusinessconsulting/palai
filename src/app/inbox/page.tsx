@@ -181,6 +181,7 @@ export default function InboxPage() {
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false)
   const [regenerateFeedback, setRegenerateFeedback] = useState('')
   const [isRegenerating, setIsRegenerating] = useState(false)
+  const [isClassifying, setIsClassifying] = useState(false)
 
   // Fetch emails
   const fetchEmails = async () => {
@@ -259,6 +260,28 @@ export default function InboxPage() {
     } finally {
       setIsSyncing(false)
       setTimeout(() => setSyncMessage(''), 3000)
+    }
+  }
+
+  // Re-classify existing emails
+  const handleReclassify = async () => {
+    setIsClassifying(true)
+    setSyncMessage('')
+    try {
+      const response = await fetch('/api/emails', { method: 'PATCH' })
+      const data = await response.json()
+      if (response.ok) {
+        setSyncMessage(data.message || `${data.classified} E-Mails klassifiziert`)
+        fetchEmails()
+      } else {
+        setSyncMessage(data.error || 'Klassifizierung fehlgeschlagen')
+      }
+    } catch (error) {
+      console.error('Reclassify failed:', error)
+      setSyncMessage('Klassifizierung fehlgeschlagen')
+    } finally {
+      setIsClassifying(false)
+      setTimeout(() => setSyncMessage(''), 5000)
     }
   }
 
@@ -438,6 +461,27 @@ export default function InboxPage() {
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? 'Sync...' : 'HubSpot Sync'}
         </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleReclassify}
+                disabled={isClassifying}
+              >
+                {isClassifying ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Bot className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Alte E-Mails neu klassifizieren</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Sync Message */}

@@ -35,9 +35,11 @@ Antworte auf Deutsch und freundlich.`
 
       const aiResponse = response.choices[0].message.content || ''
 
-      // Extract title from response
+      // Extract title from response and clean up markdown
       const titleMatch = aiResponse.match(/[Tt]itel[:\s]+[""]?([^"""\n]+)[""]?/)
-      const suggestedTitle = titleMatch?.[1]?.trim() || message.split(/[.!?\n]/)[0].substring(0, 50)
+      let suggestedTitle = titleMatch?.[1]?.trim() || message.split(/[.!?\n]/)[0].substring(0, 50)
+      // Remove markdown artifacts like **, *, _, etc.
+      suggestedTitle = suggestedTitle.replace(/^\*+\s*/, '').replace(/\*+$/, '').replace(/^_+/, '').replace(/_+$/, '').trim()
 
       return NextResponse.json({
         response: `Ich habe deinen Text analysiert:

@@ -36,6 +36,7 @@ import {
   CheckCircle,
   AlertCircle,
   Sparkles,
+  Pencil,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -130,6 +131,15 @@ export default function KnowledgePage() {
   // AI Categorization state
   const [isCategorizing, setIsCategorizing] = useState(false)
   const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number; reason: string } | null>(null)
+
+  // Edit state
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<{ title: string; content: string; sourceType: string } | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [editSourceType, setEditSourceType] = useState('')
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   // Fetch knowledge items
   const fetchItems = async () => {
@@ -265,6 +275,61 @@ export default function KnowledgePage() {
       }
     } catch (error) {
       console.error('Delete error:', error)
+    }
+  }
+
+  // Handle edit - load item content
+  const handleEdit = async (itemTitle: string) => {
+    setIsLoadingEdit(true)
+    setIsEditDialogOpen(true)
+
+    try {
+      const response = await fetch(`/api/knowledge/${encodeURIComponent(itemTitle)}`)
+      if (response.ok) {
+        const data = await response.json()
+        setEditingItem({ title: itemTitle, content: data.content, sourceType: data.sourceType })
+        setEditTitle(itemTitle)
+        setEditContent(data.content)
+        setEditSourceType(data.sourceType)
+      } else {
+        console.error('Failed to load item')
+        setIsEditDialogOpen(false)
+      }
+    } catch (error) {
+      console.error('Edit load error:', error)
+      setIsEditDialogOpen(false)
+    } finally {
+      setIsLoadingEdit(false)
+    }
+  }
+
+  // Handle update
+  const handleUpdate = async () => {
+    if (!editingItem || !editTitle.trim()) return
+
+    setIsUpdating(true)
+
+    try {
+      const response = await fetch('/api/knowledge', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oldTitle: editingItem.title,
+          newTitle: editTitle,
+          content: editContent !== editingItem.content ? editContent : undefined,
+          sourceType: editSourceType,
+        }),
+      })
+
+      if (response.ok) {
+        setIsEditDialogOpen(false)
+        setEditingItem(null)
+        fetchItems()
+      }
+    } catch (error) {
+      console.error('Update error:', error)
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -413,6 +478,10 @@ export default function KnowledgePage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(item.title)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Bearbeiten
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-red-600"
                         onClick={() => handleDelete(item.title)}
@@ -603,6 +672,79 @@ export default function KnowledgePage() {
                 </>
               ) : (
                 'Hochladen'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Eintrag bearbeiten</DialogTitle>
+          </DialogHeader>
+
+          {isLoadingEdit ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              {/* Title */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Titel</label>
+                <Input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                />
+              </div>
+
+              {/* Source Type */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Kategorie</label>
+                <Select value={editSourceType} onValueChange={setEditSourceType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="help_article">Help Center</SelectItem>
+                    <SelectItem value="faq">FAQ</SelectItem>
+                    <SelectItem value="course_info">Kurs-Info</SelectItem>
+                    <SelectItem value="email">E-Mail Vorlage</SelectItem>
+                    <SelectItem value="ai_instructions">AI Regel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Content */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Inhalt</label>
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={12}
+                  className="font-mono text-sm"
+                />
+                <p className="text-xs text-slate-500">
+                  Hinweis: Bei Änderungen am Inhalt werden die Embeddings neu generiert.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handleUpdate} disabled={isUpdating || isLoadingEdit}>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Speichern...
+                </>
+              ) : (
+                'Speichern'
               )}
             </Button>
           </DialogFooter>

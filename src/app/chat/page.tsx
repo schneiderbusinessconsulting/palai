@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -484,7 +485,9 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
                     }`}
                   >
-                    <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
                   </div>
 
                   {/* Sources */}

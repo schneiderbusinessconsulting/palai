@@ -331,11 +331,58 @@ export async function classifyEmail(
     }
   }
 
-  // Default: assume it's a customer inquiry that needs response
+  // No pattern matched - use AI to classify
+  try {
+    const openai = getOpenAI()
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `Du bist ein E-Mail-Klassifikator. Analysiere die E-Mail und klassifiziere sie.
+
+Kategorien:
+- system_alert: Automatische Benachrichtigungen von Services (Build-Fehler, Server-Alerts, API-Notifications, Newsletter-Bestätigungen, Passwort-Resets, etc.)
+- notification: Benachrichtigungen die keine Antwort brauchen (Meeting-Erinnerungen, Kalender-Updates, Social Media Notifications, etc.)
+- form_submission: Formular-Einreichungen (Anmeldungen, Kontaktformulare)
+- customer_inquiry: Echte Kundenanfragen die eine persönliche Antwort brauchen
+
+Antworte NUR mit einem JSON-Objekt:
+{"emailType": "...", "needsResponse": true/false, "reason": "kurze Begründung auf Deutsch"}`
+        },
+        {
+          role: 'user',
+          content: `Von: ${fromEmail}
+Betreff: ${subject}
+
+${bodyText.substring(0, 1500)}`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 150,
+    })
+
+    const content = response.choices[0].message.content || ''
+
+    // Parse JSON response
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        emailType: parsed.emailType as EmailType,
+        needsResponse: parsed.needsResponse ?? true,
+        reason: parsed.reason || 'AI-Klassifizierung',
+      }
+    }
+  } catch (error) {
+    console.error('AI classification failed:', error)
+  }
+
+  // Fallback: assume it's a customer inquiry that needs response
   return {
     emailType: 'customer_inquiry',
     needsResponse: true,
-    reason: 'Kundenanfrage',
+    reason: 'Kundenanfrage (Fallback)',
   }
 }
 

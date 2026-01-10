@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,7 +49,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { KnowledgeAIAssistant } from '@/components/knowledge/ai-assistant'
 
 interface KnowledgeItem {
   title: string
@@ -110,6 +110,7 @@ function formatDate(dateString: string) {
 }
 
 export default function KnowledgePage() {
+  const router = useRouter()
   const [items, setItems] = useState<KnowledgeItem[]>([])
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -129,9 +130,6 @@ export default function KnowledgePage() {
   // AI Categorization state
   const [isCategorizing, setIsCategorizing] = useState(false)
   const [aiSuggestion, setAiSuggestion] = useState<{ category: string; confidence: number; reason: string } | null>(null)
-
-  // AI Assistant state
-  const [isAssistantOpen, setIsAssistantOpen] = useState(false)
 
   // Fetch knowledge items
   const fetchItems = async () => {
@@ -358,8 +356,8 @@ export default function KnowledgePage() {
           Aktualisieren
         </Button>
         <Button
-          className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
-          onClick={() => setIsAssistantOpen(true)}
+          className="gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
+          onClick={() => router.push('/chat?mode=learning')}
         >
           <Sparkles className="h-4 w-4" />
           Wissen hinzufügen
@@ -610,18 +608,6 @@ export default function KnowledgePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* AI Assistant Dialog */}
-      <KnowledgeAIAssistant
-        open={isAssistantOpen}
-        onOpenChange={setIsAssistantOpen}
-        onApplySuggestion={(suggestion) => {
-          if (suggestion.title) setTitle(suggestion.title)
-          if (suggestion.category) setSourceType(suggestion.category)
-          if (suggestion.content) setContent(suggestion.content)
-          setIsDialogOpen(true) // Open upload dialog with suggested values
-        }}
-      />
     </div>
   )
 }

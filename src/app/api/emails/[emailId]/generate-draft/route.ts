@@ -35,12 +35,12 @@ export async function POST(
     const emailContent = `${email.subject}\n\n${email.body_text}`
     const embedding = await createEmbedding(emailContent)
 
-    // 3. Search for relevant knowledge chunks
+    // 3. Search for relevant knowledge chunks (threshold 0.5 for broader matching)
     const { data: chunks, error: searchError } = await supabase.rpc(
       'match_knowledge_chunks',
       {
         query_embedding: embedding,
-        match_threshold: 0.65,
+        match_threshold: 0.5,
         match_count: 5,
       }
     )

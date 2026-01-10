@@ -27,12 +27,12 @@ async function generateDraftForEmail(
     const emailContent = `${subject}\n\n${bodyText}`
     const embedding = await createEmbedding(emailContent)
 
-    // Search for relevant knowledge chunks
+    // Search for relevant knowledge chunks (threshold 0.5 for broader matching)
     const { data: chunks } = await supabase.rpc(
       'match_knowledge_chunks',
       {
         query_embedding: embedding,
-        match_threshold: 0.65,
+        match_threshold: 0.5,
         match_count: 5,
       }
     )

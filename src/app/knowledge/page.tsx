@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/dialog'
 import {
   Search,
-  Plus,
   RefreshCw,
   FileText,
   Mail,
@@ -359,16 +358,11 @@ export default function KnowledgePage() {
           Aktualisieren
         </Button>
         <Button
-          variant="outline"
-          className="gap-2 text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+          className="gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
           onClick={() => setIsAssistantOpen(true)}
         >
           <Sparkles className="h-4 w-4" />
-          AI Assistent
-        </Button>
-        <Button className="gap-2" onClick={() => setIsDialogOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Hinzufügen
+          Wissen hinzufügen
         </Button>
       </div>
 

@@ -361,6 +361,21 @@ export default function InboxPage() {
     }
   }
 
+  // Close/dismiss email without sending (marks as sent to hide it)
+  const handleDismissEmail = async (emailId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent opening the detail modal
+    try {
+      const response = await fetch(`/api/emails/${emailId}/mark-sent`, {
+        method: 'POST',
+      })
+      if (response.ok) {
+        fetchEmails()
+      }
+    } catch (error) {
+      console.error('Dismiss email failed:', error)
+    }
+  }
+
   // Open email detail
   const openEmailDetail = (email: Email) => {
     setSelectedEmail(email)
@@ -550,6 +565,21 @@ export default function InboxPage() {
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {formatDate(email.received_at)}
                           </span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={(e) => handleDismissEmail(email.id, e)}
+                                  className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Schliessen (ohne Antwort)</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
 

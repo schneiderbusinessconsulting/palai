@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard,
   Inbox,
@@ -32,7 +32,7 @@ const dashboards = [
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Inbox', href: '/inbox', icon: Inbox, badge: 3 },
+  { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
   { name: 'Templates', href: '/templates', icon: FileText },
@@ -47,6 +47,35 @@ export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
+  const [badges, setBadges] = useState<Record<string, number>>({})
+
+  // Fetch pending email count
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const response = await fetch('/api/emails?limit=100')
+        if (response.ok) {
+          const data = await response.json()
+          const emails = data.emails || []
+          // Count emails that need attention (pending or draft_ready, excluding system mails)
+          const pending = emails.filter((e: { status: string; email_type?: string; needs_response?: boolean }) =>
+            (e.status === 'pending' || e.status === 'draft_ready') &&
+            e.email_type !== 'system_alert' &&
+            e.email_type !== 'notification' &&
+            (e.email_type !== 'form_submission' || e.needs_response)
+          ).length
+          setBadges({ pendingEmails: pending })
+        }
+      } catch (error) {
+        console.error('Failed to fetch email count:', error)
+      }
+    }
+
+    fetchCounts()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchCounts, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <>
@@ -191,7 +220,7 @@ export function Sidebar() {
                     {!collapsed && (
                       <>
                         <span className="flex-1">{item.name}</span>
-                        {item.badge && (
+                        {item.badgeKey && badges[item.badgeKey] > 0 && (
                           <span
                             className={cn(
                               'px-2 py-0.5 text-xs font-medium rounded-full',
@@ -200,7 +229,7 @@ export function Sidebar() {
                                 : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                             )}
                           >
-                            {item.badge}
+                            {badges[item.badgeKey]}
                           </span>
                         )}
                       </>

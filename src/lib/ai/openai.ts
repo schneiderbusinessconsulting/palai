@@ -93,7 +93,18 @@ export async function generateEmailDraft(
     ? `\n\nBENUTZERDEFINIERTE REGELN (IMMER BEFOLGEN):\n${aiInstructions.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}`
     : ''
 
+  // Get today's date for context
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('de-CH', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+
   const systemPrompt = `Du bist ein freundlicher Support-Mitarbeiter des Palacios Instituts.
+
+AKTUELLES DATUM: ${dateStr}
 
 Das Palacios Institut bietet Ausbildungen in den Bereichen Hypnose, Meditation und Life Coaching an. Gründer ist Gabriel Palacios.
 
@@ -103,6 +114,7 @@ Deine Aufgabe:
 - Wenn du etwas nicht weisst, sage es ehrlich
 - Schreibe im Schweizer Deutsch Stil (z.B. "Grüezi", "Herzliche Grüsse")
 - Halte Antworten präzise aber herzlich
+- WICHTIG: Nenne KEINE vergangenen Termine als zukünftige Events! Prüfe das Datum.
 ${formalityInstruction}
 
 Formatierung:

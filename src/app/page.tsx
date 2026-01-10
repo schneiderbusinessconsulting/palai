@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -7,67 +10,30 @@ import {
   Clock,
   TrendingUp,
   Users,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
 
-const stats = [
-  {
-    title: 'Offene E-Mails',
-    value: '12',
-    change: '+3 heute',
-    icon: Inbox,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-  },
-  {
-    title: 'Chat-Anfragen',
-    value: '8',
-    change: '+5 heute',
-    icon: MessageSquare,
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-  },
-  {
-    title: 'Beantwortet heute',
-    value: '24',
-    change: '92% AI-assisted',
-    icon: CheckCircle2,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100 dark:bg-green-900/30',
-  },
-  {
-    title: 'Ø Antwortzeit',
-    value: '4.2h',
-    change: '-12% vs letzte Woche',
-    icon: Clock,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
-  },
-]
+interface Email {
+  id: string
+  from_email: string
+  subject: string
+  received_at: string
+  status: string
+  email_drafts?: Array<{
+    confidence_score: number
+  }>
+}
 
-const recentEmails = [
-  {
-    id: 1,
-    from: 'maria.mueller@gmail.com',
-    subject: 'Frage zur Hypnose-Ausbildung',
-    time: 'vor 2h',
-    confidence: 92,
-  },
-  {
-    id: 2,
-    from: 'thomas.weber@bluewin.ch',
-    subject: 'Ratenzahlung möglich?',
-    time: 'vor 5h',
-    confidence: 87,
-  },
-  {
-    id: 3,
-    from: 'info@firma.ch',
-    subject: 'Firmenausbildung anfragen',
-    time: 'vor 1d',
-    confidence: 45,
-  },
-]
+interface DashboardStats {
+  pendingEmails: number
+  draftReadyEmails: number
+  sentEmails: number
+  totalEmails: number
+  avgConfidence: number
+}
 
 function getConfidenceColor(confidence: number) {
   if (confidence >= 85) return 'bg-green-500'
@@ -75,17 +41,122 @@ function getConfidenceColor(confidence: number) {
   return 'bg-red-500'
 }
 
+function formatTimeAgo(dateString: string) {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 60) return `vor ${diffMins} Min`
+  if (diffHours < 24) return `vor ${diffHours}h`
+  if (diffDays === 1) return 'gestern'
+  return `vor ${diffDays} Tagen`
+}
+
 export default function DashboardPage() {
+  const [isLoading, setIsLoading] = useState(true)
+  const [emails, setEmails] = useState<Email[]>([])
+  const [stats, setStats] = useState<DashboardStats>({
+    pendingEmails: 0,
+    draftReadyEmails: 0,
+    sentEmails: 0,
+    totalEmails: 0,
+    avgConfidence: 0,
+  })
+
+  const fetchData = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/emails?limit=100')
+      if (response.ok) {
+        const data = await response.json()
+        const allEmails: Email[] = data.emails || []
+
+        // Calculate stats
+        const pending = allEmails.filter(e => e.status === 'pending').length
+        const draftReady = allEmails.filter(e => e.status === 'draft_ready').length
+        const sent = allEmails.filter(e => e.status === 'sent').length
+
+        // Calculate average confidence
+        const emailsWithDrafts = allEmails.filter(e => e.email_drafts?.[0]?.confidence_score)
+        const avgConf = emailsWithDrafts.length > 0
+          ? emailsWithDrafts.reduce((sum, e) => sum + (e.email_drafts?.[0]?.confidence_score || 0), 0) / emailsWithDrafts.length
+          : 0
+
+        setStats({
+          pendingEmails: pending,
+          draftReadyEmails: draftReady,
+          sentEmails: sent,
+          totalEmails: allEmails.length,
+          avgConfidence: Math.round(avgConf),
+        })
+
+        setEmails(allEmails.slice(0, 5)) // Only show first 5
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const statsCards = [
+    {
+      title: 'Offene E-Mails',
+      value: stats.pendingEmails.toString(),
+      change: `${stats.draftReadyEmails} mit Draft`,
+      icon: Inbox,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    },
+    {
+      title: 'Gesendet',
+      value: stats.sentEmails.toString(),
+      change: `von ${stats.totalEmails} total`,
+      icon: CheckCircle2,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
+    },
+    {
+      title: 'Ø Confidence',
+      value: `${stats.avgConfidence}%`,
+      change: 'AI Sicherheit',
+      icon: MessageSquare,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    },
+    {
+      title: 'Total E-Mails',
+      value: stats.totalEmails.toString(),
+      change: 'letzte 30 Tage',
+      icon: Clock,
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    },
+  ]
+
   return (
     <div className="space-y-6">
-      <Header
-        title="Dashboard"
-        description="Willkommen zurück! Hier ist dein Überblick."
-      />
+      <div className="flex items-center justify-between">
+        <Header
+          title="Dashboard"
+          description="Willkommen zurück! Hier ist dein Überblick."
+        />
+        <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          Aktualisieren
+        </Button>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {statsCards.map((stat) => (
           <Card key={stat.title}>
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -94,7 +165,11 @@ export default function DashboardPage() {
                     {stat.title}
                   </p>
                   <p className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
-                    {stat.value}
+                    {isLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    ) : (
+                      stat.value
+                    )}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     {stat.change}
@@ -120,35 +195,48 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentEmails.map((email) => (
-                <Link
-                  key={email.id}
-                  href="/inbox"
-                  className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                >
-                  <div
-                    className={`w-2 h-2 rounded-full ${getConfidenceColor(email.confidence)}`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                      {email.subject}
-                    </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {email.from}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {email.time}
-                    </p>
-                    <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
-                      {email.confidence}%
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+              </div>
+            ) : emails.length === 0 ? (
+              <p className="text-center text-slate-500 py-8">Keine E-Mails vorhanden</p>
+            ) : (
+              <div className="space-y-3">
+                {emails.map((email) => {
+                  const confidence = email.email_drafts?.[0]?.confidence_score || 0
+                  return (
+                    <Link
+                      key={email.id}
+                      href="/inbox"
+                      className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      <div
+                        className={`w-2 h-2 rounded-full ${getConfidenceColor(confidence)}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                          {email.subject || 'Kein Betreff'}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {email.from_email}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {formatTimeAgo(email.received_at)}
+                        </p>
+                        {confidence > 0 && (
+                          <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {Math.round(confidence)}%
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -171,7 +259,7 @@ export default function DashboardPage() {
                   Inbox öffnen
                 </p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  12 ausstehend
+                  {stats.pendingEmails} offen
                 </p>
               </Link>
               <Link
@@ -180,22 +268,22 @@ export default function DashboardPage() {
               >
                 <MessageSquare className="h-6 w-6 text-purple-600 mb-2" />
                 <p className="font-medium text-slate-900 dark:text-white">
-                  Chat starten
+                  AI Chat
                 </p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  AI Assistent
+                  Chat & Learning
                 </p>
               </Link>
               <Link
-                href="/templates"
+                href="/chat?mode=learning"
                 className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors text-left"
               >
                 <CheckCircle2 className="h-6 w-6 text-green-600 mb-2" />
                 <p className="font-medium text-slate-900 dark:text-white">
-                  Templates
+                  Wissen hinzufügen
                 </p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  23 verfügbar
+                  AI trainieren
                 </p>
               </Link>
               <Link
@@ -207,7 +295,7 @@ export default function DashboardPage() {
                   Knowledge Base
                 </p>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
-                  127 Einträge
+                  Übersicht
                 </p>
               </Link>
             </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createEmbedding, generateEmailDraft } from '@/lib/ai/openai'
+import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
 
 // Helper function to generate draft for an email (runs in background)
 async function generateDraftForEmail(
@@ -228,19 +228,26 @@ export async function POST(request: NextRequest) {
         .join(' ') || null
       const subject = props.hs_email_subject || 'Kein Betreff'
       const bodyText = props.hs_email_text || ''
+      const fromEmail = props.hs_email_from_email || 'unknown@example.com'
+
+      // Classify email type (system alert, form submission, customer inquiry)
+      const classification = await classifyEmail(fromEmail, subject, bodyText)
 
       const { data: newEmail, error: insertError } = await supabase
         .from('incoming_emails')
         .insert({
           hubspot_email_id: String(email.id),
           hubspot_thread_id: props.hs_email_thread_id || null,
-          from_email: props.hs_email_from_email || 'unknown@example.com',
+          from_email: fromEmail,
           from_name: fromName,
           subject: subject,
           body_text: bodyText,
           body_html: props.hs_email_html || null,
           received_at: receivedAt.toISOString(),
           status: 'pending',
+          email_type: classification.emailType,
+          needs_response: classification.needsResponse,
+          classification_reason: classification.reason,
         })
         .select('id')
         .single()
@@ -249,8 +256,8 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert email:', insertError)
       } else {
         imported++
-        // Trigger auto-draft generation in background (don't await)
-        if (newEmail?.id) {
+        // Only generate draft for emails that need a response
+        if (newEmail?.id && classification.needsResponse) {
           generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
             .catch(err => console.error('Background draft generation failed:', err))
         }

@@ -41,6 +41,10 @@ import {
   FileUp,
   RotateCcw,
   MessageSquare,
+  Bot,
+  Bell,
+  FileText,
+  User,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -67,6 +71,9 @@ interface Email {
   body_text: string
   received_at: string
   status: string
+  email_type?: 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
+  needs_response?: boolean
+  classification_reason?: string
   email_drafts?: EmailDraft[]
 }
 
@@ -97,6 +104,40 @@ function getStatusBadge(status: string) {
   }
 }
 
+function getEmailTypeBadge(emailType?: string, needsResponse?: boolean) {
+  switch (emailType) {
+    case 'system_alert':
+      return (
+        <Badge variant="outline" className="text-orange-600 border-orange-300 gap-1">
+          <Bell className="h-3 w-3" />
+          System
+        </Badge>
+      )
+    case 'notification':
+      return (
+        <Badge variant="outline" className="text-purple-600 border-purple-300 gap-1">
+          <Bell className="h-3 w-3" />
+          Notification
+        </Badge>
+      )
+    case 'form_submission':
+      return (
+        <Badge variant="outline" className={`gap-1 ${needsResponse ? 'text-blue-600 border-blue-300' : 'text-slate-500 border-slate-300'}`}>
+          <FileText className="h-3 w-3" />
+          Formular
+        </Badge>
+      )
+    case 'customer_inquiry':
+    default:
+      return (
+        <Badge variant="outline" className="text-green-600 border-green-300 gap-1">
+          <User className="h-3 w-3" />
+          Anfrage
+        </Badge>
+      )
+  }
+}
+
 function formatDate(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
@@ -115,6 +156,7 @@ export default function InboxPage() {
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
+  const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
@@ -316,6 +358,10 @@ export default function InboxPage() {
   const filteredEmails = emails.filter((email) => {
     // Hide sent/closed emails if toggle is on
     if (hideSent && email.status === 'sent') return false
+    // Hide system/transactional emails if toggle is on
+    if (hideSystemMails && (email.email_type === 'system_alert' || email.email_type === 'notification' || (email.email_type === 'form_submission' && !email.needs_response))) {
+      return false
+    }
     if (filter !== 'all' && email.status !== filter) return false
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -370,6 +416,17 @@ export default function InboxPage() {
           <Label htmlFor="hide-sent" className="text-sm cursor-pointer flex items-center gap-1.5">
             <EyeOff className="h-3.5 w-3.5" />
             Geschlossene ausblenden
+          </Label>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
+          <Switch
+            id="hide-system"
+            checked={hideSystemMails}
+            onCheckedChange={setHideSystemMails}
+          />
+          <Label htmlFor="hide-system" className="text-sm cursor-pointer flex items-center gap-1.5">
+            <Bot className="h-3.5 w-3.5" />
+            System-Mails ausblenden
           </Label>
         </div>
         <Button
@@ -443,7 +500,8 @@ export default function InboxPage() {
                             )}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {formatDate(email.received_at)}
@@ -492,7 +550,7 @@ export default function InboxPage() {
 
       {/* Email Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{selectedEmail?.subject}</DialogTitle>
           </DialogHeader>
@@ -512,11 +570,11 @@ export default function InboxPage() {
               </div>
 
               {/* Original Message */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
                 <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Original Nachricht
                 </h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
                   {selectedEmail.body_text}
                 </p>
               </div>
@@ -661,8 +719,8 @@ export default function InboxPage() {
                       className="font-mono text-sm"
                     />
                   ) : (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg relative">
-                      <p className="text-sm whitespace-pre-wrap">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
+                      <p className="text-sm whitespace-pre-wrap break-words">
                         {currentDraft.edited_response || currentDraft.ai_generated_response}
                       </p>
                     </div>

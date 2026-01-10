@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const SITE_PASSWORD = process.env.SITE_PASSWORD || 'palai26'
+const SITE_PASSWORD = process.env.SITE_PASSWORD || ''
 const AUTH_COOKIE_NAME = 'palai_auth'
 
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
+
+  // If no password is set, allow all access
+  if (!SITE_PASSWORD) {
+    return NextResponse.next()
+  }
 
   // Allow API routes and static files
   if (

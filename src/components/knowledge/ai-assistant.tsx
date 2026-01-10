@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Send, Bot, User, Sparkles, Copy, Check } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Copy, Check, BookOpen, Loader2, CheckCircle, Save } from 'lucide-react'
 
 interface Message {
   id: string
@@ -22,6 +24,8 @@ interface Message {
     category?: string
     summary?: string
   }
+  savedToKnowledge?: boolean
+  originalContent?: string // Store original user content for saving
 }
 
 interface KnowledgeAIAssistantProps {
@@ -46,11 +50,34 @@ Füge einfach deinen Text ein oder stelle mir eine Frage!`,
   },
 ]
 
+const learningModeMessages: Message[] = [
+  {
+    id: '1',
+    role: 'assistant',
+    content: `🎓 **Learning Mode aktiv!**
+
+Ich helfe dir, Wissen direkt in die Knowledge Base zu speichern.
+
+**So funktioniert's:**
+1. Füge Text, Stichworte oder Informationen ein
+2. Ich analysiere den Inhalt und schlage Titel & Kategorie vor
+3. Klicke auf "Direkt speichern" um es in die Knowledge Base aufzunehmen
+
+**Tipp:** Du kannst auch Stichworte oder unformatierte Notizen einfügen - ich formatiere sie automatisch.
+
+Los geht's! Was möchtest du speichern?`,
+    timestamp: new Date(),
+  },
+]
+
 export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: KnowledgeAIAssistantProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState<string | null>(null) // Track which message is being saved
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [learningMode, setLearningMode] = useState(false)
+  const [lastUserContent, setLastUserContent] = useState<string>('') // Store last user input for saving
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -59,17 +86,90 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
     }
   }, [messages])
 
+  // Handle learning mode toggle
+  const handleLearningModeToggle = (enabled: boolean) => {
+    setLearningMode(enabled)
+    setMessages(enabled ? learningModeMessages : initialMessages)
+    setLastUserContent('')
+  }
+
+  // Save content directly to knowledge base
+  const handleSaveToKnowledge = async (messageId: string, suggestion: Message['suggestion'], content: string) => {
+    if (!suggestion?.title || !content) return
+
+    setIsSaving(messageId)
+
+    try {
+      const formData = new FormData()
+      formData.append('title', suggestion.title)
+      formData.append('content', content)
+      formData.append('source_type', suggestion.category || 'help_article')
+
+      const response = await fetch('/api/knowledge', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) throw new Error('Failed to save')
+
+      const data = await response.json()
+
+      // Update the message to show it was saved
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, savedToKnowledge: true } : msg
+        )
+      )
+
+      // Add success message
+      const successMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `✅ **Erfolgreich gespeichert!**
+
+"${suggestion.title}" wurde zur Knowledge Base hinzugefügt.
+- ${data.chunksCreated} Chunk(s) erstellt
+- Kategorie: ${
+          suggestion.category === 'help_article' ? 'Help Center' :
+          suggestion.category === 'faq' ? 'FAQ' :
+          suggestion.category === 'course_info' ? 'Kurs-Info' :
+          'E-Mail Vorlage'
+        }
+
+Du kannst jetzt weiteren Content hinzufügen!`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, successMessage])
+    } catch (error) {
+      console.error('Save error:', error)
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `❌ **Fehler beim Speichern**
+
+Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
+    } finally {
+      setIsSaving(null)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!input.trim() || isLoading) return
 
+    const userContent = input.trim()
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: userContent,
       timestamp: new Date(),
     }
 
+    // Store user content for potential saving
+    setLastUserContent(userContent)
     setMessages((prev) => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
@@ -78,7 +178,7 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
       const response = await fetch('/api/knowledge/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage.content }),
+        body: JSON.stringify({ message: userContent }),
       })
 
       if (!response.ok) throw new Error('API error')
@@ -91,6 +191,7 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
         content: data.response,
         timestamp: new Date(),
         suggestion: data.suggestion,
+        originalContent: userContent, // Store for saving
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
@@ -98,8 +199,9 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: getLocalResponse(userMessage.content),
+        content: getLocalResponse(userContent),
         timestamp: new Date(),
+        originalContent: userContent,
       }
       setMessages((prev) => [...prev, assistantMessage])
     } finally {
@@ -135,12 +237,32 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-white" />
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                learningMode
+                  ? 'bg-gradient-to-br from-green-500 to-green-600'
+                  : 'bg-gradient-to-br from-amber-500 to-amber-600'
+              }`}>
+                {learningMode ? (
+                  <BookOpen className="h-4 w-4 text-white" />
+                ) : (
+                  <Bot className="h-4 w-4 text-white" />
+                )}
+              </div>
+              {learningMode ? 'Learning Mode' : 'Knowledge Base Assistent'}
+            </DialogTitle>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="learning-mode" className="text-xs text-slate-500">
+                Learning Mode
+              </Label>
+              <Switch
+                id="learning-mode"
+                checked={learningMode}
+                onCheckedChange={handleLearningModeToggle}
+              />
             </div>
-            Knowledge Base Assistent
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
         {/* Messages */}
@@ -178,12 +300,36 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
 
                   {/* Suggestion Actions */}
                   {message.suggestion && (
-                    <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className={`mt-2 p-3 rounded-lg border ${
+                      message.savedToKnowledge
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : learningMode
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                    }`}>
                       <div className="flex items-center gap-2 mb-2">
-                        <Sparkles className="h-4 w-4 text-amber-600" />
-                        <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                          Vorschlag
-                        </span>
+                        {message.savedToKnowledge ? (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                              Gespeichert
+                            </span>
+                          </>
+                        ) : learningMode ? (
+                          <>
+                            <BookOpen className="h-4 w-4 text-green-600" />
+                            <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                              Bereit zum Speichern
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 text-amber-600" />
+                            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                              Vorschlag
+                            </span>
+                          </>
+                        )}
                       </div>
 
                       {message.suggestion.title && (
@@ -221,14 +367,41 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
                         </div>
                       )}
 
-                      <Button
-                        size="sm"
-                        className="w-full mt-2 gap-2"
-                        onClick={() => handleApplySuggestion(message.suggestion)}
-                      >
-                        <Sparkles className="h-3.5 w-3.5" />
-                        Vorschlag übernehmen
-                      </Button>
+                      {!message.savedToKnowledge && (
+                        learningMode ? (
+                          <Button
+                            size="sm"
+                            className="w-full mt-2 gap-2 bg-green-600 hover:bg-green-700"
+                            onClick={() => handleSaveToKnowledge(
+                              message.id,
+                              message.suggestion,
+                              message.originalContent || lastUserContent
+                            )}
+                            disabled={isSaving === message.id}
+                          >
+                            {isSaving === message.id ? (
+                              <>
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Speichern...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="h-3.5 w-3.5" />
+                                Direkt speichern
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="w-full mt-2 gap-2"
+                            onClick={() => handleApplySuggestion(message.suggestion)}
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Vorschlag übernehmen
+                          </Button>
+                        )
+                      )}
                     </div>
                   )}
                 </div>
@@ -237,14 +410,24 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
 
             {isLoading && (
               <div className="flex gap-3">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
-                  <Bot className="h-4 w-4 text-white" />
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  learningMode
+                    ? 'bg-gradient-to-br from-green-500 to-green-600'
+                    : 'bg-gradient-to-br from-amber-500 to-amber-600'
+                }`}>
+                  {learningMode ? (
+                    <BookOpen className="h-4 w-4 text-white" />
+                  ) : (
+                    <Bot className="h-4 w-4 text-white" />
+                  )}
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-amber-500 animate-pulse" />
+                    <Loader2 className={`h-4 w-4 animate-spin ${
+                      learningMode ? 'text-green-500' : 'text-amber-500'
+                    }`} />
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                      Analysiere...
+                      {learningMode ? 'Verarbeite...' : 'Analysiere...'}
                     </span>
                   </div>
                 </div>
@@ -261,11 +444,20 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Füge Text ein oder stelle eine Frage..."
-                className="min-h-[44px] max-h-32 resize-none text-sm"
+                placeholder={learningMode
+                  ? "Füge Wissen, Stichworte oder Infos zum Speichern ein..."
+                  : "Füge Text ein oder stelle eine Frage..."
+                }
+                className={`min-h-[44px] max-h-32 resize-none text-sm ${
+                  learningMode ? 'border-green-300 focus:border-green-500' : ''
+                }`}
                 rows={2}
               />
-              <Button type="submit" disabled={!input.trim() || isLoading} className="px-4">
+              <Button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                className={`px-4 ${learningMode ? 'bg-green-600 hover:bg-green-700' : ''}`}
+              >
                 <Send className="h-4 w-4" />
               </Button>
             </div>

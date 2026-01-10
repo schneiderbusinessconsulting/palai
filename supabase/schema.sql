@@ -50,10 +50,17 @@ create table if not exists incoming_emails (
   body_html text,
   received_at timestamp with time zone not null,
   status text default 'pending', -- 'pending', 'draft_ready', 'approved', 'sent', 'rejected'
+  email_type text default 'customer_inquiry', -- 'customer_inquiry', 'form_submission', 'system_alert', 'notification'
+  needs_response boolean default true, -- AI-classified: does this email need a response?
+  classification_reason text, -- Reason for the classification
   assigned_to uuid references auth.users(id),
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+-- Index für Email-Type Filterung
+create index if not exists incoming_emails_email_type_idx
+  on incoming_emails (email_type);
 
 -- Index für Status-Filterung
 create index if not exists incoming_emails_status_idx

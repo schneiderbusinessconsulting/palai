@@ -215,4 +215,73 @@ Antworte NUR im folgenden JSON-Format:
   }
 }
 
+export type EmailType = 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
+
+// Classify incoming emails to filter transactional/system mails
+export async function classifyEmail(
+  fromEmail: string,
+  subject: string,
+  bodyText: string
+): Promise<{ emailType: EmailType; needsResponse: boolean; reason: string }> {
+  // Quick pattern-based classification for obvious cases (saves API calls)
+  const lowerFrom = fromEmail.toLowerCase()
+  const lowerSubject = subject.toLowerCase()
+
+  // System alerts - no response needed
+  const systemPatterns = [
+    { from: ['zapier', 'alerts@', 'no-reply@', 'noreply@', 'notifications@'], keywords: ['alert', 'error', 'warning'] },
+    { from: ['zoom.us', 'zoom.com'], keywords: ['meeting', 'joined', 'recording', 'ready'] },
+    { from: ['kajabi', 'activecampaign'], keywords: ['alert', 'integration', 'error'] },
+    { from: ['justcall', 'aircall'], keywords: ['summary', 'daily', 'report'] },
+  ]
+
+  for (const pattern of systemPatterns) {
+    const fromMatch = pattern.from.some(p => lowerFrom.includes(p))
+    const keywordMatch = pattern.keywords.some(k => lowerSubject.includes(k))
+    if (fromMatch && keywordMatch) {
+      return {
+        emailType: 'system_alert',
+        needsResponse: false,
+        reason: 'Automatische System-Benachrichtigung erkannt',
+      }
+    }
+  }
+
+  // Zoom notifications
+  if (lowerFrom.includes('zoom') && (lowerSubject.includes('joined') || lowerSubject.includes('recording') || lowerSubject.includes('ready'))) {
+    return {
+      emailType: 'notification',
+      needsResponse: false,
+      reason: 'Zoom Benachrichtigung',
+    }
+  }
+
+  // Form submissions - check if they need response
+  const formPatterns = ['tally.so', 'typeform', 'jotform', 'formular', 'anmeldung', 'registration']
+  const isFormSubmission = formPatterns.some(p => lowerFrom.includes(p) || lowerSubject.includes(p))
+
+  if (isFormSubmission) {
+    // Check if there's a comment/question in the form that needs response
+    const commentPatterns = ['kommentar', 'comment', 'frage', 'question', 'anmerkung', 'nachricht', 'message']
+    const hasComment = commentPatterns.some(p => bodyText.toLowerCase().includes(p))
+
+    // Look for actual content after comment field
+    const commentMatch = bodyText.match(/(?:kommentar|comment|nachricht|message)[:\s]*\n([^\n]+)/i)
+    const hasActualComment = commentMatch && commentMatch[1] && commentMatch[1].trim().length > 5 && commentMatch[1].trim() !== '-'
+
+    return {
+      emailType: 'form_submission',
+      needsResponse: hasActualComment || false,
+      reason: hasActualComment ? 'Formular mit Kundenkommentar' : 'Formular-Eingang ohne Rückfrage',
+    }
+  }
+
+  // Default: assume it's a customer inquiry that needs response
+  return {
+    emailType: 'customer_inquiry',
+    needsResponse: true,
+    reason: 'Kundenanfrage',
+  }
+}
+
 export { getOpenAI }

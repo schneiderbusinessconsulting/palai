@@ -485,7 +485,11 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
                     }`}
                   >
-                    <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+                    <div className={`text-sm prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2 ${
+                      message.role === 'user'
+                        ? 'prose-invert'
+                        : 'dark:prose-invert'
+                    }`}>
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     </div>
                   </div>

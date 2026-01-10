@@ -143,11 +143,13 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Header
-          title="Dashboard"
-          description="Willkommen zurück! Hier ist dein Überblick."
-        />
+      <Header
+        title="Dashboard"
+        description="Willkommen zurück! Hier ist dein Überblick."
+      />
+
+      {/* Refresh Button */}
+      <div className="flex justify-end -mt-4">
         <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Aktualisieren

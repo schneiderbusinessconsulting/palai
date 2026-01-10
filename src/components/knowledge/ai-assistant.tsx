@@ -4,15 +4,15 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Send, Bot, User, Sparkles, Copy, Check, BookOpen, Loader2, CheckCircle, Save } from 'lucide-react'
+import { Send, Bot, User, Sparkles, Copy, Check, BookOpen, Loader2, CheckCircle, Save, Settings, MessageSquare } from 'lucide-react'
+
+type AssistantMode = 'chat' | 'learning' | 'rules'
 
 interface Message {
   id: string
@@ -34,7 +34,7 @@ interface KnowledgeAIAssistantProps {
   onApplySuggestion?: (suggestion: { title?: string; category?: string; content?: string }) => void
 }
 
-const initialMessages: Message[] = [
+const chatMessages: Message[] = [
   {
     id: '1',
     role: 'assistant',
@@ -50,34 +50,69 @@ Füge einfach deinen Text ein oder stelle mir eine Frage!`,
   },
 ]
 
-const learningModeMessages: Message[] = [
+const learningMessages: Message[] = [
   {
     id: '1',
     role: 'assistant',
-    content: `🎓 **Learning Mode aktiv!**
+    content: `📚 **Learning Mode**
 
-Ich helfe dir, Wissen direkt in die Knowledge Base zu speichern.
+Hier kannst du Wissen direkt in die Knowledge Base speichern.
 
 **So funktioniert's:**
 1. Füge Text, Stichworte oder Informationen ein
-2. Ich analysiere den Inhalt und schlage Titel & Kategorie vor
-3. Klicke auf "Direkt speichern" um es in die Knowledge Base aufzunehmen
+2. Ich analysiere und schlage Titel & Kategorie vor
+3. Klicke "Direkt speichern"
 
-**Tipp:** Du kannst auch Stichworte oder unformatierte Notizen einfügen - ich formatiere sie automatisch.
+**Beispiele:**
+- Kurspreise und Termine
+- FAQ Antworten
+- E-Mail Vorlagen
+- Policies
 
 Los geht's! Was möchtest du speichern?`,
     timestamp: new Date(),
   },
 ]
 
+const rulesMessages: Message[] = [
+  {
+    id: '1',
+    role: 'assistant',
+    content: `⚙️ **AI Regeln & Einstellungen**
+
+Hier kannst du das Verhalten des AI Assistenten anpassen. Diese Regeln werden bei **jeder** E-Mail-Generierung berücksichtigt.
+
+**Beispiele für Regeln:**
+- "Begrüssung immer mit 'Liebe/Lieber [Vorname]' statt 'Grüezi'"
+- "Signatur: 'Herzliche Grüsse, Das Palacios Team'"
+- "Niemals Rabatte versprechen ohne Rücksprache"
+- "Bei Beschwerden immer Empathie zeigen und Rückruf anbieten"
+- "Tonalität: Warm und persönlich, nicht zu förmlich"
+
+Schreibe einfach eine neue Regel und ich speichere sie!`,
+    timestamp: new Date(),
+  },
+]
+
+function getMessagesForMode(mode: AssistantMode): Message[] {
+  switch (mode) {
+    case 'learning':
+      return learningMessages
+    case 'rules':
+      return rulesMessages
+    default:
+      return chatMessages
+  }
+}
+
 export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: KnowledgeAIAssistantProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages)
+  const [mode, setMode] = useState<AssistantMode>('chat')
+  const [messages, setMessages] = useState<Message[]>(chatMessages)
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isSaving, setIsSaving] = useState<string | null>(null) // Track which message is being saved
+  const [isSaving, setIsSaving] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [learningMode, setLearningMode] = useState(false)
-  const [lastUserContent, setLastUserContent] = useState<string>('') // Store last user input for saving
+  const [lastUserContent, setLastUserContent] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -86,10 +121,10 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
     }
   }, [messages])
 
-  // Handle learning mode toggle
-  const handleLearningModeToggle = (enabled: boolean) => {
-    setLearningMode(enabled)
-    setMessages(enabled ? learningModeMessages : initialMessages)
+  // Handle mode change
+  const handleModeChange = (newMode: AssistantMode) => {
+    setMode(newMode)
+    setMessages(getMessagesForMode(newMode))
     setLastUserContent('')
   }
 
@@ -99,11 +134,14 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
 
     setIsSaving(messageId)
 
+    // For rules mode, always save as ai_instructions
+    const sourceType = mode === 'rules' ? 'ai_instructions' : (suggestion.category || 'help_article')
+
     try {
       const formData = new FormData()
       formData.append('title', suggestion.title)
       formData.append('content', content)
-      formData.append('source_type', suggestion.category || 'help_article')
+      formData.append('source_type', sourceType)
 
       const response = await fetch('/api/knowledge', {
         method: 'POST',
@@ -122,19 +160,26 @@ export function KnowledgeAIAssistant({ open, onOpenChange, onApplySuggestion }: 
       )
 
       // Add success message
+      const categoryLabel = sourceType === 'ai_instructions' ? 'AI Regel' :
+        sourceType === 'help_article' ? 'Help Center' :
+        sourceType === 'faq' ? 'FAQ' :
+        sourceType === 'course_info' ? 'Kurs-Info' :
+        'E-Mail Vorlage'
+
       const successMessage: Message = {
         id: Date.now().toString(),
         role: 'assistant',
-        content: `✅ **Erfolgreich gespeichert!**
+        content: mode === 'rules'
+          ? `✅ **Regel gespeichert!**
+
+"${suggestion.title}" wird ab sofort bei jeder E-Mail-Generierung berücksichtigt.
+
+Du kannst weitere Regeln hinzufügen!`
+          : `✅ **Erfolgreich gespeichert!**
 
 "${suggestion.title}" wurde zur Knowledge Base hinzugefügt.
 - ${data.chunksCreated} Chunk(s) erstellt
-- Kategorie: ${
-          suggestion.category === 'help_article' ? 'Help Center' :
-          suggestion.category === 'faq' ? 'FAQ' :
-          suggestion.category === 'course_info' ? 'Kurs-Info' :
-          'E-Mail Vorlage'
-        }
+- Kategorie: ${categoryLabel}
 
 Du kannst jetzt weiteren Content hinzufügen!`,
         timestamp: new Date(),
@@ -147,7 +192,7 @@ Du kannst jetzt weiteren Content hinzufügen!`,
         role: 'assistant',
         content: `❌ **Fehler beim Speichern**
 
-Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
+Bitte versuche es erneut.`,
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
@@ -174,6 +219,32 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
     setInput('')
     setIsLoading(true)
 
+    // For rules mode, generate a simple suggestion without API call
+    if (mode === 'rules') {
+      const ruleTitle = userContent.length > 50
+        ? userContent.substring(0, 47) + '...'
+        : userContent
+
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Ich habe deine Regel analysiert:
+
+**"${userContent}"**
+
+Diese Regel wird bei jeder E-Mail-Generierung berücksichtigt. Klicke auf "Regel speichern" um sie zu aktivieren.`,
+        timestamp: new Date(),
+        suggestion: {
+          title: ruleTitle,
+          category: 'ai_instructions',
+        },
+        originalContent: userContent,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+      setIsLoading(false)
+      return
+    }
+
     try {
       const response = await fetch('/api/knowledge/assistant', {
         method: 'POST',
@@ -191,7 +262,7 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
         content: data.response,
         timestamp: new Date(),
         suggestion: data.suggestion,
-        originalContent: userContent, // Store for saving
+        originalContent: userContent,
       }
       setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
@@ -233,35 +304,67 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
     }
   }
 
+  // Get icon and color based on mode
+  const getModeConfig = () => {
+    switch (mode) {
+      case 'learning':
+        return { icon: BookOpen, color: 'from-green-500 to-green-600', label: 'Learning' }
+      case 'rules':
+        return { icon: Settings, color: 'from-purple-500 to-purple-600', label: 'AI Regeln' }
+      default:
+        return { icon: MessageSquare, color: 'from-amber-500 to-amber-600', label: 'Chat' }
+    }
+  }
+
+  const modeConfig = getModeConfig()
+  const ModeIcon = modeConfig.icon
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl h-[80vh] flex flex-col p-0">
-        <DialogHeader className="px-6 py-4 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                learningMode
-                  ? 'bg-gradient-to-br from-green-500 to-green-600'
-                  : 'bg-gradient-to-br from-amber-500 to-amber-600'
-              }`}>
-                {learningMode ? (
-                  <BookOpen className="h-4 w-4 text-white" />
-                ) : (
-                  <Bot className="h-4 w-4 text-white" />
-                )}
-              </div>
-              {learningMode ? 'Learning Mode' : 'Knowledge Base Assistent'}
-            </DialogTitle>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="learning-mode" className="text-xs text-slate-500">
-                Learning Mode
-              </Label>
-              <Switch
-                id="learning-mode"
-                checked={learningMode}
-                onCheckedChange={handleLearningModeToggle}
-              />
+        <DialogHeader className="px-6 py-4 border-b space-y-3">
+          <DialogTitle className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${modeConfig.color} flex items-center justify-center`}>
+              <ModeIcon className="h-4 w-4 text-white" />
             </div>
+            Knowledge Base Assistent
+          </DialogTitle>
+
+          {/* Mode Tabs */}
+          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => handleModeChange('chat')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                mode === 'chat'
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Chat
+            </button>
+            <button
+              onClick={() => handleModeChange('learning')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                mode === 'learning'
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-green-600'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Learning
+            </button>
+            <button
+              onClick={() => handleModeChange('rules')}
+              className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                mode === 'rules'
+                  ? 'bg-white dark:bg-slate-700 shadow-sm text-purple-600'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              AI Regeln
+            </button>
           </div>
         </DialogHeader>
 
@@ -303,7 +406,9 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
                     <div className={`mt-2 p-3 rounded-lg border ${
                       message.savedToKnowledge
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                        : learningMode
+                        : mode === 'rules'
+                        ? 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
+                        : mode === 'learning'
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
                         : 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
                     }`}>
@@ -312,10 +417,17 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
                           <>
                             <CheckCircle className="h-4 w-4 text-green-600" />
                             <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                              Gespeichert
+                              {mode === 'rules' ? 'Regel aktiv' : 'Gespeichert'}
                             </span>
                           </>
-                        ) : learningMode ? (
+                        ) : mode === 'rules' ? (
+                          <>
+                            <Settings className="h-4 w-4 text-purple-600" />
+                            <span className="text-sm font-medium text-purple-700 dark:text-purple-400">
+                              Neue Regel
+                            </span>
+                          </>
+                        ) : mode === 'learning' ? (
                           <>
                             <BookOpen className="h-4 w-4 text-green-600" />
                             <span className="text-sm font-medium text-green-700 dark:text-green-400">
@@ -334,9 +446,9 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
 
                       {message.suggestion.title && (
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="text-xs text-slate-500">Titel:</span>
+                          <span className="text-xs text-slate-500">{mode === 'rules' ? 'Regel:' : 'Titel:'}</span>
                           <div className="flex items-center gap-1">
-                            <code className="text-xs bg-white dark:bg-slate-700 px-2 py-0.5 rounded">
+                            <code className="text-xs bg-white dark:bg-slate-700 px-2 py-0.5 rounded max-w-[200px] truncate">
                               {message.suggestion.title}
                             </code>
                             <Button
@@ -355,23 +467,28 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
                         </div>
                       )}
 
-                      {message.suggestion.category && (
+                      {message.suggestion.category && mode !== 'rules' && (
                         <div className="flex items-center justify-between gap-2 mb-1">
                           <span className="text-xs text-slate-500">Kategorie:</span>
                           <code className="text-xs bg-white dark:bg-slate-700 px-2 py-0.5 rounded">
                             {message.suggestion.category === 'help_article' ? 'Help Center' :
                              message.suggestion.category === 'faq' ? 'FAQ' :
                              message.suggestion.category === 'course_info' ? 'Kurs-Info' :
+                             message.suggestion.category === 'ai_instructions' ? 'AI Regel' :
                              'E-Mail Vorlage'}
                           </code>
                         </div>
                       )}
 
                       {!message.savedToKnowledge && (
-                        learningMode ? (
+                        mode !== 'chat' ? (
                           <Button
                             size="sm"
-                            className="w-full mt-2 gap-2 bg-green-600 hover:bg-green-700"
+                            className={`w-full mt-2 gap-2 ${
+                              mode === 'rules'
+                                ? 'bg-purple-600 hover:bg-purple-700'
+                                : 'bg-green-600 hover:bg-green-700'
+                            }`}
                             onClick={() => handleSaveToKnowledge(
                               message.id,
                               message.suggestion,
@@ -387,7 +504,7 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
                             ) : (
                               <>
                                 <Save className="h-3.5 w-3.5" />
-                                Direkt speichern
+                                {mode === 'rules' ? 'Regel speichern' : 'Direkt speichern'}
                               </>
                             )}
                           </Button>
@@ -410,24 +527,18 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
 
             {isLoading && (
               <div className="flex gap-3">
-                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  learningMode
-                    ? 'bg-gradient-to-br from-green-500 to-green-600'
-                    : 'bg-gradient-to-br from-amber-500 to-amber-600'
-                }`}>
-                  {learningMode ? (
-                    <BookOpen className="h-4 w-4 text-white" />
-                  ) : (
-                    <Bot className="h-4 w-4 text-white" />
-                  )}
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-br ${modeConfig.color}`}>
+                  <ModeIcon className="h-4 w-4 text-white" />
                 </div>
                 <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Loader2 className={`h-4 w-4 animate-spin ${
-                      learningMode ? 'text-green-500' : 'text-amber-500'
+                      mode === 'rules' ? 'text-purple-500' :
+                      mode === 'learning' ? 'text-green-500' : 'text-amber-500'
                     }`} />
                     <span className="text-sm text-slate-500 dark:text-slate-400">
-                      {learningMode ? 'Verarbeite...' : 'Analysiere...'}
+                      {mode === 'rules' ? 'Speichere...' :
+                       mode === 'learning' ? 'Verarbeite...' : 'Analysiere...'}
                     </span>
                   </div>
                 </div>
@@ -444,19 +555,24 @@ Bitte versuche es erneut oder nutze das manuelle Upload-Formular.`,
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={learningMode
-                  ? "Füge Wissen, Stichworte oder Infos zum Speichern ein..."
-                  : "Füge Text ein oder stelle eine Frage..."
+                placeholder={
+                  mode === 'rules' ? "Schreibe eine neue Regel für den AI Assistenten..." :
+                  mode === 'learning' ? "Füge Wissen, Stichworte oder Infos zum Speichern ein..." :
+                  "Füge Text ein oder stelle eine Frage..."
                 }
                 className={`min-h-[44px] max-h-32 resize-none text-sm ${
-                  learningMode ? 'border-green-300 focus:border-green-500' : ''
+                  mode === 'rules' ? 'border-purple-300 focus:border-purple-500' :
+                  mode === 'learning' ? 'border-green-300 focus:border-green-500' : ''
                 }`}
                 rows={2}
               />
               <Button
                 type="submit"
                 disabled={!input.trim() || isLoading}
-                className={`px-4 ${learningMode ? 'bg-green-600 hover:bg-green-700' : ''}`}
+                className={`px-4 ${
+                  mode === 'rules' ? 'bg-purple-600 hover:bg-purple-700' :
+                  mode === 'learning' ? 'bg-green-600 hover:bg-green-700' : ''
+                }`}
               >
                 <Send className="h-4 w-4" />
               </Button>

@@ -574,9 +574,9 @@ export default function InboxPage() {
                 <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Original Nachricht
                 </h4>
-                <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-words">
+                <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-all overflow-x-auto max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                   {selectedEmail.body_text}
-                </p>
+                </div>
               </div>
 
               {/* AI Draft */}
@@ -720,9 +720,9 @@ export default function InboxPage() {
                     />
                   ) : (
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
-                      <p className="text-sm whitespace-pre-wrap break-words">
+                      <div className="text-sm whitespace-pre-wrap break-all max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {currentDraft.edited_response || currentDraft.ai_generated_response}
-                      </p>
+                      </div>
                     </div>
                   )}
                 </div>

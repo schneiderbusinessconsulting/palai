@@ -52,6 +52,14 @@ export async function POST(
     const relevantChunks = chunks?.map((c: { content: string }) => c.content) || []
     const chunkIds = chunks?.map((c: { id: string }) => c.id) || []
 
+    // 3b. Fetch AI instructions (rules) - these always apply
+    const { data: aiRules } = await supabase
+      .from('knowledge_chunks')
+      .select('content')
+      .eq('source_type', 'ai_instructions')
+
+    const aiInstructions = aiRules?.map((r: { content: string }) => r.content) || []
+
     // 4. If regenerating, store feedback for learning
     if (regenerate && feedback) {
       const { error: feedbackError } = await supabase.from('draft_feedback').insert({
@@ -64,13 +72,14 @@ export async function POST(
       }
     }
 
-    // 5. Generate draft using AI
+    // 5. Generate draft using AI (with AI instructions/rules)
     const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
       email.from_name,
       formality,
-      feedback
+      feedback,
+      aiInstructions
     )
 
     // 6. Store or update the draft

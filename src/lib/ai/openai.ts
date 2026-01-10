@@ -78,7 +78,8 @@ export async function generateEmailDraft(
   relevantContext: string[],
   senderName?: string,
   formality?: Formality,
-  regenerationFeedback?: string
+  regenerationFeedback?: string,
+  aiInstructions?: string[]
 ): Promise<{ response: string; confidence: number; detectedFormality: Formality }> {
   // Auto-detect formality if not provided
   const detectedFormality = formality || detectFormality(emailContent)
@@ -86,6 +87,11 @@ export async function generateEmailDraft(
   const formalityInstruction = detectedFormality === 'du'
     ? `- Verwende die informelle "Du"-Form (du, dir, dein)`
     : `- Verwende die formelle "Sie"-Form (Sie, Ihnen, Ihr)`
+
+  // Build dynamic rules section from AI instructions
+  const dynamicRules = aiInstructions && aiInstructions.length > 0
+    ? `\n\nBENUTZERDEFINIERTE REGELN (IMMER BEFOLGEN):\n${aiInstructions.map((rule, i) => `${i + 1}. ${rule}`).join('\n')}`
+    : ''
 
   const systemPrompt = `Du bist ein freundlicher Support-Mitarbeiter des Palacios Instituts.
 
@@ -106,7 +112,7 @@ Formatierung:
 
 Wichtig:
 - Erfinde KEINE Preise, Daten oder Fakten
-- Wenn die Knowledge Base keine Antwort liefert, bitte den Kunden höflich um Geduld und sage, dass sich jemand persönlich melden wird`
+- Wenn die Knowledge Base keine Antwort liefert, bitte den Kunden höflich um Geduld und sage, dass sich jemand persönlich melden wird${dynamicRules}`
 
   const feedbackSection = regenerationFeedback
     ? `\n\nFEEDBACK ZUR VERBESSERUNG:\n${regenerationFeedback}\n\nBitte berücksichtige dieses Feedback bei der Erstellung der Antwort.`

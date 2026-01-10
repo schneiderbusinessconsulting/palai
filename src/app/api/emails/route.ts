@@ -40,11 +40,22 @@ async function generateDraftForEmail(
     const relevantChunks = chunks?.map((c: { content: string }) => c.content) || []
     const chunkIds = chunks?.map((c: { id: string }) => c.id) || []
 
-    // Generate draft using AI
+    // Fetch AI instructions (rules) - these always apply
+    const { data: aiRules } = await supabase
+      .from('knowledge_chunks')
+      .select('content')
+      .eq('source_type', 'ai_instructions')
+
+    const aiInstructions = aiRules?.map((r: { content: string }) => r.content) || []
+
+    // Generate draft using AI (with AI instructions/rules)
     const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
-      fromName || undefined
+      fromName || undefined,
+      undefined, // formality - auto-detect
+      undefined, // feedback
+      aiInstructions
     )
 
     // Store the draft

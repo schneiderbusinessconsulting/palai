@@ -6,7 +6,6 @@ import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Send,
   Bot,
@@ -409,13 +408,13 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
   const modeConfig = getModeConfig()
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
       <Header
         title="AI Assistent"
         description="Chat, Wissen hinzufügen oder AI-Regeln definieren"
       />
 
-      <Card className="flex-1 flex flex-col overflow-hidden">
+      <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Mode Tabs */}
         <div className="border-b border-slate-200 dark:border-slate-700 p-3">
           <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 max-w-md mx-auto">
@@ -456,8 +455,8 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
         </div>
 
         {/* Messages */}
-        <ScrollArea ref={scrollRef} className="flex-1 p-4">
-          <div className="space-y-4 max-w-3xl mx-auto">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-4">
+          <div className="space-y-4 max-w-3xl mx-auto pb-4">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -584,7 +583,7 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input */}
         <CardContent className="border-t border-slate-200 dark:border-slate-700 p-4">

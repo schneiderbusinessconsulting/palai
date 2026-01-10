@@ -182,7 +182,6 @@ export default function InboxPage() {
   const [regenerateFeedback, setRegenerateFeedback] = useState('')
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
-  const [isSyncingStatus, setIsSyncingStatus] = useState(false)
 
   // Fetch emails
   const fetchEmails = async () => {
@@ -242,18 +241,31 @@ export default function InboxPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Sync from HubSpot
+  // Sync from HubSpot (including status sync for closed conversations)
   const handleSync = async () => {
     setIsSyncing(true)
     setSyncMessage('')
     try {
-      const response = await fetch('/api/emails', { method: 'POST' })
-      const data = await response.json()
-      if (response.ok) {
-        setSyncMessage(`${data.imported} neue E-Mails importiert`)
+      // First: Import new emails
+      const importResponse = await fetch('/api/emails', { method: 'POST' })
+      const importData = await importResponse.json()
+
+      // Second: Sync conversation statuses (mark closed as sent)
+      const statusResponse = await fetch('/api/emails?action=sync-status', { method: 'PATCH' })
+      const statusData = await statusResponse.json()
+
+      if (importResponse.ok) {
+        const messages = []
+        if (importData.imported > 0) {
+          messages.push(`${importData.imported} neue E-Mails`)
+        }
+        if (statusData.closedEmails > 0) {
+          messages.push(`${statusData.closedEmails} geschlossen`)
+        }
+        setSyncMessage(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
         fetchEmails()
       } else {
-        setSyncMessage(data.error || 'Sync fehlgeschlagen')
+        setSyncMessage(importData.error || 'Sync fehlgeschlagen')
       }
     } catch (error) {
       console.error('Sync failed:', error)
@@ -282,28 +294,6 @@ export default function InboxPage() {
       setSyncMessage('Klassifizierung fehlgeschlagen')
     } finally {
       setIsClassifying(false)
-      setTimeout(() => setSyncMessage(''), 5000)
-    }
-  }
-
-  // Sync HubSpot conversation status (mark closed conversations as sent)
-  const handleSyncStatus = async () => {
-    setIsSyncingStatus(true)
-    setSyncMessage('')
-    try {
-      const response = await fetch('/api/emails?action=sync-status', { method: 'PATCH' })
-      const data = await response.json()
-      if (response.ok) {
-        setSyncMessage(data.message || `${data.closedEmails} E-Mails als geschlossen markiert`)
-        fetchEmails()
-      } else {
-        setSyncMessage(data.error || 'Status-Sync fehlgeschlagen')
-      }
-    } catch (error) {
-      console.error('Status sync failed:', error)
-      setSyncMessage('Status-Sync fehlgeschlagen')
-    } finally {
-      setIsSyncingStatus(false)
       setTimeout(() => setSyncMessage(''), 5000)
     }
   }
@@ -517,27 +507,6 @@ export default function InboxPage() {
             </TooltipTrigger>
             <TooltipContent>
               <p>Alte E-Mails neu klassifizieren</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleSyncStatus}
-                disabled={isSyncingStatus}
-              >
-                {isSyncingStatus ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <CheckCircle className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>HubSpot Status synchronisieren (geschlossene markieren)</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

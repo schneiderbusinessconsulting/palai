@@ -69,6 +69,8 @@ function getSourceIcon(type: string) {
       return <Mail className="h-4 w-4" />
     case 'course_info':
       return <FileText className="h-4 w-4" />
+    case 'ai_instructions':
+      return <Sparkles className="h-4 w-4" />
     default:
       return <FileText className="h-4 w-4" />
   }
@@ -91,6 +93,10 @@ function getSourceBadge(type: string) {
     course_info: {
       label: 'Kurs-Info',
       className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    },
+    ai_instructions: {
+      label: 'AI-Regeln',
+      className: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
     },
   }
   const { label, className } = config[type] || config.help_article
@@ -414,6 +420,7 @@ export default function KnowledgePage() {
             <SelectItem value="faq">FAQ</SelectItem>
             <SelectItem value="email">E-Mail</SelectItem>
             <SelectItem value="course_info">Kurs-Info</SelectItem>
+            <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" className="gap-2" onClick={fetchItems}>
@@ -557,6 +564,7 @@ export default function KnowledgePage() {
                   <SelectItem value="faq">FAQ</SelectItem>
                   <SelectItem value="course_info">Kurs-Info</SelectItem>
                   <SelectItem value="email">E-Mail Vorlage</SelectItem>
+                  <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                 </SelectContent>
               </Select>
               {aiSuggestion && (
@@ -712,7 +720,7 @@ export default function KnowledgePage() {
                     <SelectItem value="faq">FAQ</SelectItem>
                     <SelectItem value="course_info">Kurs-Info</SelectItem>
                     <SelectItem value="email">E-Mail Vorlage</SelectItem>
-                    <SelectItem value="ai_instructions">AI Regel</SelectItem>
+                    <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

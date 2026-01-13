@@ -12,11 +12,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Allow API routes and static files
+  // Allow API routes, static files, and public pages
   if (
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
+    pathname.startsWith('/helpcenter') || // Public help center
     pathname === '/auth'
   ) {
     return NextResponse.next()

@@ -41,6 +41,8 @@ import {
   Pencil,
   Globe,
   EyeOff,
+  Plus,
+  ChevronDown,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -470,13 +472,27 @@ export default function KnowledgePage() {
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           Aktualisieren
         </Button>
-        <Button
-          className="gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
-          onClick={() => router.push('/chat?mode=learning')}
-        >
-          <Sparkles className="h-4 w-4" />
-          Wissen hinzufügen
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700">
+              <Plus className="h-4 w-4" />
+              Wissen hinzufügen
+              <ChevronDown className="h-4 w-4 ml-1" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => router.push('/chat?mode=learning')}>
+              <Sparkles className="h-4 w-4 mr-2 text-amber-500" />
+              Via KI
+              <span className="ml-2 text-xs text-slate-400">(API Credits)</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsDialogOpen(true)}>
+              <Pencil className="h-4 w-4 mr-2 text-blue-500" />
+              Manuell
+              <span className="ml-2 text-xs text-slate-400">(Kostenlos)</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Knowledge Items List */}

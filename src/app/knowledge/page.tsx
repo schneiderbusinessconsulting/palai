@@ -665,6 +665,11 @@ export default function KnowledgePage() {
                 rows={6}
                 disabled={!!selectedFile}
               />
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">**text**</code> → fett</span>
+                <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">## text</code> → Überschrift</span>
+                <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">- text</code> → Liste</span>
+              </div>
             </div>
 
             {/* File Upload */}
@@ -801,9 +806,15 @@ export default function KnowledgePage() {
                   rows={12}
                   className="font-mono text-sm"
                 />
-                <p className="text-xs text-slate-500">
-                  Hinweis: Bei Änderungen am Inhalt werden die Embeddings neu generiert.
-                </p>
+                <div className="text-xs text-slate-500 space-y-1">
+                  <p>Hinweis: Bei Änderungen am Inhalt werden die Embeddings neu generiert.</p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-slate-400">
+                    <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">**text**</code> → fett</span>
+                    <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">## text</code> → Überschrift</span>
+                    <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">### text</code> → Unterüberschrift</span>
+                    <span><code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">- text</code> → Aufzählung</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}

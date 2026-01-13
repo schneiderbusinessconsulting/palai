@@ -32,7 +32,7 @@ export async function generateChatResponse(
     model: CHAT_MODEL,
     messages,
     temperature: 0.7,
-    max_tokens: 1000,
+    max_completion_tokens: 1000,
   })
   return response.choices[0].message.content || ''
 }
@@ -149,7 +149,7 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.7,
-    max_tokens: 1000,
+    max_completion_tokens: 1000,
   })
 
   const generatedResponse = response.choices[0].message.content || ''
@@ -206,7 +206,7 @@ Antworte NUR im folgenden JSON-Format:
       { role: 'user', content: userPrompt },
     ],
     temperature: 0.3,
-    max_tokens: 200,
+    max_completion_tokens: 200,
   })
 
   const responseText = response.choices[0].message.content || ''
@@ -404,7 +404,7 @@ ${bodyText.substring(0, 1500)}`
         }
       ],
       temperature: 0.1,
-      max_tokens: 150,
+      max_completion_tokens: 150,
     })
 
     const content = response.choices[0].message.content || ''

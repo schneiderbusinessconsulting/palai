@@ -25,8 +25,24 @@ export default function HelpCenterLayout({
   const pathname = usePathname()
 
   // Set document title for Help Center (overrides default "P Intelligence" title)
+  // Use MutationObserver to persist the title even if Next.js tries to override it
   useEffect(() => {
-    document.title = 'Palacios Hilfe-Center'
+    const targetTitle = 'Palacios Hilfe-Center'
+    document.title = targetTitle
+
+    // Watch for title changes and revert them
+    const observer = new MutationObserver(() => {
+      if (document.title !== targetTitle) {
+        document.title = targetTitle
+      }
+    })
+
+    const titleElement = document.querySelector('title')
+    if (titleElement) {
+      observer.observe(titleElement, { childList: true, characterData: true, subtree: true })
+    }
+
+    return () => observer.disconnect()
   }, [])
 
   return (

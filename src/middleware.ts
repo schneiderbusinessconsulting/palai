@@ -18,27 +18,32 @@ export function middleware(request: NextRequest) {
 
   // HELP CENTER DOMAIN ROUTING
   if (isHelpCenterDomain) {
-    // Allow API routes needed for help center
+    // Allow static files
     if (
-      pathname.startsWith('/api/helpcenter') ||
       pathname.startsWith('/_next') ||
       pathname.startsWith('/favicon')
     ) {
       return NextResponse.next()
     }
 
-    // Allow /helpcenter routes
-    if (pathname.startsWith('/helpcenter')) {
+    // Rewrite root to /helpcenter (URL stays as /)
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/helpcenter', request.url))
+    }
+
+    // Rewrite /artikel/... to /helpcenter/... (cleaner URLs)
+    if (pathname.startsWith('/artikel/')) {
+      const slug = pathname.replace('/artikel/', '')
+      return NextResponse.rewrite(new URL(`/helpcenter/${slug}`, request.url))
+    }
+
+    // Allow /helpcenter routes and API
+    if (pathname.startsWith('/helpcenter') || pathname.startsWith('/api/helpcenter')) {
       return NextResponse.next()
     }
 
-    // Redirect root to /helpcenter
-    if (pathname === '/') {
-      return NextResponse.redirect(new URL('/helpcenter', request.url))
-    }
-
-    // Block all other routes - redirect to /helpcenter
-    return NextResponse.redirect(new URL('/helpcenter', request.url))
+    // Block all other routes - rewrite to /helpcenter
+    return NextResponse.rewrite(new URL('/helpcenter', request.url))
   }
 
   // DASHBOARD DOMAIN ROUTING (ai.palacios-institut.com)

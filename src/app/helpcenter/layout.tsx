@@ -52,7 +52,7 @@ export default function HelpCenterLayout({
             <div className="flex items-center gap-8">
               <Link href="/helpcenter" className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #C4AA6A 0%, #B9965A 100%)' }}>
-                  <span className="text-white font-bold text-lg">P</span>
+                  <span className="text-white font-bold text-lg font-serif">P</span>
                 </div>
                 <div>
                   <span className="font-semibold text-slate-900 dark:text-white">Hilfe-Center</span>
@@ -149,9 +149,9 @@ export default function HelpCenterLayout({
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #C4AA6A 0%, #B9965A 100%)' }}>
-                  <span className="text-white font-bold text-lg">P</span>
+                  <span className="text-white font-bold text-lg font-serif">P</span>
                 </div>
-                <span className="font-semibold text-slate-900 dark:text-white">Palacios Institut</span>
+                <span className="font-semibold text-slate-900 dark:text-white">Palacios Relations</span>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400">
                 Hypnose-Ausbildungen und Weiterbildungen für Therapeuten und Coaches.
@@ -185,13 +185,13 @@ export default function HelpCenterLayout({
               <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Kontakt</h3>
               <ul className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
                 <li>
-                  <a href="mailto:info@palacios-institut.ch" className="hover:text-[#B9965A] dark:hover:text-[#C4AA6A]">
-                    info@palacios-institut.ch
+                  <a href="mailto:kontakt@palacios-relations.ch" className="hover:text-[#B9965A] dark:hover:text-[#C4AA6A]">
+                    kontakt@palacios-relations.ch
                   </a>
                 </li>
                 <li>
                   <a href={WEBSITE_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#B9965A] dark:hover:text-[#C4AA6A]">
-                    palacios-institut.ch
+                    palacios-relations.ch
                   </a>
                 </li>
               </ul>
@@ -199,7 +199,7 @@ export default function HelpCenterLayout({
           </div>
 
           <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
-            <p>© {new Date().getFullYear()} Palacios Institut. Alle Rechte vorbehalten.</p>
+            <p>© {new Date().getFullYear()} Palacios Relations. Alle Rechte vorbehalten.</p>
           </div>
         </div>
       </footer>

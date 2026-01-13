@@ -200,8 +200,8 @@ export default function ArticlePage() {
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <a
-                href="mailto:info@palacios-institut.ch"
-                className="inline-flex items-center justify-center px-6 py-3 bg-[#B9965A] hover:bg-[#B9965A] text-white font-medium rounded-lg transition-colors"
+                href="mailto:kontakt@palacios-relations.ch"
+                className="inline-flex items-center justify-center px-6 py-3 bg-[#B9965A] hover:bg-[#9A7D4A] text-white font-medium rounded-lg transition-colors"
               >
                 Kontakt aufnehmen
               </a>

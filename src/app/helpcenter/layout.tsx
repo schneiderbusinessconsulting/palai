@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Script from 'next/script'
 import { usePathname } from 'next/navigation'
@@ -23,6 +23,11 @@ export default function HelpCenterLayout({
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
+
+  // Set document title for Help Center (overrides default "P Intelligence" title)
+  useEffect(() => {
+    document.title = 'Palacios Hilfe-Center'
+  }, [])
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 antialiased flex flex-col">

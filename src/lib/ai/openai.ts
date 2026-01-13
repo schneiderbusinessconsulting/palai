@@ -21,12 +21,15 @@ export async function createEmbedding(text: string): Promise<number[]> {
   return response.data[0].embedding
 }
 
+// Default to gpt-4o, can be overridden with OPENAI_CHAT_MODEL env var
+const CHAT_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4o'
+
 export async function generateChatResponse(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[]
 ): Promise<string> {
   const openai = getOpenAI()
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: CHAT_MODEL,
     messages,
     temperature: 0.7,
     max_tokens: 1000,
@@ -140,7 +143,7 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
 
   const openai = getOpenAI()
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: CHAT_MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

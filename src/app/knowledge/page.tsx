@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -37,6 +39,8 @@ import {
   AlertCircle,
   Sparkles,
   Pencil,
+  Globe,
+  EyeOff,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -57,6 +61,7 @@ interface KnowledgeItem {
   chunks: number
   updated_at: string
   ids: string[]
+  published: boolean
 }
 
 function getSourceIcon(type: string) {
@@ -339,6 +344,44 @@ export default function KnowledgePage() {
     }
   }
 
+  // Handle publish toggle
+  const handleTogglePublished = async (title: string, currentlyPublished: boolean) => {
+    // Optimistic update
+    setItems((prev) =>
+      prev.map((item) =>
+        item.title === title ? { ...item, published: !currentlyPublished } : item
+      )
+    )
+
+    try {
+      const response = await fetch('/api/knowledge', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oldTitle: title,
+          published: !currentlyPublished,
+        }),
+      })
+
+      if (!response.ok) {
+        // Revert on failure
+        setItems((prev) =>
+          prev.map((item) =>
+            item.title === title ? { ...item, published: currentlyPublished } : item
+          )
+        )
+      }
+    } catch (error) {
+      console.error('Toggle publish error:', error)
+      // Revert on error
+      setItems((prev) =>
+        prev.map((item) =>
+          item.title === title ? { ...item, published: currentlyPublished } : item
+        )
+      )
+    }
+  }
+
   const filteredItems = items.filter((item) => {
     if (searchQuery) {
       return item.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -478,6 +521,30 @@ export default function KnowledgePage() {
                       </span>
                     </div>
                   </div>
+                  {/* Published toggle - only show for Help Center categories */}
+                  {['help_article', 'faq', 'course_info'].includes(item.source_type) && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex items-center gap-2">
+                            <Switch
+                              checked={item.published}
+                              onCheckedChange={() => handleTogglePublished(item.title, item.published)}
+                              className="data-[state=checked]:bg-green-500"
+                            />
+                            {item.published ? (
+                              <Globe className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <EyeOff className="h-4 w-4 text-slate-400" />
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{item.published ? 'Im Help Center sichtbar' : 'Nicht im Help Center sichtbar'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">

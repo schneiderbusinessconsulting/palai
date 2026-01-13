@@ -6,12 +6,13 @@ export async function GET() {
   try {
     const supabase = await createClient()
 
-    // Fetch all knowledge chunks that should appear in help center
+    // Fetch all published knowledge chunks that should appear in help center
     // Exclude ai_instructions as those are internal only
     const { data: chunks, error } = await supabase
       .from('knowledge_chunks')
-      .select('id, source_title, source_type, content, updated_at')
+      .select('id, source_title, source_type, content, updated_at, published')
       .in('source_type', ['help_article', 'faq', 'course_info'])
+      .eq('published', true) // Only show published articles
       .order('updated_at', { ascending: false })
 
     if (error) {

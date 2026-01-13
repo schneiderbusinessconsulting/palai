@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('knowledge_chunks')
-      .select('id, source_title, source_type, created_at, updated_at')
+      .select('id, source_title, source_type, created_at, updated_at, published')
       .order('created_at', { ascending: false })
 
     if (sourceType && sourceType !== 'all') {
@@ -145,6 +145,7 @@ export async function GET(request: NextRequest) {
           chunks: 0,
           updated_at: item.updated_at,
           ids: [],
+          published: item.published ?? true, // Default to true for backwards compat
         }
       }
       acc[key].chunks++
@@ -189,10 +190,10 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// Update knowledge item (title, content, category)
+// Update knowledge item (title, content, category, published)
 export async function PATCH(request: NextRequest) {
   try {
-    const { oldTitle, newTitle, content, sourceType } = await request.json()
+    const { oldTitle, newTitle, content, sourceType, published } = await request.json()
 
     if (!oldTitle) {
       return NextResponse.json({ error: 'Old title required' }, { status: 400 })
@@ -200,15 +201,18 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // If only updating title/sourceType without new content
+    // If only updating title/sourceType/published without new content
     if (!content) {
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      }
+      if (newTitle) updateData.source_title = newTitle
+      if (sourceType) updateData.source_type = sourceType
+      if (typeof published === 'boolean') updateData.published = published
+
       const { error } = await supabase
         .from('knowledge_chunks')
-        .update({
-          source_title: newTitle || oldTitle,
-          source_type: sourceType,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('source_title', oldTitle)
 
       if (error) {

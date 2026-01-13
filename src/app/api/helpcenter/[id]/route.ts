@@ -10,32 +10,36 @@ export async function GET(
     const { id } = await params
     const supabase = await createClient()
 
-    // Fetch the chunk by ID
+    // Fetch the chunk by exact ID first
     const { data: chunk, error } = await supabase
       .from('knowledge_chunks')
-      .select('id, source_title, source_type, content, updated_at')
+      .select('id, source_title, source_type, content, updated_at, published')
       .eq('id', id)
+      .eq('published', true)
       .single()
 
     if (error || !chunk) {
       // Try to find by partial ID match (for shorter slugs)
-      const { data: chunks } = await supabase
+      // Fetch all published help center articles and filter by partial ID
+      const { data: allChunks } = await supabase
         .from('knowledge_chunks')
-        .select('id, source_title, source_type, content, updated_at')
-        .ilike('id', `${id}%`)
-        .limit(1)
+        .select('id, source_title, source_type, content, updated_at, published')
+        .in('source_type', ['help_article', 'faq', 'course_info'])
+        .eq('published', true)
 
-      if (chunks && chunks.length > 0) {
-        const foundChunk = chunks[0]
+      // Find the chunk that starts with the partial ID
+      const foundChunk = allChunks?.find(c => c.id.startsWith(id))
 
+      if (foundChunk) {
         // Get all chunks with the same title to combine content
-        const { data: allChunks } = await supabase
+        const { data: relatedChunks } = await supabase
           .from('knowledge_chunks')
           .select('content')
           .eq('source_title', foundChunk.source_title)
+          .eq('published', true)
           .order('created_at', { ascending: true })
 
-        const fullContent = allChunks?.map(c => c.content).join('\n\n') || foundChunk.content
+        const fullContent = relatedChunks?.map(c => c.content).join('\n\n') || foundChunk.content
 
         return NextResponse.json({
           article: {
@@ -56,6 +60,7 @@ export async function GET(
       .from('knowledge_chunks')
       .select('content')
       .eq('source_title', chunk.source_title)
+      .eq('published', true)
       .order('created_at', { ascending: true })
 
     const fullContent = allChunks?.map(c => c.content).join('\n\n') || chunk.content

@@ -26,7 +26,7 @@ export async function generateChatResponse(
 ): Promise<string> {
   const openai = getOpenAI()
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-5.2',
     messages,
     temperature: 0.7,
     max_tokens: 1000,
@@ -140,7 +140,7 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
 
   const openai = getOpenAI()
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-5.2',
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

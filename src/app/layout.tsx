@@ -32,6 +32,11 @@ export default async function RootLayout({
         <head>
           <title>Palacios Hilfe-Center</title>
           <meta name="description" content="Finden Sie Antworten zu Hypnose-Ausbildungen, Kursen und mehr." />
+          {/* Open Graph tags for link previews */}
+          <meta property="og:title" content="Palacios Hilfe-Center" />
+          <meta property="og:description" content="Finden Sie Antworten zu Hypnose-Ausbildungen, Kursen und mehr." />
+          <meta property="og:site_name" content="Palacios Hilfe-Center" />
+          <meta property="og:type" content="website" />
         </head>
         <body className="font-sans antialiased">
           <ThemeProvider>

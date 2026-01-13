@@ -30,7 +30,7 @@ export default async function RootLayout({
     return (
       <html lang="de" suppressHydrationWarning>
         <head>
-          <title>Hilfe-Center | Palacios Institut</title>
+          <title>Palacios Hilfe-Center</title>
           <meta name="description" content="Finden Sie Antworten zu Hypnose-Ausbildungen, Kursen und mehr." />
         </head>
         <body className="font-sans antialiased">

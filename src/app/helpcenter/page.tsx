@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -79,7 +79,7 @@ function getExcerpt(content: string, maxLength: number = 120): string {
   return cleaned.substring(0, maxLength).trim() + '...'
 }
 
-export default function HelpCenterPage() {
+function HelpCenterContent() {
   const searchParams = useSearchParams()
   const categoryFilter = searchParams.get('category')
 
@@ -321,5 +321,32 @@ export default function HelpCenterPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Loading fallback for Suspense
+function HelpCenterLoading() {
+  return (
+    <div className="min-h-screen">
+      <div className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border-b border-slate-200 dark:border-slate-800">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24 text-center">
+          <h1 className="text-4xl sm:text-5xl font-bold text-slate-900 dark:text-white mb-4">
+            Wie können wir helfen?
+          </h1>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Main export with Suspense boundary for useSearchParams
+export default function HelpCenterPage() {
+  return (
+    <Suspense fallback={<HelpCenterLoading />}>
+      <HelpCenterContent />
+    </Suspense>
   )
 }

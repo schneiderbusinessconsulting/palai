@@ -4,9 +4,44 @@ import type { NextRequest } from 'next/server'
 const SITE_PASSWORD = process.env.SITE_PASSWORD || ''
 const AUTH_COOKIE_NAME = 'palai_auth'
 
+// Help Center domain - only shows /helpcenter routes
+const HELP_CENTER_DOMAINS = ['help.palacios-institut.ch', 'help.palacios-institut.com']
+
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
+  const hostname = request.headers.get('host') || ''
 
+  // Check if this is the Help Center domain
+  const isHelpCenterDomain = HELP_CENTER_DOMAINS.some(domain =>
+    hostname.includes(domain) || hostname.startsWith('help.')
+  )
+
+  // HELP CENTER DOMAIN ROUTING
+  if (isHelpCenterDomain) {
+    // Allow API routes needed for help center
+    if (
+      pathname.startsWith('/api/helpcenter') ||
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/favicon')
+    ) {
+      return NextResponse.next()
+    }
+
+    // Allow /helpcenter routes
+    if (pathname.startsWith('/helpcenter')) {
+      return NextResponse.next()
+    }
+
+    // Redirect root to /helpcenter
+    if (pathname === '/') {
+      return NextResponse.redirect(new URL('/helpcenter', request.url))
+    }
+
+    // Block all other routes - redirect to /helpcenter
+    return NextResponse.redirect(new URL('/helpcenter', request.url))
+  }
+
+  // DASHBOARD DOMAIN ROUTING (ai.palacios-institut.com)
   // If no password is set, allow all access
   if (!SITE_PASSWORD) {
     return NextResponse.next()
@@ -17,7 +52,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
-    pathname.startsWith('/helpcenter') || // Public help center
+    pathname.startsWith('/helpcenter') || // Public help center also accessible on dashboard
     pathname === '/auth'
   ) {
     return NextResponse.next()
@@ -54,10 +89,9 @@ export const config = {
   matcher: [
     /*
      * Match all paths except:
-     * - api routes
      * - _next (static files)
      * - favicon
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Script from 'next/script'
 import { usePathname } from 'next/navigation'
 import { Menu, X, BookOpen, HelpCircle, GraduationCap, ChevronRight } from 'lucide-react'
 
@@ -10,6 +11,10 @@ const navigation = [
   { name: 'Häufige Fragen', href: '/helpcenter?category=faq', icon: HelpCircle },
   { name: 'Kurse & Ausbildungen', href: '/helpcenter?category=course_info', icon: GraduationCap },
 ]
+
+// Environment variables
+const WEBSITE_URL = process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://palacios-relations.ch/'
+const GA_ID = process.env.NEXT_PUBLIC_GA_ID
 
 export default function HelpCenterLayout({
   children,
@@ -21,6 +26,24 @@ export default function HelpCenterLayout({
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 antialiased flex flex-col">
+      {/* Google Analytics */}
+      {GA_ID && (
+        <>
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
+            strategy="afterInteractive"
+          />
+          <Script id="google-analytics" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', '${GA_ID}');
+            `}
+          </Script>
+        </>
+      )}
+
       {/* Top Navigation */}
       <header className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -28,7 +51,7 @@ export default function HelpCenterLayout({
             {/* Logo */}
             <div className="flex items-center gap-8">
               <Link href="/helpcenter" className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #C4AA6A 0%, #B9965A 100%)' }}>
                   <span className="text-white font-bold text-lg">P</span>
                 </div>
                 <div>
@@ -49,7 +72,7 @@ export default function HelpCenterLayout({
                       href={item.href}
                       className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                         isActive
-                          ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20'
+                          ? 'bg-[#B9965A]/10 text-[#B9965A]'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800'
                       }`}
                     >
@@ -63,10 +86,10 @@ export default function HelpCenterLayout({
             {/* Right side */}
             <div className="flex items-center gap-4">
               <a
-                href="https://palacios-institut.ch"
+                href={WEBSITE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden sm:flex items-center gap-1 text-sm text-slate-600 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500 transition-colors"
+                className="hidden sm:flex items-center gap-1 text-sm text-slate-600 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#C4AA6A] transition-colors"
               >
                 Zur Website
                 <ChevronRight className="h-4 w-4" />
@@ -102,7 +125,7 @@ export default function HelpCenterLayout({
             </div>
             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
               <a
-                href="https://palacios-institut.ch"
+                href={WEBSITE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400"
@@ -125,7 +148,7 @@ export default function HelpCenterLayout({
             {/* Brand */}
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                <div className="h-8 w-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #C4AA6A 0%, #B9965A 100%)' }}>
                   <span className="text-white font-bold text-lg">P</span>
                 </div>
                 <span className="font-semibold text-slate-900 dark:text-white">Palacios Institut</span>
@@ -140,17 +163,17 @@ export default function HelpCenterLayout({
               <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Schnellzugriff</h3>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="/helpcenter" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                  <Link href="/helpcenter" className="text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#C4AA6A]">
                     Alle Hilfeartikel
                   </Link>
                 </li>
                 <li>
-                  <Link href="/helpcenter?category=faq" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                  <Link href="/helpcenter?category=faq" className="text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#C4AA6A]">
                     Häufige Fragen
                   </Link>
                 </li>
                 <li>
-                  <Link href="/helpcenter?category=course_info" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                  <Link href="/helpcenter?category=course_info" className="text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#C4AA6A]">
                     Kursinformationen
                   </Link>
                 </li>
@@ -162,12 +185,12 @@ export default function HelpCenterLayout({
               <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Kontakt</h3>
               <ul className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
                 <li>
-                  <a href="mailto:info@palacios-institut.ch" className="hover:text-amber-600 dark:hover:text-amber-500">
+                  <a href="mailto:info@palacios-institut.ch" className="hover:text-[#B9965A] dark:hover:text-[#C4AA6A]">
                     info@palacios-institut.ch
                   </a>
                 </li>
                 <li>
-                  <a href="https://palacios-institut.ch" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 dark:hover:text-amber-500">
+                  <a href={WEBSITE_URL} target="_blank" rel="noopener noreferrer" className="hover:text-[#B9965A] dark:hover:text-[#C4AA6A]">
                     palacios-institut.ch
                   </a>
                 </li>

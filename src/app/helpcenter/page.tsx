@@ -47,8 +47,8 @@ const categoryConfig: Record<string, {
     label: 'Kurse & Ausbildungen',
     description: 'Informationen zu unseren Angeboten',
     icon: <GraduationCap className="h-6 w-6" />,
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    color: 'text-[#B9965A] dark:text-[#C4AA6A]',
+    bgColor: 'bg-[#B9965A]/10 dark:bg-[#B9965A]/20',
   },
 }
 
@@ -155,7 +155,7 @@ function HelpCenterContent() {
               placeholder="Artikel durchsuchen..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-shadow"
+              className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B9965A] focus:border-transparent transition-shadow"
             />
           </div>
         </div>
@@ -171,12 +171,12 @@ function HelpCenterContent() {
                 <Link
                   key={key}
                   href={`/helpcenter?category=${key}`}
-                  className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-amber-200 dark:hover:border-amber-800 transition-all"
+                  className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm hover:shadow-md hover:border-[#B9965A]/30 dark:hover:border-[#B9965A]/50 transition-all"
                 >
                   <div className={`inline-flex p-3 rounded-lg ${config.bgColor} ${config.color} mb-4`}>
                     {config.icon}
                   </div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-500 transition-colors">
+                  <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-[#B9965A] dark:group-hover:text-[#B9965A] transition-colors">
                     {config.label}
                   </h3>
                   <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -193,7 +193,7 @@ function HelpCenterContent() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#B9965A]" />
           </div>
         ) : filteredArticles.length === 0 ? (
           <div className="text-center py-20">
@@ -209,7 +209,7 @@ function HelpCenterContent() {
             {(searchQuery || categoryFilter) && (
               <Link
                 href="/helpcenter"
-                className="inline-flex items-center mt-4 text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400"
+                className="inline-flex items-center mt-4 text-[#B9965A] hover:text-[#9A7D4A] dark:text-[#B9965A] dark:hover:text-[#C4AA6A]"
               >
                 Alle Artikel anzeigen
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -222,7 +222,7 @@ function HelpCenterContent() {
             {categoryFilter && (
               <Link
                 href="/helpcenter"
-                className="inline-flex items-center mb-6 text-sm text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500"
+                className="inline-flex items-center mb-6 text-sm text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#B9965A]"
               >
                 <ChevronRight className="h-4 w-4 mr-1 rotate-180" />
                 Zurück zur Übersicht
@@ -233,11 +233,11 @@ function HelpCenterContent() {
                 <Link
                   key={article.id}
                   href={`/helpcenter/${slugify(article.title)}-${article.id.slice(0, 8)}`}
-                  className="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-amber-200 dark:hover:border-amber-800 hover:shadow-sm transition-all"
+                  className="group block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-[#B9965A]/30 dark:hover:border-[#B9965A]/50 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-500 transition-colors">
+                      <h3 className="font-medium text-slate-900 dark:text-white group-hover:text-[#B9965A] dark:group-hover:text-[#B9965A] transition-colors">
                         {article.title}
                       </h3>
                       <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
@@ -248,7 +248,7 @@ function HelpCenterContent() {
                         <span>Aktualisiert {formatDate(article.updated_at)}</span>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-amber-500 transition-colors flex-shrink-0 mt-1" />
+                    <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-[#B9965A] transition-colors flex-shrink-0 mt-1" />
                   </div>
                 </Link>
               ))}
@@ -273,7 +273,7 @@ function HelpCenterContent() {
                     </div>
                     <Link
                       href={`/helpcenter?category=${category}`}
-                      className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400 flex items-center gap-1"
+                      className="text-sm text-[#B9965A] hover:text-[#9A7D4A] dark:text-[#B9965A] dark:hover:text-[#C4AA6A] flex items-center gap-1"
                     >
                       Alle anzeigen
                       <ChevronRight className="h-4 w-4" />
@@ -285,9 +285,9 @@ function HelpCenterContent() {
                       <Link
                         key={article.id}
                         href={`/helpcenter/${slugify(article.title)}-${article.id.slice(0, 8)}`}
-                        className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-amber-200 dark:hover:border-amber-800 hover:shadow-sm transition-all"
+                        className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-5 hover:border-[#B9965A]/30 dark:hover:border-[#B9965A]/50 hover:shadow-sm transition-all"
                       >
-                        <h3 className="font-medium text-slate-900 dark:text-white group-hover:text-amber-600 dark:group-hover:text-amber-500 transition-colors line-clamp-2">
+                        <h3 className="font-medium text-slate-900 dark:text-white group-hover:text-[#B9965A] dark:group-hover:text-[#B9965A] transition-colors line-clamp-2">
                           {article.title}
                         </h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
@@ -314,7 +314,7 @@ function HelpCenterContent() {
           </p>
           <a
             href="mailto:info@palacios-institut.ch"
-            className="inline-flex items-center justify-center px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors"
+            className="inline-flex items-center justify-center px-6 py-3 bg-[#B9965A] hover:bg-[#B9965A] text-white font-medium rounded-lg transition-colors"
           >
             Kontakt aufnehmen
           </a>
@@ -334,7 +334,7 @@ function HelpCenterLoading() {
             Wie können wir helfen?
           </h1>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#B9965A]" />
           </div>
         </div>
       </div>

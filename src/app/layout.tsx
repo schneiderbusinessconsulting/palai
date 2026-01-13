@@ -1,18 +1,48 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Sidebar } from '@/components/layout/sidebar'
+
+// Help Center domains - these don't show the sidebar
+const HELP_CENTER_DOMAINS = ['help.palacios-institut.ch', 'help.palacios-institut.com']
 
 export const metadata: Metadata = {
   title: 'P Intelligence - AI Support Dashboard',
   description: 'Internes Support-Dashboard für das Palacios Institut',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const headersList = await headers()
+  const host = headersList.get('host') || ''
+
+  // Check if this is the Help Center domain
+  const isHelpCenterDomain = HELP_CENTER_DOMAINS.some(domain =>
+    host.includes(domain) || host.startsWith('help.')
+  )
+
+  // Help Center domain - no sidebar, full width
+  if (isHelpCenterDomain) {
+    return (
+      <html lang="de" suppressHydrationWarning>
+        <head>
+          <title>Hilfe-Center | Palacios Institut</title>
+          <meta name="description" content="Finden Sie Antworten zu Hypnose-Ausbildungen, Kursen und mehr." />
+        </head>
+        <body className="font-sans antialiased">
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </body>
+      </html>
+    )
+  }
+
+  // Dashboard domain - with sidebar
   return (
     <html lang="de" suppressHydrationWarning>
       <body className="font-sans antialiased">

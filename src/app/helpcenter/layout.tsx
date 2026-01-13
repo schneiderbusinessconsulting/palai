@@ -1,0 +1,185 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { Menu, X, BookOpen, HelpCircle, GraduationCap, ChevronRight } from 'lucide-react'
+
+const navigation = [
+  { name: 'Alle Artikel', href: '/helpcenter', icon: BookOpen },
+  { name: 'Häufige Fragen', href: '/helpcenter?category=faq', icon: HelpCircle },
+  { name: 'Kurse & Ausbildungen', href: '/helpcenter?category=course_info', icon: GraduationCap },
+]
+
+export default function HelpCenterLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const pathname = usePathname()
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-slate-950 antialiased flex flex-col">
+      {/* Top Navigation */}
+      <header className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-950/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
+        <nav className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center gap-8">
+              <Link href="/helpcenter" className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">P</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-slate-900 dark:text-white">Hilfe-Center</span>
+                  <span className="hidden sm:inline text-slate-400 dark:text-slate-500 ml-2 text-sm">Palacios Institut</span>
+                </div>
+              </Link>
+
+              {/* Desktop Navigation */}
+              <div className="hidden md:flex items-center gap-1">
+                {navigation.map((item) => {
+                  const isActive = item.href === '/helpcenter'
+                    ? pathname === '/helpcenter' && !pathname.includes('?')
+                    : pathname + (typeof window !== 'undefined' ? window.location.search : '') === item.href
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        isActive
+                          ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Right side */}
+            <div className="flex items-center gap-4">
+              <a
+                href="https://palacios-institut.ch"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:flex items-center gap-1 text-sm text-slate-600 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500 transition-colors"
+              >
+                Zur Website
+                <ChevronRight className="h-4 w-4" />
+              </a>
+
+              {/* Mobile menu button */}
+              <button
+                type="button"
+                className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-4">
+            <div className="space-y-1">
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <a
+                href="https://palacios-institut.ch"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-400"
+              >
+                Zur Website
+                <ChevronRight className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1">{children}</main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 dark:border-slate-800">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">P</span>
+                </div>
+                <span className="font-semibold text-slate-900 dark:text-white">Palacios Institut</span>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Hypnose-Ausbildungen und Weiterbildungen für Therapeuten und Coaches.
+              </p>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Schnellzugriff</h3>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/helpcenter" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                    Alle Hilfeartikel
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/helpcenter?category=faq" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                    Häufige Fragen
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/helpcenter?category=course_info" className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500">
+                    Kursinformationen
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h3 className="font-semibold text-slate-900 dark:text-white mb-4">Kontakt</h3>
+              <ul className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
+                <li>
+                  <a href="mailto:info@palacios-institut.ch" className="hover:text-amber-600 dark:hover:text-amber-500">
+                    info@palacios-institut.ch
+                  </a>
+                </li>
+                <li>
+                  <a href="https://palacios-institut.ch" target="_blank" rel="noopener noreferrer" className="hover:text-amber-600 dark:hover:text-amber-500">
+                    palacios-institut.ch
+                  </a>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-8 pt-8 border-t border-slate-200 dark:border-slate-800 text-center text-sm text-slate-500 dark:text-slate-400">
+            <p>© {new Date().getFullYear()} Palacios Institut. Alle Rechte vorbehalten.</p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}

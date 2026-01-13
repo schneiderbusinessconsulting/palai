@@ -47,8 +47,8 @@ const categoryConfig: Record<string, {
     label: 'Kurse & Ausbildungen',
     href: '/helpcenter?category=course_info',
     icon: <GraduationCap className="h-4 w-4" />,
-    color: 'text-amber-600 dark:text-amber-400',
-    bgColor: 'bg-amber-100 dark:bg-amber-900/30',
+    color: 'text-[#B9965A] dark:text-[#C4AA6A]',
+    bgColor: 'bg-[#B9965A]/10 dark:bg-[#B9965A]/20',
   },
 }
 
@@ -97,7 +97,7 @@ export default function ArticlePage() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-amber-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-[#B9965A]" />
       </div>
     )
   }
@@ -115,7 +115,7 @@ export default function ArticlePage() {
           </p>
           <Link
             href="/helpcenter"
-            className="inline-flex items-center justify-center px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors"
+            className="inline-flex items-center justify-center px-6 py-3 bg-[#B9965A] hover:bg-[#B9965A] text-white font-medium rounded-lg transition-colors"
           >
             Zurück zum Hilfe-Center
           </Link>
@@ -134,14 +134,14 @@ export default function ArticlePage() {
           <nav className="flex items-center gap-2 text-sm">
             <Link
               href="/helpcenter"
-              className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500 transition-colors"
+              className="text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#B9965A] transition-colors"
             >
               Hilfe-Center
             </Link>
             <ChevronRight className="h-4 w-4 text-slate-400" />
             <Link
               href={config.href}
-              className="text-slate-500 hover:text-amber-600 dark:text-slate-400 dark:hover:text-amber-500 transition-colors"
+              className="text-slate-500 hover:text-[#B9965A] dark:text-slate-400 dark:hover:text-[#B9965A] transition-colors"
             >
               {config.label}
             </Link>
@@ -178,7 +178,7 @@ export default function ArticlePage() {
           prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
           prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-3
           prose-p:text-slate-600 dark:prose-p:text-slate-300 prose-p:leading-relaxed
-          prose-a:text-amber-600 dark:prose-a:text-amber-500 prose-a:no-underline hover:prose-a:underline
+          prose-a:text-[#B9965A] dark:prose-a:text-[#B9965A] prose-a:no-underline hover:prose-a:underline
           prose-strong:text-slate-900 dark:prose-strong:text-white
           prose-ul:my-4 prose-li:my-1
           prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
@@ -201,7 +201,7 @@ export default function ArticlePage() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <a
                 href="mailto:info@palacios-institut.ch"
-                className="inline-flex items-center justify-center px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-lg transition-colors"
+                className="inline-flex items-center justify-center px-6 py-3 bg-[#B9965A] hover:bg-[#B9965A] text-white font-medium rounded-lg transition-colors"
               >
                 Kontakt aufnehmen
               </a>

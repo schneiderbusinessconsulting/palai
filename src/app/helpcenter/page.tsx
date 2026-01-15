@@ -12,6 +12,9 @@ import {
   Loader2,
   FileText,
   Clock,
+  MessageCircle,
+  Send,
+  Sparkles,
 } from 'lucide-react'
 
 interface HelpArticle {
@@ -20,6 +23,12 @@ interface HelpArticle {
   source_type: string
   content: string
   updated_at: string
+}
+
+interface AIAnswer {
+  answer: string
+  sources: { id: string; title: string; source_type: string }[]
+  hasAnswer: boolean
 }
 
 const categoryConfig: Record<string, {
@@ -87,6 +96,48 @@ function HelpCenterContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)
 
+  // AI Question mode
+  const [mode, setMode] = useState<'search' | 'ask'>('search')
+  const [question, setQuestion] = useState('')
+  const [isAskingAI, setIsAskingAI] = useState(false)
+  const [aiAnswer, setAiAnswer] = useState<AIAnswer | null>(null)
+
+  // Handle AI question
+  const handleAskQuestion = async () => {
+    if (!question.trim() || question.trim().length < 3) return
+
+    setIsAskingAI(true)
+    setAiAnswer(null)
+
+    try {
+      const response = await fetch('/api/helpcenter/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question.trim() }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAiAnswer(data)
+      } else {
+        setAiAnswer({
+          answer: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
+          sources: [],
+          hasAnswer: false,
+        })
+      }
+    } catch (error) {
+      console.error('AI question failed:', error)
+      setAiAnswer({
+        answer: 'Entschuldigung, es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.',
+        sources: [],
+        hasAnswer: false,
+      })
+    } finally {
+      setIsAskingAI(false)
+    }
+  }
+
   useEffect(() => {
     const fetchArticles = async () => {
       try {
@@ -147,17 +198,131 @@ function HelpCenterContent() {
               : 'Durchsuchen Sie unsere Hilfeartikel oder nutzen Sie die Suche, um schnell Antworten zu finden.'}
           </p>
 
-          {/* Search */}
-          <div className="max-w-xl mx-auto relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-            <input
-              type="search"
-              placeholder="Artikel durchsuchen..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B9965A] focus:border-transparent transition-shadow"
-            />
+          {/* Mode Toggle */}
+          <div className="flex justify-center gap-2 mb-6">
+            <button
+              onClick={() => { setMode('search'); setAiAnswer(null); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                mode === 'search'
+                  ? 'bg-[#B9965A] text-white shadow-md'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-[#B9965A]/50'
+              }`}
+            >
+              <Search className="h-4 w-4" />
+              Artikel suchen
+            </button>
+            <button
+              onClick={() => { setMode('ask'); setSearchQuery(''); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                mode === 'ask'
+                  ? 'bg-[#B9965A] text-white shadow-md'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:border-[#B9965A]/50'
+              }`}
+            >
+              <MessageCircle className="h-4 w-4" />
+              Frage stellen
+            </button>
           </div>
+
+          {/* Search or Ask Input */}
+          <div className="max-w-xl mx-auto">
+            {mode === 'search' ? (
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <input
+                  type="search"
+                  placeholder="Artikel durchsuchen..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B9965A] focus:border-transparent transition-shadow"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="relative">
+                  <MessageCircle className="absolute left-4 top-4 h-5 w-5 text-slate-400" />
+                  <textarea
+                    placeholder="Stellen Sie Ihre Frage... z.B. 'Wie lange dauert die Ausbildung?'"
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        handleAskQuestion()
+                      }
+                    }}
+                    rows={2}
+                    className="w-full pl-12 pr-4 py-4 text-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#B9965A] focus:border-transparent transition-shadow resize-none"
+                  />
+                </div>
+                <button
+                  onClick={handleAskQuestion}
+                  disabled={isAskingAI || question.trim().length < 3}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#B9965A] hover:bg-[#A8854A] disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+                >
+                  {isAskingAI ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      Suche Antwort...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-5 w-5" />
+                      Frage absenden
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* AI Answer */}
+          {mode === 'ask' && aiAnswer && (
+            <div className="max-w-2xl mx-auto mt-8">
+              <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-lg overflow-hidden">
+                {/* Answer Header */}
+                <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-[#B9965A]/10 to-[#B9965A]/5 border-b border-slate-200 dark:border-slate-700">
+                  <div className="p-2 rounded-lg bg-[#B9965A]/20">
+                    <Sparkles className="h-5 w-5 text-[#B9965A]" />
+                  </div>
+                  <span className="font-medium text-slate-900 dark:text-white">Antwort</span>
+                </div>
+
+                {/* Answer Content */}
+                <div className="px-6 py-5">
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-lg">
+                    {aiAnswer.answer}
+                  </p>
+                </div>
+
+                {/* Source Articles */}
+                {aiAnswer.sources.length > 0 && (
+                  <div className="px-6 py-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
+                      Mehr dazu in diesen Artikeln:
+                    </p>
+                    <div className="space-y-2">
+                      {aiAnswer.sources.map((source) => (
+                        <Link
+                          key={source.id}
+                          href={`/helpcenter/${slugify(source.title)}-${source.id.slice(0, 8)}`}
+                          className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-[#B9965A]/50 transition-colors group"
+                        >
+                          <div className={`p-1.5 rounded ${categoryConfig[source.source_type]?.bgColor || 'bg-slate-100'}`}>
+                            {categoryConfig[source.source_type]?.icon || <FileText className="h-4 w-4" />}
+                          </div>
+                          <span className="flex-1 text-slate-700 dark:text-slate-300 group-hover:text-[#B9965A] transition-colors">
+                            {source.title}
+                          </span>
+                          <ChevronRight className="h-4 w-4 text-slate-400 group-hover:text-[#B9965A]" />
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

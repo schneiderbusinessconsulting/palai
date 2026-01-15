@@ -138,6 +138,10 @@ export async function GET(request: NextRequest) {
 // Manual sync from HubSpot - uses CRM Search API for recent incoming emails
 export async function POST(request: NextRequest) {
   try {
+    // Check if auto-draft is enabled
+    const { searchParams } = new URL(request.url)
+    const autoDraftEnabled = searchParams.get('autoDraft') === 'true'
+
     const supabase = await createClient()
 
     // Use CRM Search API to find recent incoming emails (last 30 days)
@@ -268,8 +272,8 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert email:', insertError)
       } else {
         imported++
-        // Only generate draft for emails that need a response
-        if (newEmail?.id && classification.needsResponse) {
+        // Only generate draft if auto-draft is enabled AND email needs a response
+        if (autoDraftEnabled && newEmail?.id && classification.needsResponse) {
           generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
             .catch(err => console.error('Background draft generation failed:', err))
         }

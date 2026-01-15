@@ -157,6 +157,7 @@ export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
+  const [autoDraftEnabled, setAutoDraftEnabled] = useState(false) // Auto-draft disabled by default to save credits
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
@@ -182,6 +183,20 @@ export default function InboxPage() {
   const [regenerateFeedback, setRegenerateFeedback] = useState('')
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
+
+  // Load auto-draft preference from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('autoDraftEnabled')
+    if (stored !== null) {
+      setAutoDraftEnabled(stored === 'true')
+    }
+  }, [])
+
+  // Save auto-draft preference to localStorage
+  const handleAutoDraftChange = (enabled: boolean) => {
+    setAutoDraftEnabled(enabled)
+    localStorage.setItem('autoDraftEnabled', String(enabled))
+  }
 
   // Fetch emails (with optional loading indicator)
   const fetchEmails = async (showLoading = true) => {
@@ -225,8 +240,10 @@ export default function InboxPage() {
   useEffect(() => {
     const autoSync = async () => {
       try {
+        // Get current autoDraft setting from localStorage
+        const autoDraft = localStorage.getItem('autoDraftEnabled') === 'true'
         // Sync in background
-        const response = await fetch('/api/emails', { method: 'POST' })
+        const response = await fetch(`/api/emails?autoDraft=${autoDraft}`, { method: 'POST' })
         const data = await response.json()
 
         // Only refresh UI if there are new emails
@@ -252,8 +269,8 @@ export default function InboxPage() {
     setIsSyncing(true)
     setSyncMessage('')
     try {
-      // First: Import new emails
-      const importResponse = await fetch('/api/emails', { method: 'POST' })
+      // First: Import new emails (pass autoDraft setting)
+      const importResponse = await fetch(`/api/emails?autoDraft=${autoDraftEnabled}`, { method: 'POST' })
       const importData = await importResponse.json()
 
       // Second: Sync conversation statuses (mark closed as sent)
@@ -486,6 +503,27 @@ export default function InboxPage() {
             System-Mails ausblenden
           </Label>
         </div>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={`flex items-center gap-2 px-3 py-2 border rounded-md ${autoDraftEnabled ? 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800' : 'bg-background'}`}>
+                <Switch
+                  id="auto-draft"
+                  checked={autoDraftEnabled}
+                  onCheckedChange={handleAutoDraftChange}
+                  className="data-[state=checked]:bg-amber-500"
+                />
+                <Label htmlFor="auto-draft" className="text-sm cursor-pointer flex items-center gap-1.5">
+                  <Sparkles className={`h-3.5 w-3.5 ${autoDraftEnabled ? 'text-amber-500' : ''}`} />
+                  Auto-Draft
+                </Label>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{autoDraftEnabled ? 'Drafts werden automatisch generiert (API Credits)' : 'Drafts manuell generieren (spart Credits)'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <Button
           variant="outline"
           className="gap-2"

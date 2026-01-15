@@ -20,8 +20,8 @@ export async function POST(request: NextRequest) {
       'match_knowledge_chunks',
       {
         query_embedding: questionEmbedding,
-        match_threshold: 0.7,
-        match_count: 5,
+        match_threshold: 0.5, // Lower threshold for better matches
+        match_count: 10,
       }
     )
 
@@ -30,10 +30,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Suche fehlgeschlagen' }, { status: 500 })
     }
 
-    // Filter to only published help center content
-    const relevantChunks = (chunks || []).filter((chunk: { source_type: string; published: boolean }) =>
-      ['help_article', 'faq', 'course_info'].includes(chunk.source_type) && chunk.published
+    console.log('[Help Center Ask] Found chunks:', chunks?.length || 0)
+    if (chunks?.length > 0) {
+      console.log('[Help Center Ask] First chunk type:', chunks[0].source_type, 'title:', chunks[0].source_title)
+    }
+
+    // Filter to only help center content types (published check done separately if needed)
+    const relevantChunks = (chunks || []).filter((chunk: { source_type: string }) =>
+      ['help_article', 'faq', 'course_info'].includes(chunk.source_type)
     )
+
+    console.log('[Help Center Ask] Relevant chunks after filter:', relevantChunks.length)
 
     // Get unique source articles
     const sourceArticles = new Map<string, { id: string; title: string; source_type: string }>()

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
 import {
   Search,
   BookOpen,
@@ -289,10 +290,8 @@ function HelpCenterContent() {
                 </div>
 
                 {/* Answer Content */}
-                <div className="px-6 py-5">
-                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed text-lg">
-                    {aiAnswer.answer}
-                  </p>
+                <div className="px-6 py-5 prose prose-slate dark:prose-invert max-w-none prose-p:text-lg prose-p:leading-relaxed prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-white">
+                  <ReactMarkdown>{aiAnswer.answer}</ReactMarkdown>
                 </div>
 
                 {/* Source Articles */}

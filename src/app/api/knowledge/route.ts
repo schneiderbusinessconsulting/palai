@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding } from '@/lib/ai/openai'
 
+// Import pdf-parse - use require for better compatibility
+let pdfParse: ((buffer: Buffer) => Promise<{ text: string }>) | null = null
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  pdfParse = require('pdf-parse')
+} catch (e) {
+  console.warn('pdf-parse not available:', e)
+}
+
 // Split text into chunks of roughly 500 tokens (approx 2000 chars)
 function chunkText(text: string, maxChunkSize = 2000): string[] {
   const chunks: string[] = []
@@ -40,13 +49,11 @@ export async function POST(request: NextRequest) {
 
     // Handle PDF upload
     if (file && file.type === 'application/pdf') {
+      if (!pdfParse) {
+        return NextResponse.json({ error: 'PDF parsing is not available' }, { status: 500 })
+      }
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
-
-      // Dynamic import for pdf-parse
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParseModule = await import('pdf-parse') as any
-      const pdfParse = pdfParseModule.default || pdfParseModule
       const pdfData = await pdfParse(buffer)
       textContent = pdfData.text
     } else if (file && file.type === 'text/plain') {

@@ -76,6 +76,8 @@ function getSourceIcon(type: string) {
       return <Mail className="h-4 w-4" />
     case 'course_info':
       return <FileText className="h-4 w-4" />
+    case 'training_material':
+      return <FileText className="h-4 w-4" />
     case 'ai_instructions':
       return <Sparkles className="h-4 w-4" />
     default:
@@ -100,6 +102,10 @@ function getSourceBadge(type: string) {
     course_info: {
       label: 'Kurs-Info',
       className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    },
+    training_material: {
+      label: 'Skript/Methode',
+      className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
     },
     ai_instructions: {
       label: 'AI-Regeln',
@@ -465,6 +471,7 @@ export default function KnowledgePage() {
             <SelectItem value="faq">FAQ</SelectItem>
             <SelectItem value="email">E-Mail</SelectItem>
             <SelectItem value="course_info">Kurs-Info</SelectItem>
+            <SelectItem value="training_material">Skript/Methode</SelectItem>
             <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
           </SelectContent>
         </Select>
@@ -646,6 +653,7 @@ export default function KnowledgePage() {
                   <SelectItem value="help_article">Help Center</SelectItem>
                   <SelectItem value="faq">FAQ</SelectItem>
                   <SelectItem value="course_info">Kurs-Info</SelectItem>
+                  <SelectItem value="training_material">Skript/Methode</SelectItem>
                   <SelectItem value="email">E-Mail Vorlage</SelectItem>
                   <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                 </SelectContent>
@@ -714,11 +722,12 @@ export default function KnowledgePage() {
                 />
                 {selectedFile ? (
                   <div className="flex items-center justify-center gap-2 text-green-600">
-                    <CheckCircle className="h-5 w-5" />
-                    <span>{selectedFile.name}</span>
+                    <CheckCircle className="h-5 w-5 flex-shrink-0" />
+                    <span className="truncate max-w-[200px]" title={selectedFile.name}>{selectedFile.name}</span>
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="flex-shrink-0 text-red-500 hover:text-red-600 hover:bg-red-50"
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelectedFile(null)
@@ -807,6 +816,7 @@ export default function KnowledgePage() {
                     <SelectItem value="help_article">Help Center</SelectItem>
                     <SelectItem value="faq">FAQ</SelectItem>
                     <SelectItem value="course_info">Kurs-Info</SelectItem>
+                    <SelectItem value="training_material">Skript/Methode</SelectItem>
                     <SelectItem value="email">E-Mail Vorlage</SelectItem>
                     <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                   </SelectContent>

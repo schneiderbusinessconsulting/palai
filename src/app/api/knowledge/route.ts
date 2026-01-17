@@ -1,27 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding } from '@/lib/ai/openai'
-import * as pdfjsLib from 'pdfjs-dist'
-import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 
-// Configure PDF.js to not use worker (for server-side)
-if (typeof window === 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
-}
-
-// Extract text from PDF using pdfjs-dist
+// Dynamic import for pdfjs-dist to avoid bundler issues
 async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
-  const data = new Uint8Array(buffer)
-  const pdf = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise
+  // Import pdfjs-dist dynamically
+  const pdfjsLib = await import('pdfjs-dist')
 
+  // Disable worker for server-side usage
+  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+
+  const data = new Uint8Array(buffer)
+
+  // Load the PDF document
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    useSystemFonts: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+  })
+
+  const pdf = await loadingTask.promise
   let fullText = ''
 
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const textContent = await page.getTextContent()
     const pageText = textContent.items
-      .filter((item): item is TextItem => 'str' in item)
-      .map((item) => item.str)
+      .map((item) => {
+        // Extract str property if it exists (TextItem has str, TextMarkedContent does not)
+        const textItem = item as { str?: string }
+        return textItem.str || ''
+      })
+      .filter(Boolean)
       .join(' ')
     fullText += pageText + '\n\n'
   }
@@ -68,11 +79,20 @@ export async function POST(request: NextRequest) {
     // Handle PDF upload
     if (file && file.type === 'application/pdf') {
       try {
+        console.log('Starting PDF extraction for:', file.name, 'size:', file.size)
         const arrayBuffer = await file.arrayBuffer()
+        console.log('ArrayBuffer created, size:', arrayBuffer.byteLength)
         textContent = await extractPdfText(arrayBuffer)
+        console.log('PDF text extracted, length:', textContent.length)
       } catch (pdfError) {
-        console.error('PDF parsing error:', pdfError)
-        return NextResponse.json({ error: 'PDF konnte nicht gelesen werden' }, { status: 500 })
+        console.error('PDF parsing error details:', {
+          name: (pdfError as Error).name,
+          message: (pdfError as Error).message,
+          stack: (pdfError as Error).stack,
+        })
+        return NextResponse.json({
+          error: 'PDF konnte nicht gelesen werden: ' + (pdfError as Error).message
+        }, { status: 500 })
       }
     } else if (file && file.type === 'text/plain') {
       textContent = await file.text()

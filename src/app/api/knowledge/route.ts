@@ -1,14 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding } from '@/lib/ai/openai'
+import * as pdfjsLib from 'pdfjs-dist'
+import type { TextItem } from 'pdfjs-dist/types/src/display/api'
 
-// Import pdf-parse - use require for better compatibility
-let pdfParse: ((buffer: Buffer) => Promise<{ text: string }>) | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  pdfParse = require('pdf-parse')
-} catch (e) {
-  console.warn('pdf-parse not available:', e)
+// Configure PDF.js to not use worker (for server-side)
+if (typeof window === 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+}
+
+// Extract text from PDF using pdfjs-dist
+async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
+  const data = new Uint8Array(buffer)
+  const pdf = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise
+
+  let fullText = ''
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const textContent = await page.getTextContent()
+    const pageText = textContent.items
+      .filter((item): item is TextItem => 'str' in item)
+      .map((item) => item.str)
+      .join(' ')
+    fullText += pageText + '\n\n'
+  }
+
+  return fullText.trim()
 }
 
 // Split text into chunks of roughly 500 tokens (approx 2000 chars)
@@ -49,13 +67,13 @@ export async function POST(request: NextRequest) {
 
     // Handle PDF upload
     if (file && file.type === 'application/pdf') {
-      if (!pdfParse) {
-        return NextResponse.json({ error: 'PDF parsing is not available' }, { status: 500 })
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        textContent = await extractPdfText(arrayBuffer)
+      } catch (pdfError) {
+        console.error('PDF parsing error:', pdfError)
+        return NextResponse.json({ error: 'PDF konnte nicht gelesen werden' }, { status: 500 })
       }
-      const arrayBuffer = await file.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      const pdfData = await pdfParse(buffer)
-      textContent = pdfData.text
     } else if (file && file.type === 'text/plain') {
       textContent = await file.text()
     }

@@ -4,11 +4,13 @@ import { createEmbedding } from '@/lib/ai/openai'
 
 // Dynamic import for pdfjs-dist to avoid bundler issues
 async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
-  // Import pdfjs-dist dynamically
-  const pdfjsLib = await import('pdfjs-dist')
+  // Import pdfjs-dist legacy build which works without a worker
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
-  // Disable worker for server-side usage
-  pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+  // Configure worker - use path to worker file
+  const path = await import('path')
+  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath
 
   const data = new Uint8Array(buffer)
 

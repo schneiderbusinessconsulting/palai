@@ -78,6 +78,8 @@ function getSourceIcon(type: string) {
       return <FileText className="h-4 w-4" />
     case 'training_material':
       return <FileText className="h-4 w-4" />
+    case 'sent_response':
+      return <Mail className="h-4 w-4" />
     case 'ai_instructions':
       return <Sparkles className="h-4 w-4" />
     default:
@@ -106,6 +108,10 @@ function getSourceBadge(type: string) {
     training_material: {
       label: 'Skript/Methode',
       className: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+    },
+    sent_response: {
+      label: 'Gesendete Antwort',
+      className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
     },
     ai_instructions: {
       label: 'AI-Regeln',
@@ -472,6 +478,7 @@ export default function KnowledgePage() {
             <SelectItem value="email">E-Mail</SelectItem>
             <SelectItem value="course_info">Kurs-Info</SelectItem>
             <SelectItem value="training_material">Skript/Methode</SelectItem>
+            <SelectItem value="sent_response">Gesendete Antworten</SelectItem>
             <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
           </SelectContent>
         </Select>

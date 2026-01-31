@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createEmbedding } from '@/lib/ai/openai'
 
 export async function POST(
   request: NextRequest,
@@ -48,6 +49,54 @@ export async function POST(
         { error: 'Failed to mark as sent' },
         { status: 500 }
       )
+    }
+
+    // --- LEARNING: Store sent Q&A as knowledge chunk ---
+    try {
+      // Fetch email content
+      const { data: email } = await supabase
+        .from('incoming_emails')
+        .select('subject, body_text, from_name')
+        .eq('id', emailId)
+        .single()
+
+      // Fetch the draft response
+      const { data: draft } = await supabase
+        .from('email_drafts')
+        .select('ai_generated_response, edited_response')
+        .eq('email_id', emailId)
+        .single()
+
+      if (email && draft) {
+        const finalResponse = editedResponse || draft.edited_response || draft.ai_generated_response
+        const question = `${email.subject}\n${email.body_text}`.substring(0, 500)
+
+        // Create a Q&A formatted chunk for learning
+        const qaChunk = `KUNDENANFRAGE (${email.from_name || 'Kunde'}):\n${question}\n\nGESENDETE ANTWORT:\n${finalResponse}`
+
+        // Create embedding for similarity search
+        const embedding = await createEmbedding(qaChunk)
+
+        // Store as knowledge chunk
+        await supabase
+          .from('knowledge_chunks')
+          .insert({
+            content: qaChunk,
+            embedding,
+            source_type: 'sent_response',
+            source_title: `Antwort: ${email.subject}`.substring(0, 200),
+            metadata: {
+              email_id: emailId,
+              from_name: email.from_name,
+              was_edited: !!editedResponse || !!draft.edited_response,
+            },
+          })
+
+        console.log('Learning: Stored sent response as knowledge chunk for:', email.subject)
+      }
+    } catch (learnError) {
+      // Don't fail the main operation if learning fails
+      console.error('Learning storage error (non-critical):', learnError)
     }
 
     return NextResponse.json({

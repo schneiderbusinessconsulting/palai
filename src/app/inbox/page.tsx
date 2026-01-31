@@ -169,6 +169,8 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const [editedResponse, setEditedResponse] = useState('')
   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
 
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
@@ -384,6 +386,10 @@ export default function InboxPage() {
     try {
       const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          editedResponse: editedResponse || undefined,
+        }),
       })
 
       if (response.ok) {
@@ -394,6 +400,41 @@ export default function InboxPage() {
       console.error('Mark as sent failed:', error)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  // Save edited draft
+  const handleSaveDraft = async () => {
+    if (!selectedEmail) return
+
+    setIsSaving(true)
+    setSaveMessage('')
+    try {
+      const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedResponse }),
+      })
+
+      if (response.ok) {
+        // Update local state so preview shows saved text
+        setSelectedEmail((prev) => {
+          if (!prev) return prev
+          const updatedDrafts = prev.email_drafts?.map((d) => ({
+            ...d,
+            edited_response: editedResponse,
+          }))
+          return { ...prev, email_drafts: updatedDrafts }
+        })
+        setSaveMessage('Gespeichert!')
+        setTimeout(() => setSaveMessage(''), 2000)
+      }
+    } catch (error) {
+      console.error('Save draft failed:', error)
+      setSaveMessage('Fehler beim Speichern')
+      setTimeout(() => setSaveMessage(''), 3000)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -906,19 +947,42 @@ export default function InboxPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
                 <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
                   Schliessen
                 </Button>
+                {isEditing && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                      onClick={handleSaveDraft}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Speichern
+                    </Button>
+                    {saveMessage && (
+                      <span className="text-sm text-green-600">{saveMessage}</span>
+                    )}
+                  </>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => {
-                    setIsEditing(!isEditing)
-                    if (!isEditing) {
+                    if (isEditing) {
+                      // Switching to preview - auto-save
+                      handleSaveDraft()
+                    } else {
                       setEditedResponse(
                         currentDraft.edited_response || currentDraft.ai_generated_response
                       )
                     }
+                    setIsEditing(!isEditing)
                   }}
                 >
                   <Edit className="h-4 w-4 mr-2" />

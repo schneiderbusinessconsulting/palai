@@ -661,6 +661,7 @@ export default function KnowledgePage() {
                   <SelectItem value="faq">FAQ</SelectItem>
                   <SelectItem value="course_info">Kurs-Info</SelectItem>
                   <SelectItem value="training_material">Skript/Methode</SelectItem>
+                  <SelectItem value="sent_response">Gesendete Antwort</SelectItem>
                   <SelectItem value="email">E-Mail Vorlage</SelectItem>
                   <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                 </SelectContent>
@@ -824,6 +825,7 @@ export default function KnowledgePage() {
                     <SelectItem value="faq">FAQ</SelectItem>
                     <SelectItem value="course_info">Kurs-Info</SelectItem>
                     <SelectItem value="training_material">Skript/Methode</SelectItem>
+                    <SelectItem value="sent_response">Gesendete Antwort</SelectItem>
                     <SelectItem value="email">E-Mail Vorlage</SelectItem>
                     <SelectItem value="ai_instructions">AI-Regeln</SelectItem>
                   </SelectContent>

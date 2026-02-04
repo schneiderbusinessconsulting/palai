@@ -21,17 +21,43 @@ export async function POST(
 
     // If edited response provided, save it to the draft
     if (editedResponse) {
-      const { error: draftError } = await supabase
+      // Check if a draft exists
+      const { data: existingDraft } = await supabase
         .from('email_drafts')
-        .update({
-          edited_response: editedResponse,
-          status: 'edited',
-          updated_at: new Date().toISOString(),
-        })
+        .select('id')
         .eq('email_id', emailId)
+        .single()
 
-      if (draftError) {
-        console.error('Save draft edit error:', draftError)
+      if (existingDraft) {
+        // Update existing draft
+        const { error: draftError } = await supabase
+          .from('email_drafts')
+          .update({
+            edited_response: editedResponse,
+            status: 'edited',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('email_id', emailId)
+
+        if (draftError) {
+          console.error('Save draft edit error:', draftError)
+        }
+      } else {
+        // Create new draft for manual response
+        const { error: draftError } = await supabase
+          .from('email_drafts')
+          .insert({
+            email_id: emailId,
+            ai_generated_response: editedResponse,
+            edited_response: editedResponse,
+            confidence_score: 1.0,
+            status: 'edited',
+            formality: 'sie',
+          })
+
+        if (draftError) {
+          console.error('Create manual draft error:', draftError)
+        }
       }
     }
 
@@ -122,21 +148,51 @@ export async function PATCH(
     const { editedResponse } = await request.json()
     const supabase = await createClient()
 
-    const { error } = await supabase
+    // Check if a draft exists
+    const { data: existingDraft } = await supabase
       .from('email_drafts')
-      .update({
-        edited_response: editedResponse,
-        status: 'edited',
-        updated_at: new Date().toISOString(),
-      })
+      .select('id')
       .eq('email_id', emailId)
+      .single()
 
-    if (error) {
-      console.error('Save draft error:', error)
-      return NextResponse.json(
-        { error: 'Failed to save draft' },
-        { status: 500 }
-      )
+    if (existingDraft) {
+      // Update existing draft
+      const { error } = await supabase
+        .from('email_drafts')
+        .update({
+          edited_response: editedResponse,
+          status: 'edited',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('email_id', emailId)
+
+      if (error) {
+        console.error('Save draft error:', error)
+        return NextResponse.json(
+          { error: 'Failed to save draft' },
+          { status: 500 }
+        )
+      }
+    } else {
+      // Create new draft for manual response
+      const { error } = await supabase
+        .from('email_drafts')
+        .insert({
+          email_id: emailId,
+          ai_generated_response: editedResponse,
+          edited_response: editedResponse,
+          confidence_score: 1.0,
+          status: 'edited',
+          formality: 'sie',
+        })
+
+      if (error) {
+        console.error('Create manual draft error:', error)
+        return NextResponse.json(
+          { error: 'Failed to create draft' },
+          { status: 500 }
+        )
+      }
     }
 
     return NextResponse.json({

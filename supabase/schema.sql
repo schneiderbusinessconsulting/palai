@@ -162,7 +162,10 @@ create index if not exists email_templates_category_idx
 create table if not exists courses (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  description text,
+  description text, -- Kurze Beschreibung
+  content text, -- Ausführlicher Inhalt
+  target_audience text, -- Zielgruppe
+  learning_goals jsonb default '[]', -- Array von Lernzielen
   next_start date,
   duration text,
   price decimal(10,2),
@@ -384,9 +387,14 @@ create policy "Templates are creatable by authenticated users"
   to authenticated
   with check (true);
 
--- Courses: Alle können lesen
+-- Courses: Alle können lesen und bearbeiten
 create policy "Courses are viewable by authenticated users"
   on courses for select
+  to authenticated
+  using (true);
+
+create policy "Courses are editable by authenticated users"
+  on courses for all
   to authenticated
   using (true);
 

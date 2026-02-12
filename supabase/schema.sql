@@ -308,9 +308,24 @@ alter table team_members enable row level security;
 alter table audit_log enable row level security;
 
 -- Policies für authentifizierte Benutzer
--- Knowledge Chunks: Alle können lesen
+-- Knowledge Chunks: Alle können lesen, erstellen, bearbeiten, löschen
 create policy "Knowledge chunks are viewable by authenticated users"
   on knowledge_chunks for select
+  to authenticated
+  using (true);
+
+create policy "Knowledge chunks are insertable by authenticated users"
+  on knowledge_chunks for insert
+  to authenticated
+  with check (true);
+
+create policy "Knowledge chunks are updatable by authenticated users"
+  on knowledge_chunks for update
+  to authenticated
+  using (true);
+
+create policy "Knowledge chunks are deletable by authenticated users"
+  on knowledge_chunks for delete
   to authenticated
   using (true);
 

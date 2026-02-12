@@ -411,7 +411,8 @@ create policy "Courses are viewable by authenticated users"
 create policy "Courses are editable by authenticated users"
   on courses for all
   to authenticated
-  using (true);
+  using (true)
+  with check (true);
 
 -- Team Members: Alle können lesen
 create policy "Team members are viewable by authenticated users"

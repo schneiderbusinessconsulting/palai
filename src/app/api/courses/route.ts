@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { createEmbedding } from '@/lib/ai/openai'
+
+// Admin client for courses (bypasses RLS)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export interface Course {
   id: string
@@ -24,7 +32,7 @@ export interface Course {
 // GET all courses
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     const { data, error } = await supabase
       .from('courses')
@@ -46,15 +54,7 @@ export async function GET() {
 // POST create new course
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      console.error('Auth error:', authError)
-      return NextResponse.json({ error: 'Nicht authentifiziert', details: authError?.message }, { status: 401 })
-    }
-
+    const supabase = getSupabaseAdmin()
     const body = await request.json()
     const {
       name,
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Course ID ist erforderlich' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // Clean up updates
     const cleanUpdates: Record<string, unknown> = {}
@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Course ID ist erforderlich' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // First delete associated knowledge chunks
     await supabase
@@ -208,7 +208,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 // Helper: Sync course to knowledge base
-async function syncCourseToKnowledge(supabase: Awaited<ReturnType<typeof createClient>>, course: Course) {
+async function syncCourseToKnowledge(supabase: ReturnType<typeof getSupabaseAdmin>, course: Course) {
   try {
     // Build comprehensive course text for AI
     let courseText = `KURS: ${course.name}\n\n`

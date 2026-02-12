@@ -46,6 +46,15 @@ export async function GET() {
 // POST create new course
 export async function POST(request: NextRequest) {
   try {
+    const supabase = await createClient()
+
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      console.error('Auth error:', authError)
+      return NextResponse.json({ error: 'Nicht authentifiziert', details: authError?.message }, { status: 401 })
+    }
+
     const body = await request.json()
     const {
       name,
@@ -66,8 +75,6 @@ export async function POST(request: NextRequest) {
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Name ist erforderlich' }, { status: 400 })
     }
-
-    const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('courses')
@@ -91,7 +98,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating course:', error)
-      return NextResponse.json({ error: 'Failed to create course', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create course', details: error.message, code: error.code }, { status: 500 })
     }
 
     // Sync to knowledge base (don't fail if this fails)

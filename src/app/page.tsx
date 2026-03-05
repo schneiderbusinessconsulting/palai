@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DashboardBriefing } from '@/components/dashboard/briefing'
 import {
   Inbox,
   MessageSquare,
@@ -147,6 +148,9 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Willkommen zurück! Hier ist dein Überblick."
       />
+
+      {/* Daily Briefing */}
+      <DashboardBriefing />
 
       {/* Refresh Button */}
       <div className="flex justify-end -mt-4">

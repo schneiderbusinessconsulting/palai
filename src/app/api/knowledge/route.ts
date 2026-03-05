@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { createEmbedding } from '@/lib/ai/openai'
+
+// Admin client for knowledge (bypasses RLS)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Dynamic import for pdfjs-dist to avoid bundler issues
 async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No content provided' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // Split into chunks
     const chunks = chunkText(textContent)
@@ -143,6 +152,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Return error if no chunks were stored
+    if (storedChunks.length === 0) {
+      return NextResponse.json(
+        { error: 'Keine Chunks konnten gespeichert werden. Bitte prüfen Sie die Datenbankverbindung.' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       title,
@@ -164,7 +181,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const sourceType = searchParams.get('source_type')
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     let query = supabase
       .from('knowledge_chunks')
@@ -218,7 +235,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Title required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     const { error } = await supabase
       .from('knowledge_chunks')
@@ -246,7 +263,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Old title required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // If only updating title/sourceType/published without new content
     if (!content) {

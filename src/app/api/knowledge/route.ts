@@ -54,19 +54,47 @@ async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
   return fullText.trim()
 }
 
-// Split text into chunks of roughly 500 tokens (approx 2000 chars)
-function chunkText(text: string, maxChunkSize = 2000): string[] {
+// Split text into chunks - max 6000 chars (~1500 tokens) to stay safely under 8192 token limit
+function chunkText(text: string, maxChunkSize = 6000): string[] {
   const chunks: string[] = []
   const paragraphs = text.split(/\n\n+/)
 
   let currentChunk = ''
 
   for (const paragraph of paragraphs) {
-    if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
+    // If single paragraph is too long, split it by sentences or force-split
+    if (paragraph.length > maxChunkSize) {
+      // Save current chunk first
+      if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk.trim())
+        currentChunk = ''
+      }
+      // Split long paragraph by sentences
+      const sentences = paragraph.split(/(?<=[.!?])\s+/)
+      let sentenceChunk = ''
+      for (const sentence of sentences) {
+        if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+          chunks.push(sentenceChunk.trim())
+          sentenceChunk = ''
+        }
+        // If single sentence is still too long, force-split by character
+        if (sentence.length > maxChunkSize) {
+          for (let i = 0; i < sentence.length; i += maxChunkSize) {
+            chunks.push(sentence.slice(i, i + maxChunkSize))
+          }
+        } else {
+          sentenceChunk += sentence + ' '
+        }
+      }
+      if (sentenceChunk.trim().length > 0) {
+        currentChunk = sentenceChunk
+      }
+    } else if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
       chunks.push(currentChunk.trim())
-      currentChunk = ''
+      currentChunk = paragraph + '\n\n'
+    } else {
+      currentChunk += paragraph + '\n\n'
     }
-    currentChunk += paragraph + '\n\n'
   }
 
   if (currentChunk.trim().length > 0) {

@@ -157,9 +157,29 @@ export async function POST(request: NextRequest) {
 
     // Return error if no chunks were stored
     if (storedChunks.length === 0) {
-      console.error('No chunks stored. Chunks attempted:', chunks.length)
+      // Try one more time with detailed error to return to user
+      const testChunk = chunks[0] || 'test'
+      let detailedError = 'Unknown error'
+      try {
+        const testEmbedding = await createEmbedding(testChunk)
+        const { error: testError } = await supabase
+          .from('knowledge_chunks')
+          .insert({
+            content: testChunk,
+            embedding: testEmbedding,
+            source_type: sourceType,
+            source_title: title,
+          })
+        if (testError) {
+          detailedError = `DB Error: ${testError.message} (Code: ${testError.code})`
+        }
+      } catch (e) {
+        detailedError = `Embedding Error: ${(e as Error).message}`
+      }
+
+      console.error('No chunks stored. Chunks attempted:', chunks.length, 'Error:', detailedError)
       return NextResponse.json(
-        { error: `Keine Chunks gespeichert (${chunks.length} versucht). Prüfen Sie Logs für Details.` },
+        { error: `Speichern fehlgeschlagen: ${detailedError}` },
         { status: 500 }
       )
     }

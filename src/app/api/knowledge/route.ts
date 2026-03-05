@@ -5,9 +5,12 @@ import { createEmbedding } from '@/lib/ai/openai'
 
 // Admin client for knowledge (bypasses RLS)
 function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+  }
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 }
 
@@ -143,19 +146,20 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (error) {
-          console.error('Error storing chunk:', error)
+          console.error('Error storing chunk:', error.message, error.code, error.details)
         } else {
           storedChunks.push(data)
         }
       } catch (embeddingError) {
-        console.error('Error creating embedding:', embeddingError)
+        console.error('Error creating embedding:', (embeddingError as Error).message)
       }
     }
 
     // Return error if no chunks were stored
     if (storedChunks.length === 0) {
+      console.error('No chunks stored. Chunks attempted:', chunks.length)
       return NextResponse.json(
-        { error: 'Keine Chunks konnten gespeichert werden. Bitte prüfen Sie die Datenbankverbindung.' },
+        { error: `Keine Chunks gespeichert (${chunks.length} versucht). Prüfen Sie Logs für Details.` },
         { status: 500 }
       )
     }

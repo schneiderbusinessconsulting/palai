@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
           error: 'PDF konnte nicht gelesen werden: ' + (pdfError as Error).message
         }, { status: 500 })
       }
-    } else if (file && file.type === 'text/plain') {
+    } else if (file && (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === 'text/x-markdown' || file.name.endsWith('.md'))) {
       textContent = await file.text()
     }
 

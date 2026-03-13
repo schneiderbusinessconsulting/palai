@@ -83,7 +83,8 @@ export async function generateEmailDraft(
   formality?: Formality,
   regenerationFeedback?: string,
   aiInstructions?: string[],
-  threadHistory?: { direction: string; text: string; timestamp: string }[]
+  threadHistory?: { direction: string; text: string; timestamp: string }[],
+  maxSimilarity?: number
 ): Promise<{ response: string; confidence: number; detectedFormality: Formality }> {
   // Auto-detect formality if not provided
   const detectedFormality = formality || detectFormality(emailContent)
@@ -169,14 +170,40 @@ Bitte erstelle eine passende Antwort auf diese Anfrage.`
 
   const generatedResponse = response.choices[0].message.content || ''
 
-  // Calculate confidence based on context availability and response
-  let confidence = 0.5 // Base confidence
-  if (relevantContext.length > 0) confidence += 0.2
-  if (relevantContext.length > 2) confidence += 0.1
-  if (!generatedResponse.includes('persönlich melden') && !generatedResponse.includes('nicht sicher')) {
-    confidence += 0.15
+  // Calculate confidence based on KB similarity, context count, and response quality
+  let confidence = 0.35 // Honest base — no KB = low confidence
+
+  // Primary driver: similarity score from pgvector search
+  if (maxSimilarity !== undefined && maxSimilarity > 0) {
+    if (maxSimilarity > 0.82) confidence += 0.35
+    else if (maxSimilarity > 0.70) confidence += 0.25
+    else if (maxSimilarity > 0.58) confidence += 0.16
+    else if (maxSimilarity > 0.50) confidence += 0.10
+    else confidence += 0.05 // below threshold but still found something
+  } else if (relevantContext.length > 0) {
+    confidence += 0.08 // chunks found but no similarity score available
   }
-  confidence = Math.min(confidence, 0.98)
+
+  // Boost for multiple high-quality chunks
+  if (relevantContext.length >= 3 && (maxSimilarity ?? 0) > 0.60) confidence += 0.10
+  else if (relevantContext.length >= 2) confidence += 0.04
+
+  // AI instructions provide extra grounding
+  if (aiInstructions && aiInstructions.length > 0) confidence += 0.05
+
+  // Penalize hedging language — AI is uncertain too
+  const hedgingPhrases = [
+    'persönlich melden', 'nicht sicher', 'kann ich nicht', 'weiss ich nicht',
+    'keine information', 'leider nicht', 'bitte wenden sie sich', 'bitte kontaktieren sie'
+  ]
+  const hedgingCount = hedgingPhrases.filter(p => generatedResponse.toLowerCase().includes(p)).length
+  confidence -= hedgingCount * 0.10
+
+  // Cap: if response is essentially just "someone will get back to you" with no KB, limit to 0.45
+  const isEssentiallyDeflection = hedgingCount >= 2 && relevantContext.length === 0
+  if (isEssentiallyDeflection) confidence = Math.min(confidence, 0.45)
+
+  confidence = Math.max(0.10, Math.min(0.97, confidence))
 
   return {
     response: generatedResponse,

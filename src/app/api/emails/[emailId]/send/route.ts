@@ -143,7 +143,18 @@ export async function POST(
     }
 
     // 8. Phase 2: Create learning case if draft was significantly edited
-    if (wasEdited && editDist !== null && editDist > 0.1) {
+    // Use dynamic threshold from app_config (fallback to 0.1)
+    let learningThreshold = 0.1
+    try {
+      const { data: configRow } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'learning_min_edit_distance')
+        .single()
+      if (configRow) learningThreshold = parseFloat(configRow.value) || 0.1
+    } catch { /* use default */ }
+
+    if (wasEdited && editDist !== null && editDist > learningThreshold) {
       try {
         await supabase.from('learning_cases').insert({
           email_id: emailId,

@@ -46,6 +46,7 @@ import {
   FileText,
   User,
   AlertTriangle,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -75,6 +76,7 @@ interface Email {
   email_type?: 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
   needs_response?: boolean
   classification_reason?: string
+  buying_intent_score?: number
   email_drafts?: EmailDraft[]
 }
 
@@ -137,6 +139,23 @@ function getEmailTypeBadge(emailType?: string, needsResponse?: boolean) {
         </Badge>
       )
   }
+}
+
+function getBuyingIntentBadge(score?: number) {
+  if (!score || score <= 0) return null
+  if (score >= 70) return (
+    <Badge className="bg-emerald-500 hover:bg-emerald-600 gap-1">
+      <TrendingUp className="h-3 w-3" />
+      {score}% Intent
+    </Badge>
+  )
+  if (score >= 40) return (
+    <Badge className="bg-amber-500 hover:bg-amber-600 gap-1">
+      <TrendingUp className="h-3 w-3" />
+      {score}%
+    </Badge>
+  )
+  return null // Low intent not shown
 }
 
 function formatDate(dateString: string) {
@@ -430,6 +449,40 @@ export default function InboxPage() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  // Send via Resend + HubSpot (full send pipeline)
+  const handleSend = async () => {
+    if (!selectedEmail || !currentDraft) return
+
+    setIsSending(true)
+    try {
+      const finalText = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftId: currentDraft.id,
+          finalText,
+          ownerId: selectedOwnerId || undefined,
+        }),
+      })
+
+      if (response.ok) {
+        releaseLock(selectedEmail.id)
+        setIsDetailOpen(false)
+        fetchEmails()
+        setCsatEmailId(selectedEmail.id)
+        setCsatRating(0)
+      } else {
+        const data = await response.json()
+        console.error('Send failed:', data.error)
+      }
+    } catch (error) {
+      console.error('Send failed:', error)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   // Mark as sent (just update status, no actual sending)
   const handleMarkAsSent = async () => {
     if (!selectedEmail) return
@@ -693,6 +746,7 @@ export default function InboxPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -1014,20 +1068,40 @@ export default function InboxPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   {isEditing ? 'Vorschau' : 'Bearbeiten'}
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        onClick={handleMarkAsSent}
+                        disabled={isSending}
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Nur als gesendet markieren (kein echtes Senden)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleMarkAsSent}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSend}
                   disabled={isSending}
                 >
                   {isSending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Markiere...
+                      Sende...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Als gesendet markieren
+                      <Send className="h-4 w-4 mr-2" />
+                      Senden
                     </>
                   )}
                 </Button>

@@ -128,6 +128,21 @@ export async function POST() {
       }
 
       try {
+        const sourceTitle = `Training: ${subject.substring(0, 80)}`
+
+        // Deduplication: skip if this thread was already imported
+        const { data: existing } = await supabase
+          .from('knowledge_chunks')
+          .select('id')
+          .eq('source_type', 'email_training')
+          .eq('source_title', sourceTitle)
+          .maybeSingle()
+
+        if (existing) {
+          skipped++
+          continue
+        }
+
         const knowledge = await extractKnowledgeFromThread(subject, incomingText, replyText)
 
         if (!knowledge.trim()) {
@@ -141,7 +156,7 @@ export async function POST() {
           content: knowledge,
           embedding,
           source_type: 'email_training',
-          source_title: `Training: ${subject.substring(0, 80)}`,
+          source_title: sourceTitle,
           metadata: {
             hubspot_thread_id: emails[0].properties.hs_email_thread_id,
             imported_at: new Date().toISOString(),

@@ -4,7 +4,13 @@ import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/ope
 import { analyzeTone, determinePriority } from '@/lib/text-utils'
 
 // Phase 3: BI scanning — fire-and-forget, runs in background after email insert
-async function scanEmailForBiInsights(emailId: string, subject: string, bodyText: string) {
+// Returns buying intent score (0-100) for immediate storage on the email record
+async function scanEmailForBiInsights(
+  emailId: string,
+  subject: string,
+  bodyText: string,
+  tone?: { urgency?: string; sentiment?: string }
+): Promise<number> {
   try {
     const supabase = await createClient()
     const { data: triggerWords } = await supabase
@@ -12,7 +18,7 @@ async function scanEmailForBiInsights(emailId: string, subject: string, bodyText
       .select('word, category, weight')
       .eq('is_active', true)
 
-    if (!triggerWords?.length) return
+    if (!triggerWords?.length) return 0
 
     const text = `${subject} ${bodyText}`.toLowerCase()
     const insightsToInsert: Array<{
@@ -23,27 +29,54 @@ async function scanEmailForBiInsights(emailId: string, subject: string, bodyText
       metadata: Record<string, unknown>
     }> = []
 
+    // Track signal counts for buying intent formula
+    let buyingCount = 0
+    let objectionCount = 0
+    let churnCount = 0
+
     for (const tw of triggerWords) {
       if (text.includes(tw.word.toLowerCase())) {
-        // Check if this category is already added (avoid duplicates)
-        const alreadyAdded = insightsToInsert.some(i => i.insight_type === tw.category)
-        if (!alreadyAdded) {
-          insightsToInsert.push({
-            email_id: emailId,
-            insight_type: tw.category,
-            content: `Erkanntes Muster: "${tw.word}"`,
-            confidence: Math.min(tw.weight / 2, 1.0),
-            metadata: { trigger_word: tw.word, weight: tw.weight },
-          })
-        }
+        // Store ALL matches — no category deduplication (one signal per word)
+        insightsToInsert.push({
+          email_id: emailId,
+          insight_type: tw.category,
+          content: `Erkanntes Muster: "${tw.word}"`,
+          confidence: Math.min(tw.weight / 2, 1.0),
+          metadata: { trigger_word: tw.word, weight: tw.weight },
+        })
+
+        // Count by category for buying intent score
+        if (tw.category === 'buying_signal') buyingCount++
+        else if (tw.category === 'objection') objectionCount++
+        else if (tw.category === 'churn_risk') churnCount++
       }
     }
 
     if (insightsToInsert.length > 0) {
       await supabase.from('bi_insights').insert(insightsToInsert)
     }
+
+    // Calculate buying intent score (0-100)
+    const urgencyScore =
+      tone?.urgency === 'critical' ? 25 :
+      tone?.urgency === 'high' ? 18 :
+      tone?.urgency === 'medium' ? 10 : 0
+    const sentimentScore =
+      tone?.sentiment === 'positive' ? 20 :
+      tone?.sentiment === 'neutral' ? 10 : 0
+
+    const intentScore = Math.max(0, Math.min(100,
+      Math.min(buyingCount * 20, 60) +
+      urgencyScore +
+      sentimentScore -
+      objectionCount * 8 -
+      churnCount * 20
+    ))
+
+    return intentScore
   } catch {
     // Ignore — BI table may not exist yet (migration 006 not applied)
+    return 0
   }
 }
 
@@ -64,7 +97,8 @@ async function generateDraftForEmail(
   emailId: string,
   subject: string,
   bodyText: string,
-  fromName?: string | null
+  fromName?: string | null,
+  hubspotThreadId?: string | null
 ) {
   try {
     const supabase = await createClient()
@@ -80,22 +114,36 @@ async function generateDraftForEmail(
       return // Already has a draft
     }
 
+    // Read dynamic RAG threshold from app_config (fallback to 0.5)
+    let ragThreshold = 0.5
+    try {
+      const { data: configRow } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'rag_match_threshold')
+        .single()
+      if (configRow) ragThreshold = parseFloat(configRow.value) || 0.5
+    } catch { /* use default */ }
+
     // Create embedding for the email content
     const emailContent = `${subject}\n\n${bodyText}`
     const embedding = await createEmbedding(emailContent)
 
-    // Search for relevant knowledge chunks (threshold 0.5 for broader matching)
+    // Search for relevant knowledge chunks
     const { data: chunks } = await supabase.rpc(
       'match_knowledge_chunks',
       {
         query_embedding: embedding,
-        match_threshold: 0.5,
+        match_threshold: ragThreshold,
         match_count: 5,
       }
     )
 
     const relevantChunks = chunks?.map((c: { content: string }) => c.content) || []
     const chunkIds = chunks?.map((c: { id: string }) => c.id) || []
+    const maxSimilarity: number = chunks?.length > 0
+      ? Math.max(...chunks.map((c: { similarity: number }) => c.similarity || 0))
+      : 0
 
     // Fetch AI instructions (rules) - these always apply
     const { data: aiRules } = await supabase
@@ -105,14 +153,68 @@ async function generateDraftForEmail(
 
     const aiInstructions = aiRules?.map((r: { content: string }) => r.content) || []
 
-    // Generate draft using AI (with AI instructions/rules)
+    // Build thread history from DB (same thread, previous messages)
+    let threadHistory: { direction: string; text: string; timestamp: string }[] = []
+    if (hubspotThreadId) {
+      try {
+        // Step 1: get sibling email IDs in this thread
+        const { data: threadEmails } = await supabase
+          .from('incoming_emails')
+          .select('id, body_text, received_at, status')
+          .eq('hubspot_thread_id', hubspotThreadId)
+          .neq('id', emailId)
+          .order('received_at', { ascending: true })
+          .limit(5)
+
+        if (threadEmails && threadEmails.length > 0) {
+          // Incoming emails from thread
+          const incoming = threadEmails.map((e: { id: string; body_text: string; received_at: string; status: string }) => ({
+            direction: e.status === 'sent' ? 'EMAIL' : 'INCOMING_EMAIL',
+            text: e.body_text || '',
+            timestamp: e.received_at || '',
+          }))
+
+          // Step 2: get sent drafts for those email IDs (outgoing replies)
+          const threadEmailIds = threadEmails.map((e: { id: string }) => e.id)
+          const { data: sentDrafts } = await supabase
+            .from('email_drafts')
+            .select('email_id, edited_response, ai_generated_response, sent_at')
+            .in('email_id', threadEmailIds)
+            .eq('status', 'edited')
+            .not('sent_at', 'is', null)
+            .order('sent_at', { ascending: true })
+
+          // Merge: replace 'sent' status emails with their actual draft text if available
+          const draftMap = new Map(
+            (sentDrafts || []).map((d: { email_id: string; edited_response: string; ai_generated_response: string; sent_at: string }) => [
+              d.email_id,
+              { text: d.edited_response || d.ai_generated_response, timestamp: d.sent_at },
+            ])
+          )
+
+          threadHistory = incoming.map((e, i) => {
+            const draft = draftMap.get(threadEmails[i]?.id)
+            if (draft && e.direction === 'EMAIL') {
+              return { direction: 'EMAIL', text: draft.text, timestamp: draft.timestamp }
+            }
+            return e
+          })
+        }
+      } catch (e) {
+        console.error('Thread history fetch error in auto-draft:', e)
+      }
+    }
+
+    // Generate draft using AI (with AI instructions/rules + thread history)
     const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
       fromName || undefined,
       undefined, // formality - auto-detect
       undefined, // feedback
-      aiInstructions
+      aiInstructions,
+      threadHistory,
+      maxSimilarity
     )
 
     // Store the draft
@@ -347,14 +449,24 @@ export async function POST(request: NextRequest) {
       } else {
         imported++
         if (newEmail?.id) {
-          // Phase 3: BI scanning (fire-and-forget)
+          const hubspotThreadId = props.hs_email_thread_id || null
+          // Phase 3: BI scanning — async so we can store buying intent score
           if (classification.emailType === 'customer_inquiry' || classification.emailType === 'form_submission') {
-            scanEmailForBiInsights(newEmail.id, subject, bodyText)
+            scanEmailForBiInsights(newEmail.id, subject, bodyText, { urgency: tone.urgency, sentiment: tone.sentiment })
+              .then(async (intentScore) => {
+                if (intentScore > 0) {
+                  const supabase2 = await createClient()
+                  await supabase2
+                    .from('incoming_emails')
+                    .update({ buying_intent_score: intentScore })
+                    .eq('id', newEmail.id)
+                }
+              })
               .catch(err => console.error('BI scan failed:', err))
           }
           // Auto-draft if enabled
           if (autoDraftEnabled && classification.needsResponse) {
-            generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
+            generateDraftForEmail(newEmail.id, subject, bodyText, fromName, hubspotThreadId)
               .catch(err => console.error('Background draft generation failed:', err))
           }
         }

@@ -52,14 +52,24 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Allow API routes, static files, and public pages
+  // Allow static files, public pages, and webhook endpoints (unauthenticated)
   if (
-    pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon') ||
     pathname.startsWith('/helpcenter') || // Public help center also accessible on dashboard
-    pathname === '/auth'
+    pathname === '/auth' ||
+    pathname.startsWith('/api/webhooks') || // Public webhooks (e.g. HubSpot inbound)
+    pathname.startsWith('/api/helpcenter')  // Public help center API
   ) {
+    return NextResponse.next()
+  }
+
+  // Protect API routes with the same password cookie
+  if (pathname.startsWith('/api')) {
+    const authCookie = request.cookies.get(AUTH_COOKIE_NAME)
+    if (!authCookie || authCookie.value !== SITE_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     return NextResponse.next()
   }
 

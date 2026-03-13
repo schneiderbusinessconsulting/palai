@@ -218,23 +218,60 @@ export default function SettingsPage() {
     showSaved('ai')
   }
 
-  // ── Learning Config (localStorage) ──────────────────────────────────────────
+  // ── Learning Config (app_config API) ────────────────────────────────────────
   const [learningConfig, setLearningConfig] = useState({
     minEditDistance: 0.10,
     learningEnabled: true,
-    autoExtractDays: 0,
+    autoExtractDays: 90,
+    ragMatchThreshold: 0.5,
   })
+  const [learningConfigLoading, setLearningConfigLoading] = useState(false)
+  const [learningConfigSaving, setLearningConfigSaving] = useState(false)
 
-  useEffect(() => {
-    const stored = localStorage.getItem('palai_learning_config')
-    if (stored) setLearningConfig(JSON.parse(stored))
-  }, [])
+  const fetchLearningConfig = async () => {
+    setLearningConfigLoading(true)
+    try {
+      const res = await fetch('/api/settings/config')
+      if (res.ok) {
+        const data = await res.json()
+        const c = data.config || {}
+        setLearningConfig({
+          minEditDistance: parseFloat(c.learning_min_edit_distance ?? '0.10'),
+          learningEnabled: (c.auto_extract_enabled ?? 'true') === 'true',
+          autoExtractDays: parseInt(c.auto_extract_days ?? '90'),
+          ragMatchThreshold: parseFloat(c.rag_match_threshold ?? '0.5'),
+        })
+      }
+    } catch {
+      // App_config table may not exist yet — keep defaults
+    } finally {
+      setLearningConfigLoading(false)
+    }
+  }
+
+  const saveLearningConfig = async () => {
+    setLearningConfigSaving(true)
+    try {
+      await fetch('/api/settings/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: {
+            learning_min_edit_distance: String(learningConfig.minEditDistance),
+            auto_extract_enabled: String(learningConfig.learningEnabled),
+            auto_extract_days: String(learningConfig.autoExtractDays),
+            rag_match_threshold: String(learningConfig.ragMatchThreshold),
+          },
+        }),
+      })
+      showSaved('learning')
+    } finally {
+      setLearningConfigSaving(false)
+    }
+  }
 
   const updateLearning = (patch: Partial<typeof learningConfig>) => {
-    const next = { ...learningConfig, ...patch }
-    setLearningConfig(next)
-    localStorage.setItem('palai_learning_config', JSON.stringify(next))
-    showSaved('learning')
+    setLearningConfig(prev => ({ ...prev, ...patch }))
   }
 
   // ── SLA ─────────────────────────────────────────────────────────────────────
@@ -417,7 +454,7 @@ export default function SettingsPage() {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" />Profil</TabsTrigger>
           <TabsTrigger value="ai-instructions" className="gap-2" onClick={fetchInstructions}><Brain className="h-4 w-4" />AI Anweisungen</TabsTrigger>
-          <TabsTrigger value="ai-style" className="gap-2"><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
+          <TabsTrigger value="ai-style" className="gap-2" onClick={fetchLearningConfig}><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
           <TabsTrigger value="sla" className="gap-2" onClick={fetchSlaTargets}><Clock className="h-4 w-4" />SLA</TabsTrigger>
           <TabsTrigger value="bi" className="gap-2" onClick={fetchTriggerWords}><ShoppingCart className="h-4 w-4" />BI Trigger</TabsTrigger>
           <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}><Shield className="h-4 w-4" />Team</TabsTrigger>
@@ -730,7 +767,7 @@ export default function SettingsPage() {
                   <Input
                     type="number"
                     min={0}
-                    max={30}
+                    max={365}
                     value={learningConfig.autoExtractDays}
                     onChange={(e) =>
                       updateLearning({ autoExtractDays: parseInt(e.target.value) || 0 })
@@ -745,18 +782,55 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {savedKey === 'learning' && (
-                <span className="text-sm text-green-600 flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" />Gespeichert
-                </span>
-              )}
-
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Knowledge Base Ähnlichkeitsschwelle (0.3 – 0.9)
+                </label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0.30}
+                    max={0.90}
+                    step={0.05}
+                    value={learningConfig.ragMatchThreshold}
+                    onChange={(e) =>
+                      updateLearning({ ragMatchThreshold: parseFloat(e.target.value) || 0.5 })
+                    }
+                    className="h-8 w-28"
+                  />
+                  <span className="text-sm text-slate-500">
+                    {learningConfig.ragMatchThreshold >= 0.7
+                      ? 'Hoch — nur sehr ähnliche Artikel werden verwendet'
+                      : learningConfig.ragMatchThreshold <= 0.4
+                        ? 'Niedrig — mehr Treffer, aber weniger präzise'
+                        : 'Ausgewogen — guter Mittelweg (empfohlen: 0.5)'}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-400">
-                  Hinweis: Die hier konfigurierten Werte sind UI-Referenzwerte (localStorage). Die aktive Schwelle in{' '}
-                  <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">src/app/api/emails/[emailId]/send/route.ts</code>{' '}
-                  muss separat angepasst werden.
+                  Niedrig = mehr KB-Treffer (eventuell irrelevant). Hoch = weniger aber präzisere Treffer.
                 </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={saveLearningConfig}
+                  disabled={learningConfigSaving || learningConfigLoading}
+                  size="sm"
+                >
+                  {learningConfigSaving ? (
+                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Speichert...</>
+                  ) : (
+                    <><Save className="h-4 w-4 mr-2" />Speichern</>
+                  )}
+                </Button>
+                {savedKey === 'learning' && (
+                  <span className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" />Gespeichert (aktiv)
+                  </span>
+                )}
+                {learningConfigLoading && (
+                  <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                )}
               </div>
             </CardContent>
           </Card>

@@ -33,6 +33,7 @@ const dashboards = [
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
+  { name: 'Insights', href: '/insights', icon: BarChart3 },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
   { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },

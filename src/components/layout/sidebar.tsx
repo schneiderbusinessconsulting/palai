@@ -35,6 +35,7 @@ const navigation = [
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
+  { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },
   { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Kurse & Preise', href: '/courses', icon: GraduationCap },
   { name: 'Analytics', href: '/analytics', icon: BarChart3 },
@@ -49,25 +50,37 @@ export function Sidebar() {
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [badges, setBadges] = useState<Record<string, number>>({})
 
-  // Fetch pending email count
+  // Fetch pending email count + learning cases count
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const response = await fetch('/api/emails?limit=100')
-        if (response.ok) {
-          const data = await response.json()
+        const [emailRes, learningRes] = await Promise.all([
+          fetch('/api/emails?limit=100'),
+          fetch('/api/learning?status=pending'),
+        ])
+
+        const newBadges: Record<string, number> = {}
+
+        if (emailRes.ok) {
+          const data = await emailRes.json()
           const emails = data.emails || []
-          // Count emails that need attention (pending or draft_ready, excluding system mails)
           const pending = emails.filter((e: { status: string; email_type?: string; needs_response?: boolean }) =>
             (e.status === 'pending' || e.status === 'draft_ready') &&
             e.email_type !== 'system_alert' &&
             e.email_type !== 'notification' &&
             (e.email_type !== 'form_submission' || e.needs_response)
           ).length
-          setBadges({ pendingEmails: pending })
+          newBadges.pendingEmails = pending
         }
+
+        if (learningRes.ok) {
+          const data = await learningRes.json()
+          newBadges.learningPending = data.pending || 0
+        }
+
+        setBadges(newBadges)
       } catch (error) {
-        console.error('Failed to fetch email count:', error)
+        console.error('Failed to fetch sidebar counts:', error)
       }
     }
 

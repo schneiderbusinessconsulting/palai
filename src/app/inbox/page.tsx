@@ -276,9 +276,14 @@ export default function InboxPage() {
       if (response.ok) {
         const data = await response.json()
         setOwners(data.owners || [])
-        // Auto-select first owner if available
+        // Auto-select owner based on profile email, fallback to first
         if (data.owners?.length > 0 && !selectedOwnerId) {
-          setSelectedOwnerId(data.owners[0].id)
+          const profile = localStorage.getItem('palai_profile')
+          const profileEmail = profile ? JSON.parse(profile).email : null
+          const match = profileEmail
+            ? data.owners.find((o: HubSpotOwner) => o.email === profileEmail)
+            : null
+          setSelectedOwnerId(match?.id || data.owners[0].id)
         }
       }
     } catch (error) {

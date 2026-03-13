@@ -27,7 +27,6 @@ import { Button } from '@/components/ui/button'
 
 const dashboards = [
   { name: 'Intelligence', href: '/', current: true },
-  { name: 'Analytics', href: 'https://analytics.palacios-institut.com/', current: false },
 ]
 
 const navigation = [
@@ -39,7 +38,6 @@ const navigation = [
   { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },
   { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Kurse & Preise', href: '/courses', icon: GraduationCap },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
 ]
 

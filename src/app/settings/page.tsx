@@ -30,7 +30,22 @@ import {
   AlertOctagon,
   UserMinus,
   Clock,
+  Brain,
+  BookOpen,
+  GraduationCap,
+  CheckCircle2,
+  Circle,
+  Zap,
+  TrendingUp,
+  RefreshCw,
+  AlertCircle,
+  ChevronRight,
+  MessageSquare,
+  BarChart3,
+  Inbox,
 } from 'lucide-react'
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface TriggerWord {
   id: string
@@ -58,37 +73,175 @@ interface Agent {
   max_open_tickets: number
 }
 
+interface AiInstruction {
+  title: string
+  content: string
+  ids: string[]
+  created_at: string
+}
+
+interface TrainingStats {
+  email_training_count: number
+  ai_instructions_count: number
+}
+
+interface BulkResult {
+  success: boolean
+  total_emails: number
+  threads: number
+  extracted: number
+  skipped: number
+  errors: string[]
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
 const CATEGORY_LABELS: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   buying_signal: { label: 'Kaufsignal', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', icon: ShoppingCart },
   objection: { label: 'Einwand', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: AlertOctagon },
   churn_risk: { label: 'Churn-Risiko', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: UserMinus },
 }
 
-export default function SettingsPage() {
-  const [signature, setSignature] = useState(`Herzliche Grüsse
-Max Mustermann
-Palacios Institut`)
+const fmtMins = (m: number) =>
+  m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`
 
-  // SLA state
+// ─── Tiny save-feedback hook ──────────────────────────────────────────────────
+
+function useSaveFeedback() {
+  const [saved, setSaved] = useState<string | null>(null)
+  const showSaved = (key: string) => {
+    setSaved(key)
+    setTimeout(() => setSaved(null), 2000)
+  }
+  return { saved, showSaved }
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function SettingsPage() {
+  const { saved: savedKey, showSaved } = useSaveFeedback()
+
+  // ── Profil ──────────────────────────────────────────────────────────────────
+  const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', signature: '' })
+  const [profileLoaded, setProfileLoaded] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('palai_profile')
+    setProfile(
+      stored
+        ? JSON.parse(stored)
+        : {
+            firstName: 'Sandro',
+            lastName: 'Palacios',
+            email: 'sandro@palacios-institut.ch',
+            signature: 'Herzliche Grüsse\nSandro Palacios\nPalacios Institut',
+          }
+    )
+    setProfileLoaded(true)
+  }, [])
+
+  const handleSaveProfile = () => {
+    localStorage.setItem('palai_profile', JSON.stringify(profile))
+    showSaved('profile')
+  }
+
+  // ── AI Instructions ─────────────────────────────────────────────────────────
+  const [instructions, setInstructions] = useState<AiInstruction[]>([])
+  const [instrLoading, setInstrLoading] = useState(false)
+  const [newInstrTitle, setNewInstrTitle] = useState('')
+  const [newInstrContent, setNewInstrContent] = useState('')
+  const [addingInstr, setAddingInstr] = useState(false)
+  const [deletingInstr, setDeletingInstr] = useState<string | null>(null)
+
+  const fetchInstructions = async () => {
+    setInstrLoading(true)
+    try {
+      const res = await fetch('/api/settings/ai-instructions')
+      const data = await res.json()
+      setInstructions(data.instructions || [])
+    } finally {
+      setInstrLoading(false)
+    }
+  }
+
+  const handleAddInstruction = async () => {
+    if (!newInstrTitle.trim() || !newInstrContent.trim()) return
+    setAddingInstr(true)
+    try {
+      const res = await fetch('/api/settings/ai-instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newInstrTitle, content: newInstrContent }),
+      })
+      if (res.ok) {
+        setNewInstrTitle('')
+        setNewInstrContent('')
+        fetchInstructions()
+        showSaved('instruction')
+      }
+    } finally {
+      setAddingInstr(false)
+    }
+  }
+
+  const handleDeleteInstruction = async (title: string) => {
+    setDeletingInstr(title)
+    try {
+      await fetch('/api/settings/ai-instructions', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      fetchInstructions()
+    } finally {
+      setDeletingInstr(null)
+    }
+  }
+
+  // ── AI Settings (localStorage) ───────────────────────────────────────────────
+  const [aiSettings, setAiSettings] = useState({
+    tonality: 'friendly',
+    language: 'de-ch',
+    confidenceGreen: 85,
+    confidenceYellow: 70,
+  })
+
+  useEffect(() => {
+    const stored = localStorage.getItem('palai_ai_settings')
+    if (stored) setAiSettings(JSON.parse(stored))
+  }, [])
+
+  const updateAiSettings = (patch: Partial<typeof aiSettings>) => {
+    const next = { ...aiSettings, ...patch }
+    setAiSettings(next)
+    localStorage.setItem('palai_ai_settings', JSON.stringify(next))
+    showSaved('ai')
+  }
+
+  // ── Learning Config (localStorage) ──────────────────────────────────────────
+  const [learningConfig, setLearningConfig] = useState({
+    minEditDistance: 0.10,
+    learningEnabled: true,
+    autoExtractDays: 0,
+  })
+
+  useEffect(() => {
+    const stored = localStorage.getItem('palai_learning_config')
+    if (stored) setLearningConfig(JSON.parse(stored))
+  }, [])
+
+  const updateLearning = (patch: Partial<typeof learningConfig>) => {
+    const next = { ...learningConfig, ...patch }
+    setLearningConfig(next)
+    localStorage.setItem('palai_learning_config', JSON.stringify(next))
+    showSaved('learning')
+  }
+
+  // ── SLA ─────────────────────────────────────────────────────────────────────
   const [slaTargets, setSlaTargets] = useState<SlaTarget[]>([])
   const [slaLoading, setSlaLoading] = useState(false)
   const [slaSaving, setSlaSaving] = useState<string | null>(null)
   const [slaEdits, setSlaEdits] = useState<Record<string, { first: number; resolution: number }>>({})
-
-  // Trigger Words state
-  const [triggerWords, setTriggerWords] = useState<TriggerWord[]>([])
-  const [twLoading, setTwLoading] = useState(false)
-  const [newWord, setNewWord] = useState('')
-  const [newCategory, setNewCategory] = useState('buying_signal')
-  const [addingWord, setAddingWord] = useState(false)
-
-  // Agents state
-  const [agents, setAgents] = useState<Agent[]>([])
-  const [agentsLoading, setAgentsLoading] = useState(false)
-  const [newAgentName, setNewAgentName] = useState('')
-  const [newAgentEmail, setNewAgentEmail] = useState('')
-  const [newAgentRole, setNewAgentRole] = useState('L1')
-  const [addingAgent, setAddingAgent] = useState(false)
 
   const fetchSlaTargets = async () => {
     setSlaLoading(true)
@@ -97,11 +250,8 @@ Palacios Institut`)
       const data = await res.json()
       const targets: SlaTarget[] = data.targets || []
       setSlaTargets(targets)
-      // Init edits with current values
       const edits: Record<string, { first: number; resolution: number }> = {}
-      targets.forEach(t => {
-        edits[t.id] = { first: t.first_response_minutes, resolution: t.resolution_minutes }
-      })
+      targets.forEach((t) => { edits[t.id] = { first: t.first_response_minutes, resolution: t.resolution_minutes } })
       setSlaEdits(edits)
     } finally {
       setSlaLoading(false)
@@ -119,10 +269,18 @@ Palacios Institut`)
         body: JSON.stringify({ id, first_response_minutes: edit.first, resolution_minutes: edit.resolution }),
       })
       fetchSlaTargets()
+      showSaved(`sla-${id}`)
     } finally {
       setSlaSaving(null)
     }
   }
+
+  // ── Trigger Words ────────────────────────────────────────────────────────────
+  const [triggerWords, setTriggerWords] = useState<TriggerWord[]>([])
+  const [twLoading, setTwLoading] = useState(false)
+  const [newWord, setNewWord] = useState('')
+  const [newCategory, setNewCategory] = useState('buying_signal')
+  const [addingWord, setAddingWord] = useState(false)
 
   const fetchTriggerWords = async () => {
     setTwLoading(true)
@@ -135,17 +293,6 @@ Palacios Institut`)
     }
   }
 
-  const fetchAgents = async () => {
-    setAgentsLoading(true)
-    try {
-      const res = await fetch('/api/agents')
-      const data = await res.json()
-      setAgents(data.agents || [])
-    } finally {
-      setAgentsLoading(false)
-    }
-  }
-
   const handleAddWord = async () => {
     if (!newWord.trim()) return
     setAddingWord(true)
@@ -155,10 +302,7 @@ Palacios Institut`)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: newWord, category: newCategory, weight: 1.0 }),
       })
-      if (res.ok) {
-        setNewWord('')
-        fetchTriggerWords()
-      }
+      if (res.ok) { setNewWord(''); fetchTriggerWords() }
     } finally {
       setAddingWord(false)
     }
@@ -178,6 +322,31 @@ Palacios Institut`)
     fetchTriggerWords()
   }
 
+  const groupedWords = triggerWords.reduce<Record<string, TriggerWord[]>>((acc, w) => {
+    if (!acc[w.category]) acc[w.category] = []
+    acc[w.category].push(w)
+    return acc
+  }, {})
+
+  // ── Agents ───────────────────────────────────────────────────────────────────
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [agentsLoading, setAgentsLoading] = useState(false)
+  const [newAgentName, setNewAgentName] = useState('')
+  const [newAgentEmail, setNewAgentEmail] = useState('')
+  const [newAgentRole, setNewAgentRole] = useState('L1')
+  const [addingAgent, setAddingAgent] = useState(false)
+
+  const fetchAgents = async () => {
+    setAgentsLoading(true)
+    try {
+      const res = await fetch('/api/agents')
+      const data = await res.json()
+      setAgents(data.agents || [])
+    } finally {
+      setAgentsLoading(false)
+    }
+  }
+
   const handleAddAgent = async () => {
     if (!newAgentName || !newAgentEmail) return
     setAddingAgent(true)
@@ -187,11 +356,7 @@ Palacios Institut`)
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newAgentName, email: newAgentEmail, role: newAgentRole }),
       })
-      if (res.ok) {
-        setNewAgentName('')
-        setNewAgentEmail('')
-        fetchAgents()
-      }
+      if (res.ok) { setNewAgentName(''); setNewAgentEmail(''); fetchAgents() }
     } finally {
       setAddingAgent(false)
     }
@@ -206,145 +371,409 @@ Palacios Institut`)
     fetchAgents()
   }
 
-  const groupedWords = triggerWords.reduce<Record<string, TriggerWord[]>>((acc, w) => {
-    if (!acc[w.category]) acc[w.category] = []
-    acc[w.category].push(w)
-    return acc
-  }, {})
+  // ── Training (HubSpot Bulk Import) ───────────────────────────────────────────
+  const [trainingStats, setTrainingStats] = useState<TrainingStats | null>(null)
+  const [bulkRunning, setBulkRunning] = useState(false)
+  const [bulkResult, setBulkResult] = useState<BulkResult | null>(null)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+
+  const fetchTrainingStats = async () => {
+    try {
+      const res = await fetch('/api/training/hubspot-bulk')
+      const data = await res.json()
+      setTrainingStats(data)
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleBulkImport = async () => {
+    setBulkRunning(true)
+    setBulkResult(null)
+    setBulkError(null)
+    try {
+      const res = await fetch('/api/training/hubspot-bulk', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setBulkError(data.error || 'Import fehlgeschlagen')
+      } else {
+        setBulkResult(data)
+        fetchTrainingStats()
+      }
+    } catch (e) {
+      setBulkError(String(e))
+    } finally {
+      setBulkRunning(false)
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      <Header title="Einstellungen" description="Verwalte dein Profil und App-Einstellungen" />
+      <Header title="Einstellungen" description="Profil, AI, Learning und System-Konfiguration" />
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="h-4 w-4" />
-            Profil
-          </TabsTrigger>
-          <TabsTrigger value="ai" className="gap-2">
-            <Key className="h-4 w-4" />
-            AI
-          </TabsTrigger>
-          <TabsTrigger value="sla" className="gap-2" onClick={fetchSlaTargets}>
-            <Clock className="h-4 w-4" />
-            SLA
-          </TabsTrigger>
-          <TabsTrigger value="bi" className="gap-2" onClick={fetchTriggerWords}>
-            <ShoppingCart className="h-4 w-4" />
-            BI Trigger
-          </TabsTrigger>
-          <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}>
-            <Shield className="h-4 w-4" />
-            Team
-          </TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-2">
-            <Database className="h-4 w-4" />
-            Integrationen
-          </TabsTrigger>
+        <TabsList className="flex-wrap h-auto gap-1">
+          <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" />Profil</TabsTrigger>
+          <TabsTrigger value="ai-instructions" className="gap-2" onClick={fetchInstructions}><Brain className="h-4 w-4" />AI Anweisungen</TabsTrigger>
+          <TabsTrigger value="ai-style" className="gap-2"><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
+          <TabsTrigger value="sla" className="gap-2" onClick={fetchSlaTargets}><Clock className="h-4 w-4" />SLA</TabsTrigger>
+          <TabsTrigger value="bi" className="gap-2" onClick={fetchTriggerWords}><ShoppingCart className="h-4 w-4" />BI Trigger</TabsTrigger>
+          <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}><Shield className="h-4 w-4" />Team</TabsTrigger>
+          <TabsTrigger value="training" className="gap-2" onClick={fetchTrainingStats}><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
+          <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2"><Database className="h-4 w-4" />Integrationen</TabsTrigger>
         </TabsList>
 
-        {/* Profile Tab */}
+        {/* ── PROFIL ─────────────────────────────────────────────────────────── */}
         <TabsContent value="profile" className="space-y-6">
+          {profileLoaded && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Persönliche Informationen</CardTitle>
+                  <CardDescription>Wird in E-Mail-Antworten und der Signatur verwendet</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vorname</label>
+                      <Input
+                        value={profile.firstName}
+                        onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nachname</label>
+                      <Input
+                        value={profile.lastName}
+                        onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">E-Mail</label>
+                    <Input
+                      type="email"
+                      value={profile.email}
+                      onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>E-Mail Signatur</CardTitle>
+                  <CardDescription>Wird automatisch an AI-generierte Antworten angehängt</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    value={profile.signature}
+                    onChange={(e) => setProfile((p) => ({ ...p, signature: e.target.value }))}
+                    rows={5}
+                    className="font-mono text-sm"
+                  />
+                  <Button onClick={handleSaveProfile} className="gap-2">
+                    {savedKey === 'profile' ? (
+                      <><CheckCircle2 className="h-4 w-4 text-green-400" />Gespeichert</>
+                    ) : (
+                      <><Save className="h-4 w-4" />Speichern</>
+                    )}
+                  </Button>
+                  <p className="text-xs text-slate-400">Gespeichert im Browser (localStorage)</p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </TabsContent>
+
+        {/* ── AI ANWEISUNGEN ──────────────────────────────────────────────────── */}
+        <TabsContent value="ai-instructions" className="space-y-6">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+            <p className="font-medium mb-1 flex items-center gap-2"><Brain className="h-4 w-4" />Was sind AI Anweisungen?</p>
+            <p>Diese Regeln werden bei <strong>jedem</strong> AI-Entwurf automatisch berücksichtigt — unabhängig vom Thema. Ideal für feste Vorgaben wie Anrede, Stil, Do&apos;s und Don&apos;ts, Preise, USPs des Instituts.</p>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Persönliche Informationen</CardTitle>
-              <CardDescription>Diese Informationen werden in E-Mail-Antworten verwendet</CardDescription>
+              <CardTitle>Neue Anweisung hinzufügen</CardTitle>
+              <CardDescription>Titel + Inhalt → wird als Embedding in der Knowledge Base gespeichert</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vorname</label>
-                  <Input defaultValue="Max" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nachname</label>
-                  <Input defaultValue="Mustermann" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">E-Mail</label>
-                <Input type="email" defaultValue="max@palacios-institut.ch" />
+            <CardContent className="space-y-3">
+              <Input
+                placeholder="Titel, z.B. «Anrede und Tonalität»"
+                value={newInstrTitle}
+                onChange={(e) => setNewInstrTitle(e.target.value)}
+              />
+              <Textarea
+                placeholder={`Inhalt der Anweisung, z.B.:\n- Immer mit «Herzliche Grüsse» abschliessen\n- Du-Form verwenden wenn Vorname bekannt\n- Nie Preise ohne Rückfrage nennen`}
+                value={newInstrContent}
+                onChange={(e) => setNewInstrContent(e.target.value)}
+                rows={5}
+                className="text-sm"
+              />
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleAddInstruction}
+                  disabled={addingInstr || !newInstrTitle.trim() || !newInstrContent.trim()}
+                  className="gap-2"
+                >
+                  {addingInstr ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Anweisung speichern
+                </Button>
+                {savedKey === 'instruction' && (
+                  <span className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4" />Gespeichert
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle>E-Mail Signatur</CardTitle>
-              <CardDescription>Wird automatisch an AI-generierte Antworten angehängt</CardDescription>
+              <CardTitle>Aktive Anweisungen</CardTitle>
+              <CardDescription>
+                {instructions.length} Regel{instructions.length !== 1 ? 'n' : ''} — werden bei jedem Draft geladen
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea value={signature} onChange={(e) => setSignature(e.target.value)} rows={4} className="font-mono text-sm" />
-              <Button className="gap-2"><Save className="h-4 w-4" />Speichern</Button>
+            <CardContent>
+              {instrLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                </div>
+              ) : instructions.length === 0 ? (
+                <p className="text-center text-slate-400 py-6 text-sm">
+                  Noch keine Anweisungen — oben hinzufügen
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {instructions.map((instr) => (
+                    <div
+                      key={instr.title}
+                      className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-slate-900 dark:text-white">{instr.title}</p>
+                          <p className="text-xs text-slate-500 mt-1 line-clamp-3 whitespace-pre-line">
+                            {instr.content}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteInstruction(instr.title)}
+                          disabled={deletingInstr === instr.title}
+                          className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        >
+                          {deletingInstr === instr.title ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* AI Settings Tab */}
-        <TabsContent value="ai" className="space-y-6">
+        {/* ── AI & LERNEN ─────────────────────────────────────────────────────── */}
+        <TabsContent value="ai-style" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>AI Antwort-Stil</CardTitle>
-              <CardDescription>Passe an, wie AI-generierte Antworten klingen sollen</CardDescription>
+              <CardDescription>Grundeinstellungen für AI-generierte Antworten (im Browser gespeichert)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tonalität</label>
-                <Select defaultValue="friendly">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="formal">Formell</SelectItem>
-                    <SelectItem value="friendly">Freundlich</SelectItem>
-                    <SelectItem value="casual">Locker</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Tonalität</label>
+                  <Select
+                    value={aiSettings.tonality}
+                    onValueChange={(v) => updateAiSettings({ tonality: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="formal">Formell</SelectItem>
+                      <SelectItem value="friendly">Freundlich</SelectItem>
+                      <SelectItem value="casual">Locker</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sprache</label>
+                  <Select
+                    value={aiSettings.language}
+                    onValueChange={(v) => updateAiSettings({ language: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="de-ch">Deutsch (Schweiz)</SelectItem>
+                      <SelectItem value="de-de">Deutsch (Deutschland)</SelectItem>
+                      <SelectItem value="en">Englisch</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sprache</label>
-                <Select defaultValue="de-ch">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="de-ch">Deutsch (Schweiz)</SelectItem>
-                    <SelectItem value="de-de">Deutsch (Deutschland)</SelectItem>
-                    <SelectItem value="en">Englisch</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {savedKey === 'ai' && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" />Gespeichert
+                </span>
+              )}
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Confidence Schwellwerte</CardTitle>
+              <CardDescription>Ab welchem Score ist ein Entwurf sicher / unsicher</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                <div><p className="font-medium">Grün (Sicher)</p><p className="text-sm text-slate-500">Kann direkt gesendet werden</p></div>
-                <Badge className="bg-green-500">&gt; 85%</Badge>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-green-700 dark:text-green-400">
+                    Grün-Schwelle (Sicher, direkt senden) %
+                  </label>
+                  <Input
+                    type="number"
+                    min={50}
+                    max={100}
+                    value={aiSettings.confidenceGreen}
+                    onChange={(e) => updateAiSettings({ confidenceGreen: parseInt(e.target.value) || 85 })}
+                    className="h-8"
+                  />
+                  <p className="text-xs text-slate-400">
+                    Score &gt; {aiSettings.confidenceGreen}% → grüner Badge
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                    Gelb-Schwelle (Review empfohlen) %
+                  </label>
+                  <Input
+                    type="number"
+                    min={30}
+                    max={aiSettings.confidenceGreen - 1}
+                    value={aiSettings.confidenceYellow}
+                    onChange={(e) => updateAiSettings({ confidenceYellow: parseInt(e.target.value) || 70 })}
+                    className="h-8"
+                  />
+                  <p className="text-xs text-slate-400">
+                    {aiSettings.confidenceYellow}%–{aiSettings.confidenceGreen}% → gelb · &lt;{aiSettings.confidenceYellow}% → rot
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                <div><p className="font-medium">Gelb (Prüfen)</p><p className="text-sm text-slate-500">Review empfohlen</p></div>
-                <Badge className="bg-amber-500">70–85%</Badge>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Self-Learning Konfiguration
+              </CardTitle>
+              <CardDescription>
+                Steuert wann Korrekturen als Learning Cases erfasst werden
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Self-Learning aktiviert</p>
+                  <p className="text-sm text-slate-500">Korrekturen werden automatisch erfasst und zur Review weitergeleitet</p>
+                </div>
+                <Switch
+                  checked={learningConfig.learningEnabled}
+                  onCheckedChange={(v) => updateLearning({ learningEnabled: v })}
+                />
               </div>
-              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                <div><p className="font-medium">Rot (Unsicher)</p><p className="text-sm text-slate-500">Manuelle Prüfung nötig</p></div>
-                <Badge className="bg-red-500">&lt; 70%</Badge>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Mindest-Änderungsrate für Learning Case (0.01 – 0.50)
+                </label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0.01}
+                    max={0.50}
+                    step={0.01}
+                    value={learningConfig.minEditDistance}
+                    onChange={(e) =>
+                      updateLearning({ minEditDistance: parseFloat(e.target.value) || 0.1 })
+                    }
+                    className="h-8 w-28"
+                  />
+                  <span className="text-sm text-slate-500">
+                    Aktuell: Entwürfe mit &gt;{Math.round(learningConfig.minEditDistance * 100)}% Änderungen werden erfasst
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Niedrig = mehr Cases (auch kleine Korrekturen). Hoch = nur starke Korrekturen.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Auto-Extraktion nach X Tagen (0 = deaktiviert)
+                </label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={30}
+                    value={learningConfig.autoExtractDays}
+                    onChange={(e) =>
+                      updateLearning({ autoExtractDays: parseInt(e.target.value) || 0 })
+                    }
+                    className="h-8 w-28"
+                  />
+                  <span className="text-sm text-slate-500">
+                    {learningConfig.autoExtractDays === 0
+                      ? 'Deaktiviert — nur manuelle Extraktion'
+                      : `Cases werden nach ${learningConfig.autoExtractDays} Tagen automatisch in die Knowledge Base übernommen`}
+                  </span>
+                </div>
+              </div>
+
+              {savedKey === 'learning' && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" />Gespeichert
+                </span>
+              )}
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
+                <p className="text-xs text-slate-400">
+                  Hinweis: Die hier konfigurierten Werte sind UI-Referenzwerte (localStorage). Die aktive Schwelle in{' '}
+                  <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">src/app/api/emails/[emailId]/send/route.ts</code>{' '}
+                  muss separat angepasst werden.
+                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* SLA Settings Tab */}
+        {/* ── SLA ────────────────────────────────────────────────────────────── */}
         <TabsContent value="sla" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>SLA Zeiten</CardTitle>
-              <CardDescription>
-                Maximale Reaktions- und Lösungszeiten pro Priorität. Werden bei jedem Ticket automatisch zugewiesen.
-              </CardDescription>
+              <CardDescription>Maximale Reaktions- und Lösungszeiten pro Priorität</CardDescription>
             </CardHeader>
             <CardContent>
               {slaLoading ? (
-                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                </div>
               ) : slaTargets.length === 0 ? (
                 <div className="text-center py-6">
                   <p className="text-slate-400 text-sm">Keine SLA-Ziele — Migration 006 zuerst ausführen</p>
@@ -352,7 +781,7 @@ Palacios Institut`)
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {slaTargets.map(target => {
+                  {slaTargets.map((target) => {
                     const edit = slaEdits[target.id] || { first: target.first_response_minutes, resolution: target.resolution_minutes }
                     const priorityColors: Record<string, string> = {
                       critical: 'border-l-red-500',
@@ -367,43 +796,21 @@ Palacios Institut`)
                             <span className="font-medium text-slate-900 dark:text-white">{target.name}</span>
                             <Badge variant="outline" className="text-xs capitalize">{target.priority}</Badge>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSaveSla(target.id)}
-                            disabled={slaSaving === target.id}
-                            className="gap-1.5"
-                          >
-                            {slaSaving === target.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                          <Button size="sm" variant="outline" onClick={() => handleSaveSla(target.id)} disabled={slaSaving === target.id} className="gap-1.5">
+                            {slaSaving === target.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : savedKey === `sla-${target.id}` ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500" /> : <Save className="h-3.5 w-3.5" />}
                             Speichern
                           </Button>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-500">Erste Antwort (Minuten)</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={edit.first}
-                              onChange={e => setSlaEdits(prev => ({ ...prev, [target.id]: { ...edit, first: parseInt(e.target.value) || 1 } }))}
-                              className="h-8 text-sm"
-                            />
-                            <p className="text-xs text-slate-400">
-                              = {edit.first < 60 ? `${edit.first}m` : edit.first < 1440 ? `${Math.round(edit.first / 60)}h` : `${Math.round(edit.first / 1440)}d`}
-                            </p>
+                            <Input type="number" min={1} value={edit.first} onChange={(e) => setSlaEdits((prev) => ({ ...prev, [target.id]: { ...edit, first: parseInt(e.target.value) || 1 } }))} className="h-8 text-sm" />
+                            <p className="text-xs text-slate-400">= {fmtMins(edit.first)}</p>
                           </div>
                           <div className="space-y-1.5">
                             <label className="text-xs font-medium text-slate-500">Lösungszeit (Minuten)</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={edit.resolution}
-                              onChange={e => setSlaEdits(prev => ({ ...prev, [target.id]: { ...edit, resolution: parseInt(e.target.value) || 1 } }))}
-                              className="h-8 text-sm"
-                            />
-                            <p className="text-xs text-slate-400">
-                              = {edit.resolution < 60 ? `${edit.resolution}m` : edit.resolution < 1440 ? `${Math.round(edit.resolution / 60)}h` : `${Math.round(edit.resolution / 1440)}d`}
-                            </p>
+                            <Input type="number" min={1} value={edit.resolution} onChange={(e) => setSlaEdits((prev) => ({ ...prev, [target.id]: { ...edit, resolution: parseInt(e.target.value) || 1 } }))} className="h-8 text-sm" />
+                            <p className="text-xs text-slate-400">= {fmtMins(edit.resolution)}</p>
                           </div>
                         </div>
                       </div>
@@ -417,14 +824,12 @@ Palacios Institut`)
           <Card>
             <CardHeader>
               <CardTitle>Prioritäts-Regeln</CardTitle>
-              <CardDescription>
-                Wie wird die Priorität einer E-Mail automatisch bestimmt
-              </CardDescription>
+              <CardDescription>Wie wird die Priorität einer E-Mail automatisch bestimmt</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 text-sm">
                 {[
-                  { priority: 'Kritisch', color: 'text-red-600', rule: 'Urgency "critical" erkannt (Schlüsselwörter: dringend, Notfall, sofort, asap)' },
+                  { priority: 'Kritisch', color: 'text-red-600', rule: 'Urgency "critical" (dringend, Notfall, sofort, asap)' },
                   { priority: 'Hoch', color: 'text-amber-600', rule: 'Customer Inquiry + Urgency "high" (rasch, baldmöglich, zeitnah)' },
                   { priority: 'Normal', color: 'text-blue-600', rule: 'Customer Inquiry oder Form Submission ohne spezielle Urgency' },
                   { priority: 'Niedrig', color: 'text-slate-500', rule: 'System-Alerts, Notifications, keine Antwort nötig' },
@@ -435,24 +840,18 @@ Palacios Institut`)
                   </div>
                 ))}
               </div>
-              <p className="text-xs text-slate-400 mt-3">
-                Prioritäts-Logik in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">src/lib/text-utils.ts → determinePriority()</code>
-              </p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* BI Trigger Words Tab */}
+        {/* ── BI TRIGGER ─────────────────────────────────────────────────────── */}
         <TabsContent value="bi" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>BI Trigger Words</CardTitle>
-              <CardDescription>
-                Schlüsselwörter die in eingehenden E-Mails erkannt werden. Neue Emails werden automatisch gescannt.
-              </CardDescription>
+              <CardDescription>Schlüsselwörter die in eingehenden E-Mails erkannt werden</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Add new word */}
               <div className="flex gap-2 flex-wrap">
                 <Input
                   placeholder="Neues Schlüsselwort..."
@@ -462,9 +861,7 @@ Palacios Institut`)
                   className="flex-1 min-w-48"
                 />
                 <Select value={newCategory} onValueChange={setNewCategory}>
-                  <SelectTrigger className="w-44">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="buying_signal">Kaufsignal</SelectItem>
                     <SelectItem value="objection">Einwand</SelectItem>
@@ -494,21 +891,11 @@ Palacios Institut`)
                           <p className="text-sm text-slate-400 italic ml-6">Keine Wörter definiert</p>
                         ) : (
                           <div className="flex flex-wrap gap-2 ml-6">
-                            {words.map(w => (
-                              <div
-                                key={w.id}
-                                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm ${color} ${w.is_active ? '' : 'opacity-40'}`}
-                              >
-                                <Switch
-                                  checked={w.is_active}
-                                  onCheckedChange={(v) => handleToggleWord(w.id, v)}
-                                  className="scale-75 data-[state=checked]:bg-current"
-                                />
+                            {words.map((w) => (
+                              <div key={w.id} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm ${color} ${w.is_active ? '' : 'opacity-40'}`}>
+                                <Switch checked={w.is_active} onCheckedChange={(v) => handleToggleWord(w.id, v)} className="scale-75 data-[state=checked]:bg-current" />
                                 <span>{w.word}</span>
-                                <button
-                                  onClick={() => handleDeleteWord(w.id)}
-                                  className="ml-1 hover:opacity-70 transition-opacity"
-                                >
+                                <button onClick={() => handleDeleteWord(w.id)} className="ml-1 hover:opacity-70 transition-opacity">
                                   <Trash2 className="h-3 w-3" />
                                 </button>
                               </div>
@@ -529,29 +916,25 @@ Palacios Institut`)
           </Card>
         </TabsContent>
 
-        {/* Team Tab */}
+        {/* ── TEAM ───────────────────────────────────────────────────────────── */}
         <TabsContent value="team" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Support Agents</CardTitle>
-              <CardDescription>
-                L1/L2 Tiered Support — Agents verwalten und zuweisen
-              </CardDescription>
+              <CardDescription>L1/L2 Tiered Support — Agents verwalten und zuweisen</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {agentsLoading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
               ) : agents.length === 0 ? (
-                <p className="text-center text-slate-400 py-4 text-sm">
-                  Noch keine Agents — unten hinzufügen oder Migration 006 ausführen
-                </p>
+                <p className="text-center text-slate-400 py-4 text-sm">Noch keine Agents — unten hinzufügen oder Migration 006 ausführen</p>
               ) : (
                 <div className="space-y-3">
-                  {agents.map(agent => (
+                  {agents.map((agent) => (
                     <div key={agent.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium text-sm">
-                          {agent.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2)}
+                          {agent.name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2)}
                         </div>
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">{agent.name}</p>
@@ -562,13 +945,8 @@ Palacios Institut`)
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant={agent.role === 'L2' ? 'default' : 'secondary'}>
-                          {agent.role}
-                        </Badge>
-                        <button
-                          onClick={() => handleDeactivateAgent(agent.id)}
-                          className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-red-500 transition-colors"
-                        >
+                        <Badge variant={agent.role === 'L2' ? 'default' : 'secondary'}>{agent.role}</Badge>
+                        <button onClick={() => handleDeactivateAgent(agent.id)} className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-slate-400 hover:text-red-500 transition-colors">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -576,13 +954,11 @@ Palacios Institut`)
                   ))}
                 </div>
               )}
-
-              {/* Add Agent */}
               <div className="pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
                 <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Agent hinzufügen</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Input placeholder="Name" value={newAgentName} onChange={e => setNewAgentName(e.target.value)} />
-                  <Input placeholder="E-Mail" type="email" value={newAgentEmail} onChange={e => setNewAgentEmail(e.target.value)} />
+                  <Input placeholder="Name" value={newAgentName} onChange={(e) => setNewAgentName(e.target.value)} />
+                  <Input placeholder="E-Mail" type="email" value={newAgentEmail} onChange={(e) => setNewAgentEmail(e.target.value)} />
                   <Select value={newAgentRole} onValueChange={setNewAgentRole}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -592,11 +968,7 @@ Palacios Institut`)
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  onClick={handleAddAgent}
-                  disabled={addingAgent || !newAgentName || !newAgentEmail}
-                  className="gap-2 w-full sm:w-auto"
-                >
+                <Button onClick={handleAddAgent} disabled={addingAgent || !newAgentName || !newAgentEmail} className="gap-2 w-full sm:w-auto">
                   {addingAgent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   Agent hinzufügen
                 </Button>
@@ -605,57 +977,314 @@ Palacios Institut`)
           </Card>
         </TabsContent>
 
-        {/* Integrations Tab */}
-        <TabsContent value="integrations" className="space-y-6">
+        {/* ── TRAINING ───────────────────────────────────────────────────────── */}
+        <TabsContent value="training" className="space-y-6">
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+            <p className="font-medium mb-1 flex items-center gap-2"><GraduationCap className="h-4 w-4" />Was passiert beim Bulk Training?</p>
+            <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400">
+              <li>Alle E-Mails werden aus HubSpot abgerufen (max. 1000)</li>
+              <li>Threads mit Eingang + Antwort werden als Q&amp;A-Paare erkannt</li>
+              <li>GPT-4o-mini extrahiert das Kern-Wissen aus jedem Thread</li>
+              <li>Das Wissen wird mit Embedding in der Knowledge Base gespeichert</li>
+              <li>Bei zukünftigen Drafts wird dieses Wissen automatisch verwendet</li>
+            </ol>
+          </div>
+
+          {trainingStats && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-purple-100 dark:bg-purple-900/30">
+                    <GraduationCap className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">E-Mail Training Chunks</p>
+                    <p className="text-2xl font-bold text-purple-600">{trainingStats.email_training_count}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                    <Brain className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">AI Anweisungen</p>
+                    <p className="text-2xl font-bold text-blue-600">{trainingStats.ai_instructions_count}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>HubSpot Bulk Import</CardTitle>
+              <CardDescription>
+                Analysiert alle historischen E-Mail-Threads in HubSpot und extrahiert Wissen in die Knowledge Base
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleBulkImport}
+                  disabled={bulkRunning}
+                  className="gap-2"
+                >
+                  {bulkRunning ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" />Analysiere HubSpot Emails…</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4" />Bulk Import starten</>
+                  )}
+                </Button>
+                {!bulkRunning && (
+                  <p className="text-xs text-slate-500">
+                    Dauert ca. 2–5 Minuten bei 100+ Threads
+                  </p>
+                )}
+              </div>
+
+              {bulkError && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Fehler</p>
+                    <p>{bulkError}</p>
+                  </div>
+                </div>
+              )}
+
+              {bulkResult && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+                  <p className="font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />Import erfolgreich
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-700">{bulkResult.total_emails}</p>
+                      <p className="text-xs text-slate-500">E-Mails geladen</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-700">{bulkResult.threads}</p>
+                      <p className="text-xs text-slate-500">Threads</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-700">{bulkResult.extracted}</p>
+                      <p className="text-xs text-slate-500">Wissen extrahiert</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-slate-500">{bulkResult.skipped}</p>
+                      <p className="text-xs text-slate-500">Übersprungen</p>
+                    </div>
+                  </div>
+                  {bulkResult.errors.length > 0 && (
+                    <div className="mt-2 text-xs text-red-600">
+                      <p className="font-medium">Fehler ({bulkResult.errors.length}):</p>
+                      {bulkResult.errors.map((e, i) => <p key={i}>{e}</p>)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── ONBOARDING ─────────────────────────────────────────────────────── */}
+        <TabsContent value="onboarding" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Mail className="h-5 w-5" />HubSpot
+                <BookOpen className="h-5 w-5" />
+                Onboarding Guide für Philipp
               </CardTitle>
-              <CardDescription>E-Mail Integration und Knowledge Base Sync</CardDescription>
+              <CardDescription>
+                Alles was du wissen musst, um das System selbstständig zu betreiben
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Daily Workflow */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Inbox className="h-4 w-4 text-blue-500" />
+                  Täglicher Workflow
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    { step: '1', title: 'Inbox öffnen', desc: 'Neue E-Mails von HubSpot werden automatisch importiert (alle 60s). Status: pending = noch nicht bearbeitet.' },
+                    { step: '2', title: 'AI Draft generieren', desc: 'Klick auf «AI Entwurf generieren». Die AI nutzt die Knowledge Base + AI Anweisungen aus den Einstellungen.' },
+                    { step: '3', title: 'Draft prüfen & anpassen', desc: 'Grüner Badge = direkt senden. Gelber Badge = kurz prüfen. Roter Badge = manuell schreiben.' },
+                    { step: '4', title: 'Senden', desc: 'Nach dem Senden erscheint ein kurzes CSAT-Rating (1-5 ★). Das hilft der AI zu lernen.' },
+                    { step: '5', title: 'AI Learning reviewen', desc: 'Falls du einen Entwurf stark geändert hast, erscheint er in «AI Learning» → dort extrahieren oder verwerfen.' },
+                  ].map(({ step, title, desc }) => (
+                    <div key={step} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                        {step}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm text-slate-900 dark:text-white">{title}</p>
+                        <p className="text-sm text-slate-500">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Weekly Tasks */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-green-500" />
+                  Wöchentliche Aufgaben
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    { title: 'AI Learning Cases reviewen', desc: 'Unter «AI Learning» ausstehende Korrekturen als Wissen extrahieren oder verwerfen.' },
+                    { title: 'Analytics checken', desc: 'Unter «Analytics» Antwortzeiten, Kundenstimmung und BI Insights prüfen.' },
+                    { title: 'Knowledge Base aktualisieren', desc: 'Neue Kurse, Preisänderungen oder FAQs unter «Knowledge Base» hinzufügen.' },
+                    { title: 'SLA Compliance prüfen', desc: 'Im Analytics Dashboard sehen ob SLA-Ziele eingehalten wurden.' },
+                  ].map(({ title, desc }) => (
+                    <div key={title} className="flex gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm text-slate-900 dark:text-white">{title}</p>
+                        <p className="text-sm text-slate-500">{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Navigation Guide */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-purple-500" />
+                  Wo finde ich was?
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { icon: Inbox, label: 'Inbox', href: '/inbox', desc: 'Alle eingehenden Emails + AI Drafts' },
+                    { icon: BookOpen, label: 'Knowledge Base', href: '/knowledge', desc: 'Wissen verwalten (Kurse, FAQs, PDFs)' },
+                    { icon: Brain, label: 'AI Learning', href: '/learning', desc: 'Korrekturen reviewen und extrahieren' },
+                    { icon: BarChart3, label: 'Analytics', href: '/analytics', desc: 'Kennzahlen, SLA, Stimmung' },
+                    { icon: MessageSquare, label: 'Chat', href: '/chat', desc: 'Direkt mit der AI über das Institut chatten' },
+                    { icon: Shield, label: 'Einstellungen → Team', href: '/settings', desc: 'Agents, SLA, BI Trigger verwalten' },
+                  ].map(({ icon: Icon, label, href, desc }) => (
+                    <a
+                      key={href}
+                      href={href}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <Icon className="h-4 w-4 text-slate-500 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm text-slate-900 dark:text-white">{label}</p>
+                        <p className="text-xs text-slate-500">{desc}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Handoff Checklist */}
+              <div>
+                <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-amber-500" />
+                  Übergabe-Checkliste (Rafi → Philipp)
+                </h3>
+                <div className="space-y-2">
+                  {[
+                    'Zugang zu HubSpot erhalten und bestätigt',
+                    'Supabase Migration 006 wurde ausgeführt',
+                    'Ersten AI-Draft generiert und gesendet',
+                    'Mind. 1 AI Learning Case extrahiert',
+                    'Mind. 1 Knowledge Base Eintrag hinzugefügt',
+                    'AI Anweisungen (Profil, Tonalität) überprüft',
+                    'SLA Zeiten auf Institut-Standards angepasst',
+                    'HubSpot Bulk Training mindestens einmal ausgeführt',
+                    'Analytics Dashboard verstanden',
+                    'Ersten Chat mit der AI ausprobiert',
+                  ].map((item) => (
+                    <div key={item} className="flex items-center gap-3 p-2.5">
+                      <Circle className="h-4 w-4 text-slate-300 flex-shrink-0" />
+                      <span className="text-sm text-slate-700 dark:text-slate-300">{item}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400 mt-3">
+                  Tipp: Drucke diese Liste aus oder kopiere sie in Notion für die Übergabe.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── INTEGRATIONEN ──────────────────────────────────────────────────── */}
+        <TabsContent value="integrations" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Mail className="h-5 w-5" />HubSpot</CardTitle>
+              <CardDescription>E-Mail Integration via Webhook + API</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm font-medium">Verbunden</span>
+                  <span className="text-sm font-medium">Verbunden (HUBSPOT_ACCESS_TOKEN)</span>
                 </div>
-                <Button variant="outline" size="sm">Trennen</Button>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Webhook URL</label>
-                <Input readOnly value="https://your-domain.com/api/webhooks/hubspot" className="font-mono text-sm" />
+                <Input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : 'https://your-domain.com'}/api/webhooks/hubspot`} className="font-mono text-sm" />
+                <p className="text-xs text-slate-400">Diese URL in HubSpot unter Einstellungen → Integrationen → Webhooks eintragen</p>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+                <p className="font-medium">Automatischer E-Mail Import</p>
+                <p className="mt-1">Emails werden alle 60 Sekunden automatisch importiert. Für sofortigen Import: Inbox öffnen → das Polling startet automatisch.</p>
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />OpenAI
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" />OpenAI</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
                   <span className="text-sm font-medium">API Key konfiguriert</span>
                 </div>
-                <Badge variant="outline">GPT-4o</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">GPT-4o (Drafts)</Badge>
+                  <Badge variant="outline">gpt-4o-mini (Klassifikation)</Badge>
+                </div>
+              </div>
+              <div className="text-sm text-slate-500 space-y-1">
+                <p>• Draft-Generierung: GPT-4o mit RAG (Knowledge Base)</p>
+                <p>• E-Mail Klassifikation: gpt-4o-mini</p>
+                <p>• Embeddings: text-embedding-3-small</p>
+                <p>• Training Extraktion: gpt-4o-mini</p>
               </div>
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />Supabase
-              </CardTitle>
+              <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" />Supabase</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full" />
                   <span className="text-sm font-medium">Verbunden</span>
                 </div>
+              </div>
+              <div className="text-sm text-slate-500 space-y-1">
+                <p>• PostgreSQL + pgvector (Embeddings)</p>
+                <p>• Row Level Security aktiviert</p>
+                <p>• Migrations: 001–006 (006 = Support Analytics)</p>
+              </div>
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400">
+                Falls neue Tabellen fehlen: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">supabase/migrations/006_support_analytics.sql</code> im Supabase SQL Editor ausführen.
               </div>
             </CardContent>
           </Card>

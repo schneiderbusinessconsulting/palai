@@ -29,6 +29,7 @@ import {
   ShoppingCart,
   AlertOctagon,
   UserMinus,
+  Clock,
 } from 'lucide-react'
 
 interface TriggerWord {
@@ -37,6 +38,14 @@ interface TriggerWord {
   category: string
   weight: number
   is_active: boolean
+}
+
+interface SlaTarget {
+  id: string
+  name: string
+  priority: string
+  first_response_minutes: number
+  resolution_minutes: number
 }
 
 interface Agent {
@@ -60,6 +69,12 @@ export default function SettingsPage() {
 Max Mustermann
 Palacios Institut`)
 
+  // SLA state
+  const [slaTargets, setSlaTargets] = useState<SlaTarget[]>([])
+  const [slaLoading, setSlaLoading] = useState(false)
+  const [slaSaving, setSlaSaving] = useState<string | null>(null)
+  const [slaEdits, setSlaEdits] = useState<Record<string, { first: number; resolution: number }>>({})
+
   // Trigger Words state
   const [triggerWords, setTriggerWords] = useState<TriggerWord[]>([])
   const [twLoading, setTwLoading] = useState(false)
@@ -74,6 +89,40 @@ Palacios Institut`)
   const [newAgentEmail, setNewAgentEmail] = useState('')
   const [newAgentRole, setNewAgentRole] = useState('L1')
   const [addingAgent, setAddingAgent] = useState(false)
+
+  const fetchSlaTargets = async () => {
+    setSlaLoading(true)
+    try {
+      const res = await fetch('/api/settings/sla')
+      const data = await res.json()
+      const targets: SlaTarget[] = data.targets || []
+      setSlaTargets(targets)
+      // Init edits with current values
+      const edits: Record<string, { first: number; resolution: number }> = {}
+      targets.forEach(t => {
+        edits[t.id] = { first: t.first_response_minutes, resolution: t.resolution_minutes }
+      })
+      setSlaEdits(edits)
+    } finally {
+      setSlaLoading(false)
+    }
+  }
+
+  const handleSaveSla = async (id: string) => {
+    const edit = slaEdits[id]
+    if (!edit) return
+    setSlaSaving(id)
+    try {
+      await fetch('/api/settings/sla', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, first_response_minutes: edit.first, resolution_minutes: edit.resolution }),
+      })
+      fetchSlaTargets()
+    } finally {
+      setSlaSaving(null)
+    }
+  }
 
   const fetchTriggerWords = async () => {
     setTwLoading(true)
@@ -177,6 +226,10 @@ Palacios Institut`)
             <Key className="h-4 w-4" />
             AI
           </TabsTrigger>
+          <TabsTrigger value="sla" className="gap-2" onClick={fetchSlaTargets}>
+            <Clock className="h-4 w-4" />
+            SLA
+          </TabsTrigger>
           <TabsTrigger value="bi" className="gap-2" onClick={fetchTriggerWords}>
             <ShoppingCart className="h-4 w-4" />
             BI Trigger
@@ -276,6 +329,115 @@ Palacios Institut`)
                 <div><p className="font-medium">Rot (Unsicher)</p><p className="text-sm text-slate-500">Manuelle Prüfung nötig</p></div>
                 <Badge className="bg-red-500">&lt; 70%</Badge>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* SLA Settings Tab */}
+        <TabsContent value="sla" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>SLA Zeiten</CardTitle>
+              <CardDescription>
+                Maximale Reaktions- und Lösungszeiten pro Priorität. Werden bei jedem Ticket automatisch zugewiesen.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {slaLoading ? (
+                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+              ) : slaTargets.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-slate-400 text-sm">Keine SLA-Ziele — Migration 006 zuerst ausführen</p>
+                  <p className="text-xs text-slate-400 mt-1">supabase/migrations/006_support_analytics.sql im Supabase SQL Editor</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {slaTargets.map(target => {
+                    const edit = slaEdits[target.id] || { first: target.first_response_minutes, resolution: target.resolution_minutes }
+                    const priorityColors: Record<string, string> = {
+                      critical: 'border-l-red-500',
+                      high: 'border-l-amber-500',
+                      normal: 'border-l-blue-500',
+                      low: 'border-l-slate-400',
+                    }
+                    return (
+                      <div key={target.id} className={`p-4 border-l-4 ${priorityColors[target.priority] || 'border-l-slate-400'} bg-slate-50 dark:bg-slate-800/50 rounded-r-lg`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900 dark:text-white">{target.name}</span>
+                            <Badge variant="outline" className="text-xs capitalize">{target.priority}</Badge>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveSla(target.id)}
+                            disabled={slaSaving === target.id}
+                            className="gap-1.5"
+                          >
+                            {slaSaving === target.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                            Speichern
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-500">Erste Antwort (Minuten)</label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={edit.first}
+                              onChange={e => setSlaEdits(prev => ({ ...prev, [target.id]: { ...edit, first: parseInt(e.target.value) || 1 } }))}
+                              className="h-8 text-sm"
+                            />
+                            <p className="text-xs text-slate-400">
+                              = {edit.first < 60 ? `${edit.first}m` : edit.first < 1440 ? `${Math.round(edit.first / 60)}h` : `${Math.round(edit.first / 1440)}d`}
+                            </p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-slate-500">Lösungszeit (Minuten)</label>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={edit.resolution}
+                              onChange={e => setSlaEdits(prev => ({ ...prev, [target.id]: { ...edit, resolution: parseInt(e.target.value) || 1 } }))}
+                              className="h-8 text-sm"
+                            />
+                            <p className="text-xs text-slate-400">
+                              = {edit.resolution < 60 ? `${edit.resolution}m` : edit.resolution < 1440 ? `${Math.round(edit.resolution / 60)}h` : `${Math.round(edit.resolution / 1440)}d`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Prioritäts-Regeln</CardTitle>
+              <CardDescription>
+                Wie wird die Priorität einer E-Mail automatisch bestimmt
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3 text-sm">
+                {[
+                  { priority: 'Kritisch', color: 'text-red-600', rule: 'Urgency "critical" erkannt (Schlüsselwörter: dringend, Notfall, sofort, asap)' },
+                  { priority: 'Hoch', color: 'text-amber-600', rule: 'Customer Inquiry + Urgency "high" (rasch, baldmöglich, zeitnah)' },
+                  { priority: 'Normal', color: 'text-blue-600', rule: 'Customer Inquiry oder Form Submission ohne spezielle Urgency' },
+                  { priority: 'Niedrig', color: 'text-slate-500', rule: 'System-Alerts, Notifications, keine Antwort nötig' },
+                ].map(({ priority, color, rule }) => (
+                  <div key={priority} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                    <span className={`font-medium w-20 flex-shrink-0 ${color}`}>{priority}</span>
+                    <span className="text-slate-600 dark:text-slate-400">{rule}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-3">
+                Prioritäts-Logik in <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">src/lib/text-utils.ts → determinePriority()</code>
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

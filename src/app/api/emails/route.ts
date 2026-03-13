@@ -1,6 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
+import { analyzeTone, determinePriority } from '@/lib/text-utils'
+
+// Phase 3: BI scanning — fire-and-forget, runs in background after email insert
+async function scanEmailForBiInsights(emailId: string, subject: string, bodyText: string) {
+  try {
+    const supabase = await createClient()
+    const { data: triggerWords } = await supabase
+      .from('bi_trigger_words')
+      .select('word, category, weight')
+      .eq('is_active', true)
+
+    if (!triggerWords?.length) return
+
+    const text = `${subject} ${bodyText}`.toLowerCase()
+    const insightsToInsert: Array<{
+      email_id: string
+      insight_type: string
+      content: string
+      confidence: number
+      metadata: Record<string, unknown>
+    }> = []
+
+    for (const tw of triggerWords) {
+      if (text.includes(tw.word.toLowerCase())) {
+        // Check if this category is already added (avoid duplicates)
+        const alreadyAdded = insightsToInsert.some(i => i.insight_type === tw.category)
+        if (!alreadyAdded) {
+          insightsToInsert.push({
+            email_id: emailId,
+            insight_type: tw.category,
+            content: `Erkanntes Muster: "${tw.word}"`,
+            confidence: Math.min(tw.weight / 2, 1.0),
+            metadata: { trigger_word: tw.word, weight: tw.weight },
+          })
+        }
+      }
+    }
+
+    if (insightsToInsert.length > 0) {
+      await supabase.from('bi_insights').insert(insightsToInsert)
+    }
+  } catch {
+    // Ignore — BI table may not exist yet (migration 006 not applied)
+  }
+}
+
+// Phase 4: Fetch SLA targets once per import batch
+async function getSlaTargets(): Promise<Record<string, string>> {
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.from('sla_targets').select('id, priority')
+    if (!data) return {}
+    return Object.fromEntries(data.map(t => [t.priority, t.id]))
+  } catch {
+    return {} // sla_targets table may not exist yet
+  }
+}
 
 // Helper function to generate draft for an email (runs in background)
 async function generateDraftForEmail(
@@ -207,6 +264,9 @@ export async function POST(request: NextRequest) {
     let imported = 0
     let skipped = 0
 
+    // Phase 4: Fetch SLA targets once for this batch
+    const slaTargets = await getSlaTargets()
+
     for (const email of emails) {
       const props = email.properties
 
@@ -238,7 +298,6 @@ export async function POST(request: NextRequest) {
         receivedAt = new Date()
       }
 
-      // Insert email and get the new ID
       const fromName = [props.hs_email_from_firstname, props.hs_email_from_lastname]
         .filter(Boolean)
         .join(' ') || null
@@ -248,6 +307,13 @@ export async function POST(request: NextRequest) {
 
       // Classify email type (system alert, form submission, customer inquiry)
       const classification = await classifyEmail(fromEmail, subject, bodyText)
+
+      // Phase 5: Tone analysis (rule-based, free)
+      const tone = analyzeTone(subject, bodyText)
+
+      // Phase 4: Determine priority + SLA target
+      const priority = determinePriority(classification.emailType, tone.urgency, classification.needsResponse)
+      const slaTargetId = slaTargets[priority] || null
 
       const { data: newEmail, error: insertError } = await supabase
         .from('incoming_emails')
@@ -264,6 +330,14 @@ export async function POST(request: NextRequest) {
           email_type: classification.emailType,
           needs_response: classification.needsResponse,
           classification_reason: classification.reason,
+          // Phase 4: SLA
+          priority,
+          sla_target_id: slaTargetId,
+          sla_status: classification.needsResponse ? 'ok' : null,
+          // Phase 5: Tone
+          tone_formality: tone.formality,
+          tone_sentiment: tone.sentiment,
+          tone_urgency: tone.urgency,
         })
         .select('id')
         .single()
@@ -272,10 +346,17 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert email:', insertError)
       } else {
         imported++
-        // Only generate draft if auto-draft is enabled AND email needs a response
-        if (autoDraftEnabled && newEmail?.id && classification.needsResponse) {
-          generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
-            .catch(err => console.error('Background draft generation failed:', err))
+        if (newEmail?.id) {
+          // Phase 3: BI scanning (fire-and-forget)
+          if (classification.emailType === 'customer_inquiry' || classification.emailType === 'form_submission') {
+            scanEmailForBiInsights(newEmail.id, subject, bodyText)
+              .catch(err => console.error('BI scan failed:', err))
+          }
+          // Auto-draft if enabled
+          if (autoDraftEnabled && classification.needsResponse) {
+            generateDraftForEmail(newEmail.id, subject, bodyText, fromName)
+              .catch(err => console.error('Background draft generation failed:', err))
+          }
         }
       }
     }

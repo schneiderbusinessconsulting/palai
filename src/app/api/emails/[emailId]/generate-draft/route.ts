@@ -155,11 +155,16 @@ export async function POST(
       )
     }
 
-    // 7. Update email status
+    // 7. Update email status + Phase 4: set first_response_at
     await supabase
       .from('incoming_emails')
-      .update({ status: 'draft_ready' })
+      .update({
+        status: 'draft_ready',
+        // Set first_response_at only if not already set (first human interaction)
+        first_response_at: new Date().toISOString(),
+      })
       .eq('id', emailId)
+      .is('first_response_at', null)
 
     // 8. Log to audit
     await supabase.from('audit_log').insert({

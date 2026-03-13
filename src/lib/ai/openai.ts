@@ -82,7 +82,8 @@ export async function generateEmailDraft(
   senderName?: string,
   formality?: Formality,
   regenerationFeedback?: string,
-  aiInstructions?: string[]
+  aiInstructions?: string[],
+  threadHistory?: { direction: string; text: string; timestamp: string }[]
 ): Promise<{ response: string; confidence: number; detectedFormality: Formality }> {
   // Auto-detect formality if not provided
   const detectedFormality = formality || detectFormality(emailContent)
@@ -133,11 +134,25 @@ Wichtig:
     ? `\n\nFEEDBACK ZUR VERBESSERUNG:\n${regenerationFeedback}\n\nBitte berücksichtige dieses Feedback bei der Erstellung der Antwort.`
     : ''
 
+  // Build thread context section — previous messages give the AI conversation history
+  const threadSection =
+    threadHistory && threadHistory.length > 0
+      ? `\n\nGESPRÄCHSVERLAUF (${threadHistory.length} vorherige Nachrichten, älteste zuerst):\n${threadHistory
+          .map((msg, i) => {
+            const role =
+              msg.direction === 'INCOMING_EMAIL' || msg.direction === 'INCOMING'
+                ? '📥 KUNDE'
+                : '📤 PALACIOS ANTWORT'
+            return `[${i + 1}] ${role}: ${msg.text.substring(0, 600)}${msg.text.length > 600 ? '…' : ''}`
+          })
+          .join('\n\n')}\n\nDie KUNDENANFRAGE oben ist die NEUESTE Nachricht. Antworte darauf und berücksichtige den Gesprächsverlauf — wiederhole keine Informationen die bereits gegeben wurden.`
+      : ''
+
   const userPrompt = `KUNDENANFRAGE:
 ${emailContent}
 
 RELEVANTE INFORMATIONEN AUS UNSERER KNOWLEDGE BASE:
-${relevantContext.length > 0 ? relevantContext.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n') : 'Keine spezifischen Informationen gefunden.'}${feedbackSection}
+${relevantContext.length > 0 ? relevantContext.map((chunk, i) => `[${i + 1}] ${chunk}`).join('\n\n') : 'Keine spezifischen Informationen gefunden.'}${threadSection}${feedbackSection}
 
 Bitte erstelle eine passende Antwort auf diese Anfrage.`
 

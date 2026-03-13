@@ -168,40 +168,46 @@ class HubSpotClient {
       console.log('Resend not configured - email will only be logged to HubSpot')
     }
 
-    // Log email to HubSpot as engagement (regardless of whether it was actually sent)
-    const engagementData = {
-      engagement: {
-        active: true,
-        type: 'EMAIL',
-        timestamp: Date.now(),
-      },
-      metadata: {
-        from: { email: fromEmail },
-        to: [{ email: params.to }],
-        subject: params.subject,
-        text: params.body,
-        status: actualSent ? 'SENT' : 'DRAFT',
-      },
-      associations: {
-        contactIds: contactId ? [parseInt(contactId)] : [],
-        companyIds: [],
-        dealIds: [],
-        ownerIds: [],
-        ticketIds: [],
-      },
-    }
+    // Log reply to HubSpot using v3 CRM email API (supports thread_id for proper threading)
+    const v3Id = await this.createReplyEngagementV3({
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      threadId: params.threadId,
+      contactId,
+      fromEmail,
+      status: actualSent ? 'SENT' : 'DRAFT',
+    })
+    emailId = emailId || v3Id
 
-    try {
-      const response = await this.request<{ engagement: { id: number } }>(
-        '/engagements/v1/engagements',
-        {
-          method: 'POST',
-          body: JSON.stringify(engagementData),
+    // Fallback: also log via v1 engagements API for backwards compat
+    if (!emailId) {
+      try {
+        const engagementData = {
+          engagement: { active: true, type: 'EMAIL', timestamp: Date.now() },
+          metadata: {
+            from: { email: fromEmail },
+            to: [{ email: params.to }],
+            subject: params.subject,
+            text: params.body,
+            status: actualSent ? 'SENT' : 'DRAFT',
+          },
+          associations: {
+            contactIds: contactId ? [parseInt(contactId)] : [],
+            companyIds: [],
+            dealIds: [],
+            ownerIds: [],
+            ticketIds: [],
+          },
         }
-      )
-      emailId = emailId || String(response.engagement.id)
-    } catch (e) {
-      console.error('Failed to log email to HubSpot:', e)
+        const response = await this.request<{ engagement: { id: number } }>(
+          '/engagements/v1/engagements',
+          { method: 'POST', body: JSON.stringify(engagementData) }
+        )
+        emailId = String(response.engagement.id)
+      } catch (e) {
+        console.error('Failed to log email to HubSpot v1:', e)
+      }
     }
 
     return { id: emailId, actualSent }
@@ -293,6 +299,97 @@ class HubSpotClient {
         }),
       }
     )
+  }
+
+  // Fetch all emails in a thread (for context in AI draft generation)
+  async getEmailThread(threadId: string): Promise<
+    { direction: string; text: string; timestamp: string; subject: string }[]
+  > {
+    try {
+      const response = await this.request<{
+        results: Array<{
+          properties: {
+            hs_email_direction?: string
+            hs_email_text?: string
+            hs_timestamp?: string
+            hs_email_subject?: string
+          }
+        }>
+      }>('/crm/v3/objects/emails/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          filterGroups: [
+            {
+              filters: [
+                {
+                  propertyName: 'hs_email_thread_id',
+                  operator: 'EQ',
+                  value: threadId,
+                },
+              ],
+            },
+          ],
+          properties: ['hs_email_direction', 'hs_email_text', 'hs_email_subject', 'hs_timestamp'],
+          sorts: [{ propertyName: 'hs_timestamp', direction: 'ASCENDING' }],
+          limit: 10,
+        }),
+      })
+
+      return (response.results || []).map((e) => ({
+        direction: e.properties.hs_email_direction || 'INCOMING_EMAIL',
+        text: (e.properties.hs_email_text || '').substring(0, 1500),
+        timestamp: e.properties.hs_timestamp || '',
+        subject: e.properties.hs_email_subject || '',
+      }))
+    } catch (e) {
+      console.error('Failed to fetch email thread from HubSpot:', e)
+      return []
+    }
+  }
+
+  // Log outgoing reply via v3 CRM email API (proper thread association)
+  async createReplyEngagementV3(params: {
+    to: string
+    subject: string
+    body: string
+    threadId?: string
+    contactId?: string
+    fromEmail: string
+    status: 'SENT' | 'DRAFT'
+  }): Promise<string> {
+    try {
+      const properties: Record<string, string> = {
+        hs_email_direction: 'EMAIL',
+        hs_email_subject: params.subject,
+        hs_email_text: params.body,
+        hs_email_to_email: params.to,
+        hs_email_from_email: params.fromEmail,
+        hs_email_status: params.status,
+      }
+      if (params.threadId) {
+        properties.hs_email_thread_id = params.threadId
+      }
+
+      const body: Record<string, unknown> = { properties }
+
+      if (params.contactId) {
+        body.associations = [
+          {
+            to: { id: params.contactId },
+            types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 198 }],
+          },
+        ]
+      }
+
+      const response = await this.request<{ id: string }>('/crm/v3/objects/emails', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      return response.id
+    } catch (e) {
+      console.error('Failed to create v3 email engagement:', e)
+      return ''
+    }
   }
 
   // Update email engagement (e.g., mark as completed/replied)

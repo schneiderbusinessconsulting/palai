@@ -60,6 +60,33 @@ export async function POST(
 
     const aiInstructions = aiRules?.map((r: { content: string }) => r.content) || []
 
+    // 3c. Fetch thread history from our own DB for conversation context
+    // (Uses hubspot_thread_id to find previous messages in the same thread)
+    let threadHistory: { direction: string; text: string; timestamp: string }[] = []
+    const emailRecord = email as { hubspot_thread_id?: string }
+    if (emailRecord.hubspot_thread_id) {
+      try {
+        const { data: threadEmails } = await supabase
+          .from('incoming_emails')
+          .select('body_text, received_at, status')
+          .eq('hubspot_thread_id', emailRecord.hubspot_thread_id)
+          .neq('id', emailId)
+          .order('received_at', { ascending: true })
+          .limit(5)
+
+        if (threadEmails && threadEmails.length > 0) {
+          threadHistory = threadEmails.map((e: { body_text: string; received_at: string; status: string }) => ({
+            // Sent = outgoing reply, anything else = incoming from customer
+            direction: e.status === 'sent' ? 'EMAIL' : 'INCOMING_EMAIL',
+            text: e.body_text || '',
+            timestamp: e.received_at || '',
+          }))
+        }
+      } catch (e) {
+        console.error('Thread history fetch error:', e)
+      }
+    }
+
     // 4. If regenerating, store feedback for learning
     if (regenerate && feedback) {
       const { error: feedbackError } = await supabase.from('draft_feedback').insert({
@@ -72,14 +99,15 @@ export async function POST(
       }
     }
 
-    // 5. Generate draft using AI (with AI instructions/rules)
+    // 5. Generate draft using AI (with AI instructions/rules + thread history)
     const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
       email.from_name,
       formality,
       feedback,
-      aiInstructions
+      aiInstructions,
+      threadHistory
     )
 
     // 6. Store or update the draft

@@ -45,6 +45,7 @@ import {
   Bell,
   FileText,
   User,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -188,6 +189,37 @@ export default function InboxPage() {
   const [csatEmailId, setCsatEmailId] = useState<string | null>(null)
   const [csatRating, setCsatRating] = useState(0)
   const [csatSubmitting, setCsatSubmitting] = useState(false)
+
+  // Conflict detection: lock state
+  const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
+
+  // Agent name helper (from profile localStorage)
+  const getAgentName = () => {
+    try {
+      const profile = localStorage.getItem('palai_profile')
+      if (profile) {
+        const p = JSON.parse(profile)
+        return [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unbekannt'
+      }
+    } catch { /* ignore */ }
+    return 'Unbekannt'
+  }
+
+  // Release lock helper (fire-and-forget)
+  const releaseLock = (emailId: string) => {
+    fetch(`/api/emails/${emailId}/lock`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_name: getAgentName() }),
+    }).catch(() => {})
+  }
+
+  // Close modal and release any held lock
+  const handleClose = () => {
+    if (selectedEmail) releaseLock(selectedEmail.id)
+    setIsDetailOpen(false)
+    setLockWarning(null)
+  }
 
   // Load auto-draft preference from localStorage
   useEffect(() => {
@@ -333,6 +365,23 @@ export default function InboxPage() {
     } else {
       setIsGenerating(true)
     }
+
+    // Acquire lock — prevent two agents from generating simultaneously
+    try {
+      const lockRes = await fetch(`/api/emails/${emailId}/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_name: getAgentName() }),
+      })
+      if (lockRes.status === 409) {
+        const data = await lockRes.json()
+        setLockWarning({ locked_by: data.locked_by, locked_at: data.locked_at })
+        setIsGenerating(false)
+        setIsRegenerating(false)
+        return
+      }
+    } catch { /* network error — proceed anyway */ }
+
     try {
       const response = await fetch(`/api/emails/${emailId}/generate-draft`, {
         method: 'POST',
@@ -392,6 +441,7 @@ export default function InboxPage() {
       })
 
       if (response.ok) {
+        if (selectedEmail) releaseLock(selectedEmail.id)
         setIsDetailOpen(false)
         fetchEmails()
         // Show CSAT prompt
@@ -706,7 +756,7 @@ export default function InboxPage() {
       )}
 
       {/* Email Detail Modal */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+      <Dialog open={isDetailOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{selectedEmail?.subject}</DialogTitle>
@@ -714,6 +764,20 @@ export default function InboxPage() {
 
           {selectedEmail && (
             <div className="space-y-4 py-4">
+              {/* Conflict warning */}
+              {lockWarning && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>
+                    <strong>{lockWarning.locked_by}</strong> bearbeitet diese E-Mail gerade seit{' '}
+                    {new Date(lockWarning.locked_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <button onClick={() => setLockWarning(null)} className="ml-auto flex-shrink-0">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Email Info */}
               <div className="text-sm text-slate-500 dark:text-slate-400">
                 <p>
@@ -933,7 +997,7 @@ export default function InboxPage() {
               )}
 
               <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
-                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+                <Button variant="outline" onClick={handleClose}>
                   Schliessen
                 </Button>
                 <Button

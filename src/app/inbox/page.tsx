@@ -204,6 +204,10 @@ export default function InboxPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
 
+  // Save to KB state
+  const [isSavingToKb, setIsSavingToKb] = useState(false)
+  const [kbSaveMsg, setKbSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
   // Conflict detection: lock state
   const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
 
@@ -495,6 +499,38 @@ export default function InboxPage() {
       console.error('Mark as sent failed:', error)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  // Save current draft to Knowledge Base
+  const handleSaveToKb = async () => {
+    if (!selectedEmail || !currentDraft) return
+    setIsSavingToKb(true)
+    setKbSaveMsg(null)
+    try {
+      const text = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const res = await fetch('/api/knowledge/from-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: selectedEmail.subject,
+          content: text,
+          emailId: selectedEmail.id,
+        }),
+      })
+      const data = await res.json()
+      if (res.status === 409) {
+        setKbSaveMsg({ ok: false, text: 'Bereits in der KB vorhanden.' })
+      } else if (res.ok) {
+        setKbSaveMsg({ ok: true, text: 'In Knowledge Base gespeichert!' })
+      } else {
+        setKbSaveMsg({ ok: false, text: data.error || 'Fehler beim Speichern.' })
+      }
+    } catch {
+      setKbSaveMsg({ ok: false, text: 'Fehler beim Speichern.' })
+    } finally {
+      setIsSavingToKb(false)
+      setTimeout(() => setKbSaveMsg(null), 3000)
     }
   }
 
@@ -1022,10 +1058,36 @@ export default function InboxPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
+                {kbSaveMsg && (
+                  <span className={`text-xs ${kbSaveMsg.ok ? 'text-green-600' : 'text-amber-600'}`}>
+                    {kbSaveMsg.text}
+                  </span>
+                )}
                 <Button variant="outline" onClick={handleClose}>
                   Schliessen
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleSaveToKb}
+                        disabled={isSavingToKb}
+                      >
+                        {isSavingToKb ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <BookOpen className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Antwort zur Knowledge Base hinzufügen</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   variant="outline"
                   onClick={() => {

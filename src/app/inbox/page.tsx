@@ -204,11 +204,6 @@ export default function InboxPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
 
-  // CSAT state
-  const [csatEmailId, setCsatEmailId] = useState<string | null>(null)
-  const [csatRating, setCsatRating] = useState(0)
-  const [csatSubmitting, setCsatSubmitting] = useState(false)
-
   // Conflict detection: lock state
   const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
 
@@ -470,8 +465,6 @@ export default function InboxPage() {
         releaseLock(selectedEmail.id)
         setIsDetailOpen(false)
         fetchEmails()
-        setCsatEmailId(selectedEmail.id)
-        setCsatRating(0)
       } else {
         const data = await response.json()
         console.error('Send failed:', data.error)
@@ -497,32 +490,11 @@ export default function InboxPage() {
         if (selectedEmail) releaseLock(selectedEmail.id)
         setIsDetailOpen(false)
         fetchEmails()
-        // Show CSAT prompt
-        if (selectedEmail) {
-          setCsatEmailId(selectedEmail.id)
-          setCsatRating(0)
-        }
       }
     } catch (error) {
       console.error('Mark as sent failed:', error)
     } finally {
       setIsSending(false)
-    }
-  }
-
-  // Submit CSAT rating
-  const handleCsatSubmit = async (rating: number) => {
-    if (!csatEmailId) return
-    setCsatSubmitting(true)
-    try {
-      await fetch('/api/csat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emailId: csatEmailId, rating }),
-      })
-    } finally {
-      setCsatSubmitting(false)
-      setCsatEmailId(null)
     }
   }
 
@@ -1111,49 +1083,6 @@ export default function InboxPage() {
         </DialogContent>
       </Dialog>
 
-      {/* CSAT Rating Dialog */}
-      <Dialog open={!!csatEmailId} onOpenChange={() => setCsatEmailId(null)}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Wie war die Antwort?</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center">
-              Bewerte die Qualität des AI-Entwurfs
-            </p>
-            <div className="flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map(star => (
-                <button
-                  key={star}
-                  onClick={() => setCsatRating(star)}
-                  className={`text-3xl transition-transform hover:scale-110 ${
-                    star <= csatRating ? 'opacity-100' : 'opacity-30'
-                  }`}
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-            {csatRating > 0 && (
-              <p className="text-center text-sm text-slate-500">
-                {csatRating === 5 ? 'Perfekt!' : csatRating === 4 ? 'Gut' : csatRating === 3 ? 'OK' : csatRating === 2 ? 'Schwach' : 'Schlecht'}
-              </p>
-            )}
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setCsatEmailId(null)}>
-              Überspringen
-            </Button>
-            <Button
-              size="sm"
-              disabled={csatRating === 0 || csatSubmitting}
-              onClick={() => handleCsatSubmit(csatRating)}
-            >
-              {csatSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Bewerten'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

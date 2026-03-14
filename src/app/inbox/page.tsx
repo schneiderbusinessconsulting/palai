@@ -385,7 +385,7 @@ export default function InboxPage() {
       const response = await fetch('/api/emails', { method: 'PATCH' })
       const data = await response.json()
       if (response.ok) {
-        setSyncMessage(data.message || `${data.classified} E-Mails klassifiziert`)
+        setSyncMessage(data.message || `${data.classified || 0} klassifiziert, ${data.toneAnalyzed || 0} Tone, ${data.biScanned || 0} BI`)
         fetchEmails(false) // Silent refresh
       } else {
         setSyncMessage(data.error || 'Klassifizierung fehlgeschlagen')

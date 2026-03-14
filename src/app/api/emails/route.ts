@@ -575,15 +575,16 @@ export async function PATCH(request: NextRequest) {
       })
     }
 
-    // Default action: classify
-    // Get all emails without classification
-    const { data: unclassifiedEmails, error: fetchError } = await supabase
+    // Default action: full backfill analysis for all emails missing data
+    // Get emails without classification OR without tone analysis
+    const { data: unanalyzedEmails, error: fetchError } = await supabase
       .from('incoming_emails')
-      .select('id, from_email, subject, body_text')
-      .is('email_type', null)
+      .select('id, from_email, subject, body_text, email_type, tone_sentiment, buying_intent_score')
+      .or('email_type.is.null,tone_sentiment.is.null')
+      .limit(200)
 
     if (fetchError) {
-      console.error('Failed to fetch unclassified emails:', fetchError)
+      console.error('Failed to fetch unanalyzed emails:', fetchError)
       return NextResponse.json(
         { error: 'Failed to fetch emails' },
         { status: 500 }
@@ -591,35 +592,88 @@ export async function PATCH(request: NextRequest) {
     }
 
     let classified = 0
+    let toneAnalyzed = 0
+    let biScanned = 0
     let systemMails = 0
 
-    for (const email of unclassifiedEmails || []) {
-      const classification = await classifyEmail(
-        email.from_email,
-        email.subject,
-        email.body_text || ''
-      )
+    // Fetch SLA targets once for the batch
+    const slaTargets = await getSlaTargets()
 
-      await supabase
-        .from('incoming_emails')
-        .update({
-          email_type: classification.emailType,
-          needs_response: classification.needsResponse,
-          classification_reason: classification.reason,
-        })
-        .eq('id', email.id)
+    for (const email of unanalyzedEmails || []) {
+      const updates: Record<string, unknown> = {}
 
-      classified++
-      if (classification.emailType === 'system_alert' || classification.emailType === 'notification') {
-        systemMails++
+      // Step 1: Classify if missing
+      if (!email.email_type) {
+        const classification = await classifyEmail(
+          email.from_email,
+          email.subject,
+          email.body_text || ''
+        )
+        updates.email_type = classification.emailType
+        updates.needs_response = classification.needsResponse
+        updates.classification_reason = classification.reason
+        classified++
+        if (classification.emailType === 'system_alert' || classification.emailType === 'notification') {
+          systemMails++
+        }
+      }
+
+      // Step 2: Tone analysis if missing
+      if (!email.tone_sentiment) {
+        const tone = analyzeTone(email.subject, email.body_text || '')
+        updates.tone_formality = tone.formality
+        updates.tone_sentiment = tone.sentiment
+        updates.tone_urgency = tone.urgency
+
+        // Step 3: Priority + SLA (depends on classification + tone)
+        const emailType = (updates.email_type || email.email_type) as string
+        const priority = determinePriority(emailType, tone.urgency, (updates.needs_response ?? true) as boolean)
+        updates.priority = priority
+        updates.sla_target_id = slaTargets[priority] || null
+        updates.sla_status = (updates.needs_response ?? true) ? 'ok' : null
+        toneAnalyzed++
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await supabase
+          .from('incoming_emails')
+          .update(updates)
+          .eq('id', email.id)
+      }
+
+      // Step 4: BI scan if no buying intent yet (for customer inquiries only)
+      const emailType = (updates.email_type || email.email_type) as string
+      if (
+        (email.buying_intent_score === null || email.buying_intent_score === 0) &&
+        (emailType === 'customer_inquiry' || emailType === 'form_submission')
+      ) {
+        const tone = email.tone_sentiment
+          ? { urgency: undefined, sentiment: email.tone_sentiment }
+          : undefined
+        const intentScore = await scanEmailForBiInsights(
+          email.id,
+          email.subject,
+          email.body_text || '',
+          tone
+        )
+        if (intentScore > 0) {
+          await supabase
+            .from('incoming_emails')
+            .update({ buying_intent_score: intentScore })
+            .eq('id', email.id)
+        }
+        biScanned++
       }
     }
 
     return NextResponse.json({
       success: true,
+      total: (unanalyzedEmails || []).length,
       classified,
+      toneAnalyzed,
+      biScanned,
       systemMails,
-      message: `${classified} E-Mails klassifiziert, davon ${systemMails} System-Mails`,
+      message: `${classified} klassifiziert, ${toneAnalyzed} Tone-Analyse, ${biScanned} BI-Scan, ${systemMails} System-Mails`,
     })
   } catch (error) {
     console.error('PATCH error:', error)

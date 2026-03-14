@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
-    const query = supabase
+    let query = supabase
       .from('learning_cases')
       .select(`
         id,
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
 
     if (status !== 'all') {
-      query.eq('status', status)
+      query = query.eq('status', status)
     }
 
     const { data, error } = await query

@@ -28,6 +28,10 @@ export async function GET(request: NextRequest) {
       .order('key')
 
     if (error) {
+      // If table doesn't exist yet (migration not applied), return empty config
+      if (error.code === '42P01') {
+        return NextResponse.json({ config: {}, rows: [] })
+      }
       console.error('Config GET error:', error)
       return NextResponse.json({ error: 'Failed to fetch config' }, { status: 500 })
     }

@@ -278,6 +278,20 @@ export default function SettingsPage() {
     setLearningConfig(prev => ({ ...prev, ...patch }))
   }
 
+  // ── Integration Status ──────────────────────────────────────────────────────
+  const [integrationStatus, setIntegrationStatus] = useState({ hubspot: false, openai: false, supabase: false })
+
+  const fetchIntegrationStatus = async () => {
+    try {
+      const res = await fetch('/api/settings/status')
+      if (res.ok) {
+        setIntegrationStatus(await res.json())
+      }
+    } catch {
+      // keep defaults (all false)
+    }
+  }
+
   // ── SLA ─────────────────────────────────────────────────────────────────────
   const [slaTargets, setSlaTargets] = useState<SlaTarget[]>([])
   const [slaLoading, setSlaLoading] = useState(false)
@@ -468,7 +482,7 @@ export default function SettingsPage() {
           <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}><Shield className="h-4 w-4" />Team</TabsTrigger>
           <TabsTrigger value="training" className="gap-2" onClick={fetchTrainingStats}><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-2"><Database className="h-4 w-4" />Integrationen</TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2" onClick={fetchIntegrationStatus}><Database className="h-4 w-4" />Integrationen</TabsTrigger>
         </TabsList>
 
         {/* ── PROFIL ─────────────────────────────────────────────────────────── */}
@@ -1307,10 +1321,10 @@ export default function SettingsPage() {
               <CardDescription>E-Mail Integration via Webhook + API</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${integrationStatus.hubspot ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm font-medium">Verbunden (HUBSPOT_ACCESS_TOKEN)</span>
+                  <div className={`w-2 h-2 rounded-full ${integrationStatus.hubspot ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-sm font-medium">{integrationStatus.hubspot ? 'Verbunden' : 'Nicht konfiguriert (HUBSPOT_ACCESS_TOKEN fehlt)'}</span>
                 </div>
               </div>
               <div className="space-y-2">
@@ -1330,15 +1344,17 @@ export default function SettingsPage() {
               <CardTitle className="flex items-center gap-2"><Key className="h-5 w-5" />OpenAI</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${integrationStatus.openai ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm font-medium">API Key konfiguriert</span>
+                  <div className={`w-2 h-2 rounded-full ${integrationStatus.openai ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-sm font-medium">{integrationStatus.openai ? 'API Key konfiguriert' : 'Nicht konfiguriert (OPENAI_API_KEY fehlt)'}</span>
                 </div>
+                {integrationStatus.openai && (
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">GPT-4o (Drafts)</Badge>
                   <Badge variant="outline">gpt-4o-mini (Klassifikation)</Badge>
                 </div>
+                )}
               </div>
               <div className="text-sm text-slate-500 space-y-1">
                 <p>• Draft-Generierung: GPT-4o mit RAG (Knowledge Base)</p>
@@ -1354,10 +1370,10 @@ export default function SettingsPage() {
               <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" />Supabase</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+              <div className={`flex items-center justify-between p-3 rounded-lg ${integrationStatus.supabase ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full" />
-                  <span className="text-sm font-medium">Verbunden</span>
+                  <div className={`w-2 h-2 rounded-full ${integrationStatus.supabase ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <span className="text-sm font-medium">{integrationStatus.supabase ? 'Verbunden' : 'Nicht konfiguriert (Supabase URL/Key fehlt)'}</span>
                 </div>
               </div>
               <div className="text-sm text-slate-500 space-y-1">

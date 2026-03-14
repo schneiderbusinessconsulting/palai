@@ -660,10 +660,10 @@ export default function InboxPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="E-Mails durchsuchen..."
+            placeholder="Suchen..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -733,27 +733,18 @@ export default function InboxPage() {
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
           {isSyncing ? 'Sync...' : 'HubSpot Sync'}
         </Button>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleReclassify}
-                disabled={isClassifying}
-              >
-                {isClassifying ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Alte E-Mails neu klassifizieren</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={handleReclassify}
+          disabled={isClassifying}
+        >
+          {isClassifying ? (
+            <><Loader2 className="h-4 w-4 animate-spin" />Klassifiziere…</>
+          ) : (
+            <><Bot className="h-4 w-4" />Klassifizieren</>
+          )}
+        </Button>
       </div>
 
       {/* Sync Message */}

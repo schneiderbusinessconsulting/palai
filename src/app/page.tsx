@@ -16,6 +16,9 @@ import {
   Sparkles,
   AlertTriangle,
   ArrowRight,
+  Target,
+  Timer,
+  Shield,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -29,6 +32,8 @@ interface Email {
   email_type?: string
   needs_response?: boolean
   buying_intent_score?: number
+  priority?: string
+  sla_status?: string
   email_drafts?: Array<{ confidence_score: number }>
 }
 
@@ -40,6 +45,25 @@ interface HotLead {
   buying_intent_score?: number
   received_at: string
   status: string
+}
+
+interface SlaEmail {
+  id: string
+  from_name?: string
+  from_email: string
+  subject: string
+  priority: string
+  received_at: string
+  deadline: Date
+  remainingMs: number
+}
+
+interface SlaStats {
+  doneToday: number
+  dueNow: SlaEmail[]
+  overdue: SlaEmail[]
+  later: number
+  totalTarget: number
 }
 
 interface DashboardStats {
@@ -62,6 +86,125 @@ function formatTimeAgo(dateString: string) {
   return `vor ${days}d`
 }
 
+const SLA_RESOLUTION_MINUTES: Record<string, number> = {
+  critical: 240,   // 4h
+  high: 480,       // 8h
+  normal: 1440,    // 24h
+  low: 2880,       // 48h
+}
+
+function computeSlaStats(allEmails: Email[]): SlaStats {
+  const now = Date.now()
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
+  // Done today: sent emails resolved today
+  const doneToday = allEmails.filter(e =>
+    e.status === 'sent' &&
+    e.email_type !== 'system_alert' &&
+    e.email_type !== 'notification'
+  ).filter(e => {
+    // Use received_at as proxy since resolved_at isn't in the API response
+    // Sent emails with recent activity count as done today
+    return true // We'll use the sentToday stat separately
+  }).length
+
+  // Open emails with SLA deadlines
+  const openActionable = allEmails.filter(e =>
+    e.status !== 'sent' &&
+    e.status !== 'rejected' &&
+    e.email_type !== 'system_alert' &&
+    e.email_type !== 'notification' &&
+    (e.email_type !== 'form_submission' || e.needs_response)
+  )
+
+  const overdue: SlaEmail[] = []
+  const dueNow: SlaEmail[] = []
+  let later = 0
+
+  for (const email of openActionable) {
+    const priority = email.priority || 'normal'
+    const thresholdMin = SLA_RESOLUTION_MINUTES[priority] || SLA_RESOLUTION_MINUTES.normal
+    const receivedMs = new Date(email.received_at).getTime()
+    const deadline = new Date(receivedMs + thresholdMin * 60000)
+    const remainingMs = deadline.getTime() - now
+
+    const slaEmail: SlaEmail = {
+      id: email.id,
+      from_name: email.from_name,
+      from_email: email.from_email,
+      subject: email.subject,
+      priority,
+      received_at: email.received_at,
+      deadline,
+      remainingMs,
+    }
+
+    if (remainingMs <= 0) {
+      overdue.push(slaEmail)
+    } else if (deadline <= todayEnd) {
+      dueNow.push(slaEmail)
+    } else {
+      later++
+    }
+  }
+
+  // Sort: overdue by most overdue first, dueNow by soonest deadline first
+  overdue.sort((a, b) => a.remainingMs - b.remainingMs)
+  dueNow.sort((a, b) => a.remainingMs - b.remainingMs)
+
+  const sentToday = allEmails.filter(e => {
+    if (e.status !== 'sent') return false
+    const d = new Date(e.received_at)
+    return d >= todayStart // approximation
+  }).length
+
+  const totalTarget = sentToday + dueNow.length + overdue.length
+
+  return { doneToday: sentToday, dueNow, overdue, later, totalTarget }
+}
+
+function formatSlaRemaining(ms: number): string {
+  if (ms <= 0) {
+    const overMs = Math.abs(ms)
+    const mins = Math.floor(overMs / 60000)
+    if (mins < 60) return `${mins}min überfällig`
+    const hours = Math.floor(mins / 60)
+    return `${hours}h überfällig`
+  }
+  const mins = Math.floor(ms / 60000)
+  if (mins < 60) return `noch ${mins}min`
+  const hours = Math.floor(mins / 60)
+  const remMins = mins % 60
+  if (remMins === 0) return `noch ${hours}h`
+  return `noch ${hours}h ${remMins}min`
+}
+
+function getSlaUrgencyColor(remainingMs: number): string {
+  if (remainingMs <= 0) return 'text-red-600'
+  if (remainingMs <= 30 * 60000) return 'text-red-500'       // < 30min
+  if (remainingMs <= 2 * 3600000) return 'text-amber-600'    // < 2h
+  return 'text-green-600'
+}
+
+function getPriorityLabel(priority: string): string {
+  switch (priority) {
+    case 'critical': return 'Kritisch'
+    case 'high': return 'Hoch'
+    case 'low': return 'Niedrig'
+    default: return 'Normal'
+  }
+}
+
+function getPriorityBadgeColor(priority: string): string {
+  switch (priority) {
+    case 'critical': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+    case 'high': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+    case 'low': return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+    default: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+  }
+}
+
 function getPriorityColor(email: Email) {
   if ((email.buying_intent_score ?? 0) >= 60) return 'border-l-emerald-500'
   if (email.email_drafts?.[0]?.confidence_score === 0 || !email.email_drafts?.length) return 'border-l-amber-400'
@@ -72,6 +215,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [urgentEmails, setUrgentEmails] = useState<Email[]>([])
   const [hotLeads, setHotLeads] = useState<HotLead[]>([])
+  const [slaStats, setSlaStats] = useState<SlaStats>({ doneToday: 0, dueNow: [], overdue: [], later: 0, totalTarget: 0 })
   const [stats, setStats] = useState<DashboardStats>({
     pendingEmails: 0,
     draftReadyEmails: 0,
@@ -115,6 +259,7 @@ export default function DashboardPage() {
           .slice(0, 4)
 
         setUrgentEmails(noDraft)
+        setSlaStats(computeSlaStats(all))
         setStats(prev => ({ ...prev, pendingEmails: pending, draftReadyEmails: draftReady, urgentEmails: noDraft.length, sentToday }))
       }
 
@@ -224,6 +369,118 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* SLA Tagesziel */}
+      {!isLoading && (slaStats.totalTarget > 0 || slaStats.overdue.length > 0) && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-500" />
+                SLA Tagesziel
+              </span>
+              <span className="text-sm font-normal text-slate-500">
+                {slaStats.doneToday} von {slaStats.totalTarget} erledigt
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Progress bar */}
+            <div className="space-y-2">
+              <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    slaStats.overdue.length > 0 ? 'bg-gradient-to-r from-green-500 to-amber-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${slaStats.totalTarget > 0 ? Math.round((slaStats.doneToday / slaStats.totalTarget) * 100) : 0}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500">
+                  {slaStats.totalTarget > 0 ? Math.round((slaStats.doneToday / slaStats.totalTarget) * 100) : 0}% erreicht
+                </span>
+                {slaStats.later > 0 && (
+                  <span className="text-slate-400">+ {slaStats.later} morgen/später</span>
+                )}
+              </div>
+            </div>
+
+            {/* Status counters */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                <div>
+                  <p className="text-lg font-bold text-green-700 dark:text-green-400">{slaStats.doneToday}</p>
+                  <p className="text-xs text-green-600 dark:text-green-500">erledigt</p>
+                </div>
+              </div>
+              <div className={`flex items-center gap-2 p-2.5 rounded-lg ${slaStats.dueNow.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-slate-50 dark:bg-slate-800/30'}`}>
+                <Timer className={`h-4 w-4 flex-shrink-0 ${slaStats.dueNow.length > 0 ? 'text-amber-600' : 'text-slate-400'}`} />
+                <div>
+                  <p className={`text-lg font-bold ${slaStats.dueNow.length > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-slate-400'}`}>{slaStats.dueNow.length}</p>
+                  <p className={`text-xs ${slaStats.dueNow.length > 0 ? 'text-amber-600 dark:text-amber-500' : 'text-slate-400'}`}>fällig heute</p>
+                </div>
+              </div>
+              <div className={`flex items-center gap-2 p-2.5 rounded-lg ${slaStats.overdue.length > 0 ? 'bg-red-50 dark:bg-red-900/20' : 'bg-slate-50 dark:bg-slate-800/30'}`}>
+                <AlertTriangle className={`h-4 w-4 flex-shrink-0 ${slaStats.overdue.length > 0 ? 'text-red-600 animate-pulse' : 'text-slate-400'}`} />
+                <div>
+                  <p className={`text-lg font-bold ${slaStats.overdue.length > 0 ? 'text-red-700 dark:text-red-400' : 'text-slate-400'}`}>{slaStats.overdue.length}</p>
+                  <p className={`text-xs ${slaStats.overdue.length > 0 ? 'text-red-600 dark:text-red-500' : 'text-slate-400'}`}>überfällig</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Overdue + due soon list */}
+            {(slaStats.overdue.length > 0 || slaStats.dueNow.length > 0) && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                  {slaStats.overdue.length > 0 ? 'Dringend beantworten' : 'Als nächstes fällig'}
+                </p>
+                {[...slaStats.overdue, ...slaStats.dueNow].slice(0, 4).map(email => (
+                  <Link key={email.id} href="/inbox">
+                    <div className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
+                      email.remainingMs <= 0
+                        ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20'
+                        : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    }`}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{email.subject}</p>
+                        <p className="text-xs text-slate-500 truncate">{email.from_name || email.from_email}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge className={`text-xs px-1.5 py-0.5 ${getPriorityBadgeColor(email.priority)}`}>
+                          {getPriorityLabel(email.priority)}
+                        </Badge>
+                        <span className={`text-xs font-medium ${getSlaUrgencyColor(email.remainingMs)}`}>
+                          {formatSlaRemaining(email.remainingMs)}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+                {(slaStats.overdue.length + slaStats.dueNow.length) > 4 && (
+                  <Link href="/inbox">
+                    <p className="text-xs text-slate-500 text-center pt-1 hover:text-blue-500 transition-colors">
+                      + {slaStats.overdue.length + slaStats.dueNow.length - 4} weitere fällig →
+                    </p>
+                  </Link>
+                )}
+              </div>
+            )}
+
+            {/* All clear state */}
+            {slaStats.overdue.length === 0 && slaStats.dueNow.length === 0 && slaStats.doneToday > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <Shield className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">Alle SLA-Ziele eingehalten</p>
+                  <p className="text-xs text-green-600 dark:text-green-500">{slaStats.doneToday} E-Mails heute beantwortet — keine Deadline offen.</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

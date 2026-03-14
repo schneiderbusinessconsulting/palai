@@ -48,7 +48,16 @@ import {
   User,
   AlertTriangle,
   TrendingUp,
+  ChevronDown,
+  ChevronRight,
+  StickyNote,
+  Trash2,
+  Save,
+  Bookmark,
+  UserCircle,
+  Wand2,
 } from 'lucide-react'
+import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
   Tooltip,
   TooltipContent,
@@ -79,6 +88,36 @@ interface Email {
   classification_reason?: string
   buying_intent_score?: number
   email_drafts?: EmailDraft[]
+  assigned_agent_id?: string
+}
+
+interface Agent {
+  id: string
+  name: string
+  email: string
+  role: string
+  specializations?: string[]
+  is_active: boolean
+}
+
+interface EmailNote {
+  id: string
+  email_id: string
+  agent_name: string
+  content: string
+  created_at: string
+}
+
+interface SavedView {
+  id: string
+  name: string
+  filters: {
+    status: string
+    hideSent: boolean
+    hideSystemMails: boolean
+    searchQuery: string
+    assignedAgentId: string
+  }
 }
 
 interface HubSpotOwner {
@@ -217,6 +256,22 @@ export default function InboxPage() {
   // Conflict detection: lock state
   const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
 
+  // Agent assignment state
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [assignedAgentFilter, setAssignedAgentFilter] = useState<string>('all')
+
+  // Internal notes state
+  const [notes, setNotes] = useState<EmailNote[]>([])
+  const [notesExpanded, setNotesExpanded] = useState(false)
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [isAddingNote, setIsAddingNote] = useState(false)
+  const [notesError, setNotesError] = useState('')
+
+  // Saved views state
+  const [savedViews, setSavedViews] = useState<SavedView[]>([])
+  const [showSaveViewInput, setShowSaveViewInput] = useState(false)
+  const [newViewName, setNewViewName] = useState('')
+
   // Agent name helper (from profile localStorage)
   const getAgentName = () => {
     try {
@@ -280,6 +335,167 @@ export default function InboxPage() {
     }
   }
 
+  // Fetch agents on mount
+  const fetchAgents = async () => {
+    try {
+      const response = await fetch('/api/agents')
+      if (response.ok) {
+        const data = await response.json()
+        setAgents(data.agents || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch agents:', error)
+    }
+  }
+
+  // Fetch notes for a specific email
+  const fetchNotes = async (emailId: string) => {
+    setNotesError('')
+    try {
+      const response = await fetch(`/api/emails/${emailId}/notes`)
+      if (response.ok) {
+        const data = await response.json()
+        setNotes(data.notes || [])
+      } else {
+        setNotes([])
+      }
+    } catch {
+      setNotes([])
+      setNotesError('Notizen konnten nicht geladen werden')
+    }
+  }
+
+  // Add a note
+  const handleAddNote = async () => {
+    if (!selectedEmail || !newNoteContent.trim()) return
+    setIsAddingNote(true)
+    try {
+      const response = await fetch(`/api/emails/${selectedEmail.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newNoteContent.trim(), agent_name: getAgentName() }),
+      })
+      if (response.ok) {
+        setNewNoteContent('')
+        fetchNotes(selectedEmail.id)
+      } else {
+        const data = await response.json()
+        setNotesError(data.error || 'Fehler beim Hinzufügen')
+      }
+    } catch {
+      setNotesError('Fehler beim Hinzufügen')
+    } finally {
+      setIsAddingNote(false)
+    }
+  }
+
+  // Delete a note
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedEmail) return
+    try {
+      await fetch(`/api/emails/${selectedEmail.id}/notes`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_id: noteId }),
+      })
+      fetchNotes(selectedEmail.id)
+    } catch {
+      setNotesError('Fehler beim Löschen')
+    }
+  }
+
+  // Assign agent to email
+  const handleAssignAgent = async (emailId: string, agentId: string) => {
+    try {
+      const response = await fetch(`/api/emails/${emailId}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agentId || null }),
+      })
+      if (response.ok) {
+        // Update local state
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, assigned_agent_id: agentId || undefined } : e))
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: agentId || undefined } : prev)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to assign agent:', error)
+    }
+  }
+
+  // Resolve template variables in text
+  const resolveTemplateVars = (text: string): string => {
+    if (!selectedEmail) return text
+    const context = {
+      recipientName: selectedEmail.from_name || undefined,
+      recipientEmail: selectedEmail.from_email,
+      senderName: getAgentName(),
+      courseName: detectCourseName(selectedEmail.subject),
+      subject: selectedEmail.subject,
+    }
+    return resolveTemplateVariables(text, context)
+  }
+
+  // Load saved views from localStorage
+  const loadSavedViews = () => {
+    try {
+      const stored = localStorage.getItem('palai_saved_views')
+      if (stored) setSavedViews(JSON.parse(stored))
+    } catch { /* ignore */ }
+  }
+
+  // Save a new view
+  const handleSaveView = () => {
+    if (!newViewName.trim()) return
+    const view: SavedView = {
+      id: Date.now().toString(),
+      name: newViewName.trim(),
+      filters: {
+        status: filter,
+        hideSent,
+        hideSystemMails,
+        searchQuery,
+        assignedAgentId: assignedAgentFilter,
+      },
+    }
+    const updated = [...savedViews, view]
+    setSavedViews(updated)
+    localStorage.setItem('palai_saved_views', JSON.stringify(updated))
+    setNewViewName('')
+    setShowSaveViewInput(false)
+  }
+
+  // Load a saved view
+  const handleLoadView = (view: SavedView) => {
+    setFilter(view.filters.status)
+    setHideSent(view.filters.hideSent)
+    setHideSystemMails(view.filters.hideSystemMails)
+    setSearchQuery(view.filters.searchQuery)
+    setAssignedAgentFilter(view.filters.assignedAgentId || 'all')
+  }
+
+  // Delete a saved view
+  const handleDeleteView = (viewId: string) => {
+    const updated = savedViews.filter(v => v.id !== viewId)
+    setSavedViews(updated)
+    localStorage.setItem('palai_saved_views', JSON.stringify(updated))
+  }
+
+  // Get agent initials for avatar
+  const getAgentInitials = (agentId: string): string => {
+    const agent = agents.find(a => a.id === agentId)
+    if (!agent) return '?'
+    const parts = agent.name.split(' ')
+    return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
+  }
+
+  // Get agent name by ID
+  const getAgentNameById = (agentId: string): string => {
+    const agent = agents.find(a => a.id === agentId)
+    return agent?.name || 'Unbekannt'
+  }
+
   // Fetch owners on mount
   const fetchOwners = async () => {
     try {
@@ -305,6 +521,8 @@ export default function InboxPage() {
   useEffect(() => {
     fetchEmails()
     fetchOwners()
+    fetchAgents()
+    loadSavedViews()
   }, [filter])
 
   // Deep-link: open email detail from ?emailId= query param (e.g. from Insights page)
@@ -648,6 +866,11 @@ export default function InboxPage() {
     }
     setRegenerateFeedback('')
     setShowRegenerateDialog(false)
+    setNotes([])
+    setNotesExpanded(false)
+    setNewNoteContent('')
+    setNotesError('')
+    fetchNotes(email.id)
   }
 
   const filteredEmails = emails.filter((email) => {
@@ -656,6 +879,14 @@ export default function InboxPage() {
     // Hide system/transactional emails if toggle is on
     if (hideSystemMails && (email.email_type === 'system_alert' || email.email_type === 'notification' || (email.email_type === 'form_submission' && !email.needs_response))) {
       return false
+    }
+    // Filter by assigned agent
+    if (assignedAgentFilter !== 'all') {
+      if (assignedAgentFilter === 'unassigned') {
+        if (email.assigned_agent_id) return false
+      } else {
+        if (email.assigned_agent_id !== assignedAgentFilter) return false
+      }
     }
     if (filter !== 'all' && email.status !== filter) return false
     if (searchQuery) {
@@ -766,6 +997,92 @@ export default function InboxPage() {
             <><Bot className="h-4 w-4" />Klassifizieren</>
           )}
         </Button>
+        <Select value={assignedAgentFilter} onValueChange={setAssignedAgentFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <UserCircle className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Zugewiesen an" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Alle Agenten</SelectItem>
+            <SelectItem value="unassigned">Nicht zugewiesen</SelectItem>
+            {agents.map((agent) => (
+              <SelectItem key={agent.id} value={agent.id}>
+                {agent.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* Saved Views */}
+        <div className="flex items-center gap-1">
+          {savedViews.length > 0 && (
+            <Select onValueChange={(viewId) => {
+              const view = savedViews.find(v => v.id === viewId)
+              if (view) handleLoadView(view)
+            }}>
+              <SelectTrigger className="w-full sm:w-40">
+                <Bookmark className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Ansichten" />
+              </SelectTrigger>
+              <SelectContent>
+                {savedViews.map((view) => (
+                  <div key={view.id} className="flex items-center justify-between">
+                    <SelectItem value={view.id}>{view.name}</SelectItem>
+                  </div>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {showSaveViewInput ? (
+            <div className="flex items-center gap-1">
+              <Input
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                placeholder="Name..."
+                className="h-9 w-32"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSaveView() }}
+                autoFocus
+              />
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={handleSaveView}>
+                <Check className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => { setShowSaveViewInput(false); setNewViewName('') }}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-9 p-0" onClick={() => setShowSaveViewInput(true)}>
+                    <Save className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Aktuelle Filter als Ansicht speichern</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {savedViews.length > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => {
+                    if (confirm('Alle gespeicherten Ansichten löschen?')) {
+                      setSavedViews([])
+                      localStorage.removeItem('palai_saved_views')
+                    }
+                  }}>
+                    <Trash2 className="h-4 w-4 text-slate-400" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Alle Ansichten löschen</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+        </div>
       </div>
 
       {/* Sync Message */}
@@ -860,6 +1177,20 @@ export default function InboxPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          {email.assigned_agent_id && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                    {getAgentInitials(email.assigned_agent_id)}
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{getAgentNameById(email.assigned_agent_id)}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
                           {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
@@ -956,6 +1287,27 @@ export default function InboxPage() {
                   <strong>Empfangen:</strong>{' '}
                   {new Date(selectedEmail.received_at).toLocaleString('de-CH')}
                 </p>
+              </div>
+
+              {/* Agent Assignment */}
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Zugewiesen an:</span>
+                <Select
+                  value={selectedEmail.assigned_agent_id || 'none'}
+                  onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
+                >
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Nicht zugewiesen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nicht zugewiesen</SelectItem>
+                    {agents.map((agent) => (
+                      <SelectItem key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Original Message */}
@@ -1101,12 +1453,34 @@ export default function InboxPage() {
                   )}
 
                   {isEditing ? (
-                    <Textarea
-                      value={editedResponse}
-                      onChange={(e) => setEditedResponse(e.target.value)}
-                      rows={10}
-                      className="font-mono text-sm"
-                    />
+                    <div className="space-y-2">
+                      <Textarea
+                        value={editedResponse}
+                        onChange={(e) => setEditedResponse(e.target.value)}
+                        rows={10}
+                        className="font-mono text-sm"
+                      />
+                      <div className="flex justify-end">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1 text-xs text-slate-500"
+                                onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
+                              >
+                                <Wand2 className="h-3 w-3" />
+                                Variablen ersetzen
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    </div>
                   ) : (
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
                       <div className="text-sm whitespace-pre-wrap break-all max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
@@ -1129,6 +1503,26 @@ export default function InboxPage() {
                     placeholder="Antwort hier eingeben..."
                     autoFocus
                   />
+                  <div className="flex justify-end">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-xs text-slate-500"
+                            onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
+                          >
+                            <Wand2 className="h-3 w-3" />
+                            Variablen ersetzen
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-6">
@@ -1165,6 +1559,70 @@ export default function InboxPage() {
                   </div>
                 </div>
               )}
+
+              {/* Interne Notizen */}
+              <div className="border rounded-lg">
+                <button
+                  className="flex items-center gap-2 w-full p-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
+                  onClick={() => setNotesExpanded(!notesExpanded)}
+                >
+                  {notesExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  <StickyNote className="h-4 w-4" />
+                  Interne Notizen
+                  {notes.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{notes.length}</Badge>
+                  )}
+                </button>
+                {notesExpanded && (
+                  <div className="px-3 pb-3 space-y-3">
+                    {notesError && (
+                      <p className="text-xs text-amber-600">{notesError}</p>
+                    )}
+                    {notes.length === 0 && !notesError && (
+                      <p className="text-xs text-slate-400">Noch keine Notizen vorhanden.</p>
+                    )}
+                    {notes.map((note) => (
+                      <div key={note.id} className="flex items-start gap-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">{note.agent_name}</span>
+                            <span className="text-xs text-slate-400">{new Date(note.created_at).toLocaleString('de-CH')}</span>
+                          </div>
+                          <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{note.content}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteNote(note.id)}
+                          className="p-1 rounded hover:bg-yellow-100 dark:hover:bg-yellow-900/40 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        placeholder="Notiz hinzufügen..."
+                        rows={2}
+                        className="text-sm flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="self-end"
+                        onClick={handleAddNote}
+                        disabled={isAddingNote || !newNoteContent.trim()}
+                      >
+                        {isAddingNote ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          'Notiz hinzufügen'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

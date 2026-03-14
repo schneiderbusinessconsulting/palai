@@ -255,6 +255,8 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const limit = parseInt(searchParams.get('limit') || '100')
     const offset = parseInt(searchParams.get('offset') || '0')
+    const assignedAgentId = searchParams.get('assigned_agent_id')
+    const tags = searchParams.get('tags')
 
     const supabase = await createClient()
 
@@ -276,6 +278,21 @@ export async function GET(request: NextRequest) {
 
     if (status && status !== 'all') {
       query = query.eq('status', status)
+    }
+
+    // Filter by assigned agent
+    if (assignedAgentId === 'unassigned') {
+      query = query.is('assigned_agent_id', null)
+    } else if (assignedAgentId) {
+      query = query.eq('assigned_agent_id', assignedAgentId)
+    }
+
+    // Filter by tags (requires tags column from migration 009)
+    if (tags) {
+      const tagList = tags.split(',').map(t => t.trim()).filter(Boolean)
+      if (tagList.length > 0) {
+        query = query.contains('tags', tagList)
+      }
     }
 
     const { data: emails, error, count } = await query

@@ -14,6 +14,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
   Loader2,
   TrendingUp,
   ShoppingCart,
@@ -29,6 +35,7 @@ import {
   CheckCircle,
   Clock,
   ExternalLink,
+  Download,
 } from 'lucide-react'
 
 interface InsightsData {
@@ -267,10 +274,34 @@ export default function InsightsPage() {
           title="Insights"
           description="Marketing, Sales, Product & Kundenstimmung"
         />
-        <Button variant="outline" size="sm" onClick={fetchInsights} disabled={loading} className="flex-shrink-0 mt-1">
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Aktualisieren
-        </Button>
+        <div className="flex gap-2 flex-shrink-0 mt-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => window.open('/api/reports/export?type=emails&format=csv', '_blank')}>
+                Emails als CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('/api/reports/export?type=emails&format=json', '_blank')}>
+                Emails als JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('/api/reports/export?type=insights&format=csv', '_blank')}>
+                Insights als CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open('/api/reports/export?type=insights&format=json', '_blank')}>
+                Insights als JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={fetchInsights} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Aktualisieren
+          </Button>
+        </div>
       </div>
 
       {/* Summary Row */}

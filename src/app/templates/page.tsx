@@ -250,6 +250,28 @@ export default function TemplatesPage() {
         </Button>
       </div>
 
+      {/* Template Variables Help */}
+      <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+        <CardContent className="p-4">
+          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verfügbare Template-Variablen</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { var: '{{name}}', desc: 'Kundenname' },
+              { var: '{{email}}', desc: 'Kunden-E-Mail' },
+              { var: '{{absender}}', desc: 'Absendername' },
+              { var: '{{kurs}}', desc: 'Kursname' },
+              { var: '{{datum}}', desc: 'Heutiges Datum' },
+              { var: '{{betreff}}', desc: 'E-Mail-Betreff' },
+            ].map(v => (
+              <Badge key={v.var} variant="outline" className="text-xs text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700">
+                <code className="mr-1">{v.var}</code> — {v.desc}
+              </Badge>
+            ))}
+          </div>
+          <p className="text-xs text-blue-600/70 dark:text-blue-400/50 mt-2">Variablen werden beim Einfügen in die Inbox automatisch ersetzt.</p>
+        </CardContent>
+      </Card>
+
       {/* Category Tabs */}
       <div className="flex gap-2 flex-wrap">
         {categories.map((category) => (

@@ -16,7 +16,7 @@ export async function GET() {
       // Emails with buying intent, tone, priority, status
       supabase
         .from('incoming_emails')
-        .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status, confidence_score')
+        .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status')
         .neq('email_type', 'system_alert')
         .neq('email_type', 'notification')
         .order('received_at', { ascending: false })

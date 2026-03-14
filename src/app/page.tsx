@@ -617,16 +617,17 @@ export default function DashboardPage() {
                     <Link key={lead.id} href="/inbox">
                       <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{lead.from_name || lead.from_email}</p>
-                          <p className="text-xs text-slate-500 truncate">{lead.subject}</p>
+                          <p className="text-sm font-medium truncate">{lead.subject}</p>
+                          <p className="text-xs text-slate-500 truncate">
+                            {lead.from_name || lead.from_email}
+                            <span className="mx-1.5 text-slate-300">·</span>
+                            {formatTimeAgo(lead.received_at)}
+                            {lead.status !== 'sent' && (
+                              <span className="ml-1.5 text-amber-500 font-medium">offen</span>
+                            )}
+                          </p>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${lead.buying_intent_score || 0}%` }} />
-                          </div>
-                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 w-7">{lead.buying_intent_score}%</span>
-                          {lead.status !== 'sent' && <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />}
-                        </div>
+                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 flex-shrink-0">{lead.buying_intent_score}%</span>
                       </div>
                     </Link>
                   ))}

@@ -88,10 +88,12 @@ interface SlaStats {
 }
 
 interface WorkloadStats {
-  open: { today: number; week: number; month: number }
-  done: { today: number; week: number; month: number }
-  avg: { dayOpen: number; dayDone: number; weekOpen: number; weekDone: number; monthOpen: number; monthDone: number }
-  trend: { openVsLastWeek: number; doneVsLastWeek: number } // percentage change
+  backlog: number
+  inbound: { today: number; week: number; month: number }
+  inboundAvg: { day: number; week: number; month: number }
+  resolved: { today: number; week: number; month: number }
+  resolvedAvg: { day: number; week: number; month: number }
+  trend: { inboundVsLastWeek: number; resolvedVsLastWeek: number }
 }
 
 interface DashboardStats {
@@ -256,68 +258,70 @@ function computeWorkload(
 
   const actionable = allEmails.filter(isActionable)
 
-  // Open: currently open emails received in each period
-  const openEmails = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected')
-  const openToday = openEmails.filter(e => new Date(e.received_at) >= todayStart).length
-  const openWeek = openEmails.filter(e => new Date(e.received_at) >= weekStart).length
-  const openMonth = openEmails.filter(e => new Date(e.received_at) >= monthStart).length
+  // Backlog: total currently open
+  const backlog = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected').length
 
-  // Done: sent emails resolved in each period (use updated_at)
+  // Inbound: emails received in each period (all statuses)
+  const inboundToday = actionable.filter(e => new Date(e.received_at) >= todayStart).length
+  const inboundWeek = actionable.filter(e => new Date(e.received_at) >= weekStart).length
+  const inboundMonth = actionable.filter(e => new Date(e.received_at) >= monthStart).length
+
+  // Resolved: sent emails resolved in each period (use updated_at)
   const sentEmails = actionable.filter(e => e.status === 'sent')
-  const doneToday = sentEmails.filter(e => {
+  const resolvedToday = sentEmails.filter(e => {
     const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
     return d >= todayStart
   }).length
-  const doneWeek = sentEmails.filter(e => {
+  const resolvedWeek = sentEmails.filter(e => {
     const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
     return d >= weekStart
   }).length
-  const doneMonth = sentEmails.filter(e => {
+  const resolvedMonth = sentEmails.filter(e => {
     const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
     return d >= monthStart
   }).length
 
-  // Averages from analytics daily data
+  // Averages from analytics daily data (30d window)
   const daysInData = Math.max(daily.length, 1)
   const totalIncoming = daily.reduce((s, d) => s + d.total, 0)
   const totalSent = daily.reduce((s, d) => s + d.sent, 0)
-  const totalPending = daily.reduce((s, d) => s + d.pending, 0)
-
-  const avgDayDone = Math.round((totalSent / daysInData) * 10) / 10
-  const avgDayOpen = Math.round((totalPending / daysInData) * 10) / 10
   const weeksInData = Math.max(daysInData / 7, 1)
   const monthsInData = Math.max(daysInData / 30, 1)
 
   // Trend: compare this week vs last week using daily data
   const todayStr = now.toISOString().split('T')[0]
+  const weekStartStr = weekStart.toISOString().split('T')[0]
   const lastWeekStart = new Date(weekStart)
   lastWeekStart.setDate(lastWeekStart.getDate() - 7)
   const lastWeekEnd = new Date(weekStart)
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1)
 
-  const thisWeekDaily = daily.filter(d => d.day >= weekStart.toISOString().split('T')[0] && d.day <= todayStr)
+  const thisWeekDaily = daily.filter(d => d.day >= weekStartStr && d.day <= todayStr)
   const lastWeekDaily = daily.filter(d => d.day >= lastWeekStart.toISOString().split('T')[0] && d.day <= lastWeekEnd.toISOString().split('T')[0])
 
-  const thisWeekSent = thisWeekDaily.reduce((s, d) => s + d.sent, 0)
-  const lastWeekSent = lastWeekDaily.reduce((s, d) => s + d.sent, 0)
-  const thisWeekPending = thisWeekDaily.reduce((s, d) => s + d.pending, 0)
-  const lastWeekPending = lastWeekDaily.reduce((s, d) => s + d.pending, 0)
+  const thisWeekInbound = thisWeekDaily.reduce((s, d) => s + d.total, 0)
+  const lastWeekInbound = lastWeekDaily.reduce((s, d) => s + d.total, 0)
+  const thisWeekResolved = thisWeekDaily.reduce((s, d) => s + d.sent, 0)
+  const lastWeekResolved = lastWeekDaily.reduce((s, d) => s + d.sent, 0)
 
-  const doneVsLastWeek = lastWeekSent > 0 ? Math.round(((thisWeekSent - lastWeekSent) / lastWeekSent) * 100) : 0
-  const openVsLastWeek = lastWeekPending > 0 ? Math.round(((thisWeekPending - lastWeekPending) / lastWeekPending) * 100) : 0
+  const inboundVsLastWeek = lastWeekInbound > 0 ? Math.round(((thisWeekInbound - lastWeekInbound) / lastWeekInbound) * 100) : 0
+  const resolvedVsLastWeek = lastWeekResolved > 0 ? Math.round(((thisWeekResolved - lastWeekResolved) / lastWeekResolved) * 100) : 0
 
   return {
-    open: { today: openToday, week: openWeek, month: openMonth },
-    done: { today: doneToday, week: doneWeek, month: doneMonth },
-    avg: {
-      dayOpen: avgDayOpen,
-      dayDone: avgDayDone,
-      weekOpen: Math.round(totalPending / weeksInData),
-      weekDone: Math.round(totalSent / weeksInData),
-      monthOpen: Math.round(totalPending / monthsInData),
-      monthDone: Math.round(totalSent / monthsInData),
+    backlog,
+    inbound: { today: inboundToday, week: inboundWeek, month: inboundMonth },
+    inboundAvg: {
+      day: Math.round((totalIncoming / daysInData) * 10) / 10,
+      week: Math.round(totalIncoming / weeksInData),
+      month: Math.round(totalIncoming / monthsInData),
     },
-    trend: { openVsLastWeek, doneVsLastWeek },
+    resolved: { today: resolvedToday, week: resolvedWeek, month: resolvedMonth },
+    resolvedAvg: {
+      day: Math.round((totalSent / daysInData) * 10) / 10,
+      week: Math.round(totalSent / weeksInData),
+      month: Math.round(totalSent / monthsInData),
+    },
+    trend: { inboundVsLastWeek, resolvedVsLastWeek },
   }
 }
 
@@ -548,134 +552,121 @@ export default function DashboardPage() {
       {!isLoading && workload && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-indigo-500" />
-              Workload Übersicht
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-indigo-500" />
+                Workload Übersicht
+              </span>
+              <span className="text-sm font-normal px-3 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 font-semibold">
+                {workload.backlog} offen
+              </span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Noch Offen */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-amber-500" />
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Noch offen</h3>
-                </div>
 
-                {/* Absolute values */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Heute', value: workload.open.today, color: workload.open.today > 5 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200' },
-                    { label: 'Diese Woche', value: workload.open.week, color: workload.open.week > 20 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200' },
-                    { label: 'Dieser Monat', value: workload.open.month, color: 'text-slate-700 dark:text-slate-200' },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20">
-                      <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-                      <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Averages */}
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Durchschnitt (30 Tage)</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: 'Ø Tag', value: workload.avg.dayOpen },
-                      { label: 'Ø Woche', value: workload.avg.weekOpen },
-                      { label: 'Ø Monat', value: workload.avg.monthOpen },
-                    ].map(item => (
-                      <div key={item.label} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
-                        <span className="text-xs text-slate-500">{item.label}</span>
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{item.value}</span>
-                      </div>
-                    ))}
+              {/* Eingang (Inbound) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-blue-500" />
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Eingang</h3>
+                  </div>
+                  {/* Trend */}
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    workload.trend.inboundVsLastWeek > 0 ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600' :
+                    workload.trend.inboundVsLastWeek < 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-600' :
+                    'bg-slate-50 dark:bg-slate-800/30 text-slate-500'
+                  }`}>
+                    {workload.trend.inboundVsLastWeek > 0 ? (
+                      <ArrowUpRight className="h-3 w-3" />
+                    ) : workload.trend.inboundVsLastWeek < 0 ? (
+                      <ArrowDownRight className="h-3 w-3" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    )}
+                    {workload.trend.inboundVsLastWeek > 0 ? '+' : ''}{workload.trend.inboundVsLastWeek}% vs. Vorwoche
                   </div>
                 </div>
 
-                {/* Trend */}
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg ${
-                  workload.trend.openVsLastWeek > 0 ? 'bg-red-50 dark:bg-red-900/10' :
-                  workload.trend.openVsLastWeek < 0 ? 'bg-green-50 dark:bg-green-900/10' :
-                  'bg-slate-50 dark:bg-slate-800/30'
-                }`}>
-                  {workload.trend.openVsLastWeek > 0 ? (
-                    <ArrowUpRight className="h-4 w-4 text-red-500" />
-                  ) : workload.trend.openVsLastWeek < 0 ? (
-                    <ArrowDownRight className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Minus className="h-4 w-4 text-slate-400" />
-                  )}
-                  <span className={`text-sm font-medium ${
-                    workload.trend.openVsLastWeek > 0 ? 'text-red-600' :
-                    workload.trend.openVsLastWeek < 0 ? 'text-green-600' :
-                    'text-slate-500'
-                  }`}>
-                    {workload.trend.openVsLastWeek > 0 ? '+' : ''}{workload.trend.openVsLastWeek}% vs. letzte Woche
-                  </span>
+                {/* Table */}
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50">
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Zeitraum</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Absolut</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Ø Durchschnitt</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {[
+                        { label: 'Heute', abs: workload.inbound.today, avg: `${workload.inboundAvg.day} /Tag` },
+                        { label: 'Diese Woche', abs: workload.inbound.week, avg: `${workload.inboundAvg.week} /Wo` },
+                        { label: 'Dieser Monat', abs: workload.inbound.month, avg: `${workload.inboundAvg.month} /Mo` },
+                      ].map(row => (
+                        <tr key={row.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{row.label}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-slate-800 dark:text-slate-200">{row.abs}</td>
+                          <td className="px-3 py-2.5 text-right text-slate-500 dark:text-slate-400">{row.avg}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {/* Right: Erledigt */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <MailCheck className="h-4 w-4 text-green-500" />
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Erledigt</h3>
-                </div>
-
-                {/* Absolute values */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Heute', value: workload.done.today },
-                    { label: 'Diese Woche', value: workload.done.week },
-                    { label: 'Dieser Monat', value: workload.done.month },
-                  ].map(item => (
-                    <div key={item.label} className="p-3 rounded-lg bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
-                      <p className="text-xs text-slate-500 mb-1">{item.label}</p>
-                      <p className="text-xl font-bold text-green-700 dark:text-green-400">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Averages */}
-                <div className="space-y-1.5">
-                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Durchschnitt (30 Tage)</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { label: 'Ø Tag', value: workload.avg.dayDone },
-                      { label: 'Ø Woche', value: workload.avg.weekDone },
-                      { label: 'Ø Monat', value: workload.avg.monthDone },
-                    ].map(item => (
-                      <div key={item.label} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
-                        <span className="text-xs text-slate-500">{item.label}</span>
-                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{item.value}</span>
-                      </div>
-                    ))}
+              {/* Beantwortet (Resolved) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MailCheck className="h-4 w-4 text-green-500" />
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Beantwortet</h3>
+                  </div>
+                  {/* Trend */}
+                  <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    workload.trend.resolvedVsLastWeek > 0 ? 'bg-green-50 dark:bg-green-900/20 text-green-600' :
+                    workload.trend.resolvedVsLastWeek < 0 ? 'bg-red-50 dark:bg-red-900/20 text-red-600' :
+                    'bg-slate-50 dark:bg-slate-800/30 text-slate-500'
+                  }`}>
+                    {workload.trend.resolvedVsLastWeek > 0 ? (
+                      <ArrowUpRight className="h-3 w-3" />
+                    ) : workload.trend.resolvedVsLastWeek < 0 ? (
+                      <ArrowDownRight className="h-3 w-3" />
+                    ) : (
+                      <Minus className="h-3 w-3" />
+                    )}
+                    {workload.trend.resolvedVsLastWeek > 0 ? '+' : ''}{workload.trend.resolvedVsLastWeek}% vs. Vorwoche
                   </div>
                 </div>
 
-                {/* Trend */}
-                <div className={`flex items-center gap-2 p-2.5 rounded-lg ${
-                  workload.trend.doneVsLastWeek > 0 ? 'bg-green-50 dark:bg-green-900/10' :
-                  workload.trend.doneVsLastWeek < 0 ? 'bg-red-50 dark:bg-red-900/10' :
-                  'bg-slate-50 dark:bg-slate-800/30'
-                }`}>
-                  {workload.trend.doneVsLastWeek > 0 ? (
-                    <ArrowUpRight className="h-4 w-4 text-green-500" />
-                  ) : workload.trend.doneVsLastWeek < 0 ? (
-                    <ArrowDownRight className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <Minus className="h-4 w-4 text-slate-400" />
-                  )}
-                  <span className={`text-sm font-medium ${
-                    workload.trend.doneVsLastWeek > 0 ? 'text-green-600' :
-                    workload.trend.doneVsLastWeek < 0 ? 'text-red-600' :
-                    'text-slate-500'
-                  }`}>
-                    {workload.trend.doneVsLastWeek > 0 ? '+' : ''}{workload.trend.doneVsLastWeek}% vs. letzte Woche
-                  </span>
+                {/* Table */}
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-800/50">
+                        <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Zeitraum</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Absolut</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 dark:text-slate-400">Ø Durchschnitt</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {[
+                        { label: 'Heute', abs: workload.resolved.today, avg: `${workload.resolvedAvg.day} /Tag` },
+                        { label: 'Diese Woche', abs: workload.resolved.week, avg: `${workload.resolvedAvg.week} /Wo` },
+                        { label: 'Dieser Monat', abs: workload.resolved.month, avg: `${workload.resolvedAvg.month} /Mo` },
+                      ].map(row => (
+                        <tr key={row.label} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
+                          <td className="px-3 py-2.5 text-slate-600 dark:text-slate-300">{row.label}</td>
+                          <td className="px-3 py-2.5 text-right font-semibold text-green-700 dark:text-green-400">{row.abs}</td>
+                          <td className="px-3 py-2.5 text-right text-slate-500 dark:text-slate-400">{row.avg}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
+
             </div>
           </CardContent>
         </Card>

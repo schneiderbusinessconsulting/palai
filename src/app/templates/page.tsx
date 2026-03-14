@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
 import {
   Search,
   Plus,
@@ -15,6 +16,9 @@ import {
   MoreVertical,
   Star,
   StarOff,
+  Loader2,
+  X,
+  Check,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -22,58 +26,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
-// Mock data
-const mockTemplates = [
-  {
-    id: '1',
-    title: 'Willkommen & Infos anfordern',
-    content: 'Vielen Dank für Ihr Interesse an unseren Ausbildungen! Gerne sende ich Ihnen weitere Informationen zu...',
-    category: 'Allgemein',
-    usageCount: 45,
-    isFavorite: true,
-  },
-  {
-    id: '2',
-    title: 'Ratenzahlung bestätigen',
-    content: 'Ja, bei allen unseren Ausbildungen ist eine Ratenzahlung möglich. Die Standardkonditionen sind...',
-    category: 'Zahlung',
-    usageCount: 32,
-    isFavorite: true,
-  },
-  {
-    id: '3',
-    title: 'Kurstermin zusenden',
-    content: 'Gerne teile ich Ihnen die nächsten verfügbaren Kurstermine mit:\n\n- Hypnose-Ausbildung: [Datum]\n- Meditation Coach: [Datum]',
-    category: 'Kurse',
-    usageCount: 28,
-    isFavorite: false,
-  },
-  {
-    id: '4',
-    title: 'Zertifizierung erklären',
-    content: 'Unsere Ausbildungen sind vom Schweizerischen Verband für... zertifiziert und international anerkannt.',
-    category: 'Zertifizierung',
-    usageCount: 21,
-    isFavorite: false,
-  },
-  {
-    id: '5',
-    title: 'Absage höflich formulieren',
-    content: 'Vielen Dank für Ihre Anfrage. Leider können wir Ihnen in diesem Fall nicht weiterhelfen, da...',
-    category: 'Allgemein',
-    usageCount: 15,
-    isFavorite: false,
-  },
-  {
-    id: '6',
-    title: 'Firmenbuchung anfragen',
-    content: 'Für Firmenbuchungen bieten wir spezielle Konditionen an. Gerne erstelle ich Ihnen ein individuelles Angebot...',
-    category: 'Firmen',
-    usageCount: 12,
-    isFavorite: true,
-  },
-]
+interface Template {
+  id: string
+  title: string
+  content: string
+  category: string
+  usage_count: number
+  is_favorite: boolean
+  created_at: string
+  updated_at: string
+}
 
 const categories = ['Alle', 'Allgemein', 'Zahlung', 'Kurse', 'Zertifizierung', 'Firmen']
 
@@ -89,10 +68,40 @@ function getCategoryColor(category: string) {
 }
 
 export default function TemplatesPage() {
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('Alle')
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  const filteredTemplates = mockTemplates.filter((template) => {
+  // Dialog state
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+  const [formTitle, setFormTitle] = useState('')
+  const [formContent, setFormContent] = useState('')
+  const [formCategory, setFormCategory] = useState('Allgemein')
+  const [saving, setSaving] = useState(false)
+
+  // Delete dialog state
+  const [deleteTemplate, setDeleteTemplate] = useState<Template | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const fetchTemplates = useCallback(async () => {
+    try {
+      const res = await fetch('/api/templates')
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      setTemplates(data.templates || [])
+    } catch {
+      console.error('Failed to fetch templates')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchTemplates() }, [fetchTemplates])
+
+  const filteredTemplates = templates.filter((template) => {
     if (activeCategory !== 'Alle' && template.category !== activeCategory) return false
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -104,9 +113,117 @@ export default function TemplatesPage() {
     return true
   })
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-    // TODO: Add toast notification
+  const copyToClipboard = async (id: string, text: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const toggleFavorite = async (template: Template) => {
+    const newValue = !template.is_favorite
+    // Optimistic update
+    setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, is_favorite: newValue } : t))
+
+    const res = await fetch('/api/templates', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: template.id, is_favorite: newValue }),
+    })
+    if (!res.ok) {
+      // Revert on error
+      setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, is_favorite: !newValue } : t))
+    }
+  }
+
+  const openNewDialog = () => {
+    setEditingTemplate(null)
+    setFormTitle('')
+    setFormContent('')
+    setFormCategory('Allgemein')
+    setDialogOpen(true)
+  }
+
+  const openEditDialog = (template: Template) => {
+    setEditingTemplate(template)
+    setFormTitle(template.title)
+    setFormContent(template.content)
+    setFormCategory(template.category)
+    setDialogOpen(true)
+  }
+
+  const handleSave = async () => {
+    if (!formTitle.trim() || !formContent.trim()) return
+    setSaving(true)
+
+    try {
+      if (editingTemplate) {
+        const res = await fetch('/api/templates', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingTemplate.id,
+            title: formTitle,
+            content: formContent,
+            category: formCategory,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? data.template : t))
+        }
+      } else {
+        const res = await fetch('/api/templates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: formTitle,
+            content: formContent,
+            category: formCategory,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setTemplates(prev => [data.template, ...prev])
+        }
+      }
+      setDialogOpen(false)
+    } catch {
+      console.error('Failed to save template')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTemplate) return
+    setDeleting(true)
+
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTemplate.id }),
+      })
+      if (res.ok) {
+        setTemplates(prev => prev.filter(t => t.id !== deleteTemplate.id))
+      }
+    } catch {
+      console.error('Failed to delete template')
+    } finally {
+      setDeleting(false)
+      setDeleteTemplate(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Header title="Templates" description="Vorgefertigte Antwort-Bausteine für schnelle Antworten" />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -127,7 +244,7 @@ export default function TemplatesPage() {
             className="pl-9"
           />
         </div>
-        <Button className="gap-2">
+        <Button className="gap-2" onClick={openNewDialog}>
           <Plus className="h-4 w-4" />
           Neues Template
         </Button>
@@ -159,9 +276,9 @@ export default function TemplatesPage() {
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => {/* Toggle favorite */}}
+                    onClick={() => toggleFavorite(template)}
                   >
-                    {template.isFavorite ? (
+                    {template.is_favorite ? (
                       <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
                     ) : (
                       <StarOff className="h-4 w-4 text-slate-400" />
@@ -174,11 +291,14 @@ export default function TemplatesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEditDialog(template)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Bearbeiten
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={() => setDeleteTemplate(template)}
+                      >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Löschen
                       </DropdownMenuItem>
@@ -191,21 +311,30 @@ export default function TemplatesPage() {
               </Badge>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
-              <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-3 flex-1">
+              <p className="text-sm text-slate-600 dark:text-slate-300 line-clamp-3 flex-1 whitespace-pre-line">
                 {template.content}
               </p>
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {template.usageCount}x verwendet
+                  {template.usage_count}x verwendet
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2"
-                  onClick={() => copyToClipboard(template.content)}
+                  onClick={() => copyToClipboard(template.id, template.content)}
                 >
-                  <Copy className="h-3 w-3" />
-                  Kopieren
+                  {copiedId === template.id ? (
+                    <>
+                      <Check className="h-3 w-3 text-green-500" />
+                      Kopiert
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      Kopieren
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
@@ -220,6 +349,92 @@ export default function TemplatesPage() {
           </p>
         </div>
       )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTemplate ? 'Template bearbeiten' : 'Neues Template'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="title">Titel</Label>
+              <Input
+                id="title"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                placeholder="z.B. Willkommen & Infos"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category">Kategorie</Label>
+              <div className="flex gap-2 flex-wrap">
+                {categories.filter(c => c !== 'Alle').map((cat) => (
+                  <Button
+                    key={cat}
+                    type="button"
+                    variant={formCategory === cat ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setFormCategory(cat)}
+                  >
+                    {cat}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="content">Inhalt</Label>
+              <textarea
+                id="content"
+                value={formContent}
+                onChange={(e) => setFormContent(e.target.value)}
+                placeholder="Template-Text eingeben..."
+                rows={6}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving || !formTitle.trim() || !formContent.trim()}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {editingTemplate ? 'Speichern' : 'Erstellen'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTemplate} onOpenChange={(open) => { if (!open) setDeleteTemplate(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Template löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{deleteTemplate?.title}&quot; wird unwiderruflich gelöscht.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

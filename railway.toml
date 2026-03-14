@@ -5,6 +5,9 @@ id = "c09519b0-ff8a-490f-9419-deff40b9f397"
 builder = "NIXPACKS"
 buildCommand = "npm run build"
 
+[build.nixpacks]
+nodeVersion = "20"
+
 [deploy]
 startCommand = "npm run start"
 healthcheckPath = "/"

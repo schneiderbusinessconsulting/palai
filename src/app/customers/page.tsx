@@ -162,7 +162,7 @@ export default function CustomersPage() {
               {customers.map((customer) => (
                 <button
                   key={customer.email}
-                  onClick={() => router.push(`/inbox?search=${encodeURIComponent(customer.email)}`)}
+                  onClick={() => router.push(`/customers/${encodeURIComponent(customer.email)}`)}
                   className="w-full text-left flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">

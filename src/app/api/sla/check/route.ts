@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { runAutomationRules } from '@/lib/automation/engine'
 
 /**
  * SLA Auto-Update: Checks all open emails and updates sla_status
@@ -67,6 +68,11 @@ export async function POST() {
           .update({ sla_status: newStatus })
           .eq('id', email.id)
         updated++
+
+        // Fire automation rules for SLA transitions
+        const trigger = newStatus === 'breached' ? 'sla_breached' : 'sla_at_risk'
+        runAutomationRules(supabase, { id: email.id, priority: email.priority }, trigger)
+          .catch(err => console.error('Automation trigger error:', err))
       }
     }
 

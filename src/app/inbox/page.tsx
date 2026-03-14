@@ -89,6 +89,8 @@ interface Email {
   buying_intent_score?: number
   email_drafts?: EmailDraft[]
   assigned_agent_id?: string
+  support_level?: string
+  snoozed_until?: string
 }
 
 interface Agent {
@@ -421,6 +423,25 @@ export default function InboxPage() {
       }
     } catch (error) {
       console.error('Failed to assign agent:', error)
+    }
+  }
+
+  // Snooze an email
+  const handleSnooze = async (emailId: string, hours: number) => {
+    const until = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
+    try {
+      const response = await fetch(`/api/emails/${emailId}/snooze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ until }),
+      })
+      if (response.ok) {
+        // Remove from current view
+        setEmails(prev => prev.filter(e => e.id !== emailId))
+        handleClose()
+      }
+    } catch (error) {
+      console.error('Failed to snooze email:', error)
     }
   }
 
@@ -1191,6 +1212,9 @@ export default function InboxPage() {
                               </Tooltip>
                             </TooltipProvider>
                           )}
+                          {email.support_level === 'L2' && (
+                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">Eskaliert</Badge>
+                          )}
                           {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
@@ -1308,6 +1332,27 @@ export default function InboxPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Snooze */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Zurückstellen:</span>
+                {[
+                  { label: '1h', hours: 1 },
+                  { label: '4h', hours: 4 },
+                  { label: 'Morgen', hours: 20 },
+                  { label: '1 Woche', hours: 168 },
+                ].map(opt => (
+                  <Button
+                    key={opt.label}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
               </div>
 
               {/* Original Message */}

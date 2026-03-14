@@ -305,6 +305,54 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Thread grouping
+    const groupByThread = searchParams.get('group_by_thread') === 'true'
+    if (groupByThread && emails?.length) {
+      const threadMap = new Map<string, typeof emails>()
+      const noThread: typeof emails = []
+
+      for (const email of emails) {
+        const threadId = (email as Record<string, unknown>).hubspot_thread_id as string | null
+        if (threadId) {
+          if (!threadMap.has(threadId)) threadMap.set(threadId, [])
+          threadMap.get(threadId)!.push(email)
+        } else {
+          noThread.push(email)
+        }
+      }
+
+      const threads = Array.from(threadMap.entries()).map(([thread_id, threadEmails]) => ({
+        thread_id,
+        emails: threadEmails,
+        count: threadEmails.length,
+        latest_received_at: threadEmails[0].received_at,
+        subject: threadEmails[0].subject,
+        from_email: threadEmails[0].from_email,
+        from_name: threadEmails[0].from_name,
+      })).sort((a, b) => new Date(b.latest_received_at).getTime() - new Date(a.latest_received_at).getTime())
+
+      // Add single emails as single-item threads
+      for (const email of noThread) {
+        threads.push({
+          thread_id: email.id,
+          emails: [email],
+          count: 1,
+          latest_received_at: email.received_at,
+          subject: email.subject,
+          from_email: email.from_email,
+          from_name: email.from_name,
+        })
+      }
+
+      threads.sort((a, b) => new Date(b.latest_received_at).getTime() - new Date(a.latest_received_at).getTime())
+
+      return NextResponse.json({
+        threads,
+        total: count || 0,
+        hasMore: (count || 0) > offset + limit,
+      })
+    }
+
     return NextResponse.json({
       emails: emails || [],
       total: count || 0,

@@ -17,7 +17,6 @@ export async function GET() {
       supabase
         .from('incoming_emails')
         .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status')
-        .not('email_type', 'in', '("system_alert","notification")')
         .order('received_at', { ascending: false })
         .limit(500),
 
@@ -42,14 +41,17 @@ export async function GET() {
         .order('created_at', { ascending: false })
         .limit(100),
 
-      // Knowledge base chunk count
+      // Knowledge base chunk count (all types)
       supabase
         .from('knowledge_chunks')
-        .select('source_type', { count: 'exact', head: true })
-        .eq('source_type', 'email_training'),
+        .select('*', { count: 'exact', head: true }),
     ])
 
-    const emails = emailsRes.data || []
+    const allEmails = emailsRes.data || []
+    // Filter out system mails in JS (Supabase neq/not excludes NULLs)
+    const emails = allEmails.filter(e =>
+      e.email_type !== 'system_alert' && e.email_type !== 'notification'
+    )
     const biInsights = biInsightsRes.data || []
     const csatRatings = csatRes.data || []
     const learningCases = learningRes.data || []

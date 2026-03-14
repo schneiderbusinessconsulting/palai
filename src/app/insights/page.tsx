@@ -1,11 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   Loader2,
   TrendingUp,
@@ -21,6 +28,7 @@ import {
   Users,
   CheckCircle,
   Clock,
+  ExternalLink,
 } from 'lucide-react'
 
 interface InsightsData {
@@ -76,9 +84,24 @@ interface InsightsData {
   }
   sentiment: {
     distribution: { positive: number; neutral: number; negative: number }
+    emails: Record<string, DrilldownEmail[]>
     csatAvg: number | null
     csatTrend: Array<{ week: string; avg: number; count: number }>
   }
+  drilldown: {
+    slaOk: DrilldownEmail[]
+    slaBreached: DrilldownEmail[]
+    pending: DrilldownEmail[]
+    sent: DrilldownEmail[]
+  }
+}
+
+interface DrilldownEmail {
+  id: string
+  from_name?: string
+  from_email: string
+  subject: string
+  received_at: string
 }
 
 function BuyingIntentBar({ score }: { score: number }) {
@@ -131,10 +154,59 @@ function formatRelativeDate(dateString: string) {
   return `vor ${diffDays}d`
 }
 
+function DrilldownDialog({
+  open,
+  onOpenChange,
+  title,
+  emails,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  emails: DrilldownEmail[]
+}) {
+  const router = useRouter()
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg max-h-[70vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="overflow-y-auto space-y-2 flex-1">
+          {emails.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4 text-center">Keine E-Mails vorhanden.</p>
+          ) : (
+            emails.map(email => (
+              <button
+                key={email.id}
+                onClick={() => router.push(`/inbox?emailId=${email.id}`)}
+                className="w-full text-left p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{email.from_name || email.from_email}</p>
+                    <p className="text-xs text-slate-500 truncate">{email.subject}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-slate-400">{formatRelativeDate(email.received_at)}</span>
+                    <ExternalLink className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function InsightsPage() {
   const [data, setData] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [drilldown, setDrilldown] = useState<{ title: string; emails: DrilldownEmail[] } | null>(null)
+  const router = useRouter()
 
   const fetchInsights = async () => {
     setLoading(true)
@@ -176,7 +248,11 @@ export default function InsightsPage() {
     )
   }
 
-  const { summary, marketing, sales, product, sentiment } = data
+  const { summary, marketing, sales, product, sentiment, drilldown: dd } = data
+
+  const openDrilldown = (title: string, emails: DrilldownEmail[]) => {
+    setDrilldown({ title, emails })
+  }
 
   const totalBiSignals = Object.values(marketing.biByCategory).reduce((a, b) => a + b, 0)
   const totalSentiment = sentiment.distribution.positive + sentiment.distribution.neutral + sentiment.distribution.negative
@@ -200,8 +276,12 @@ export default function InsightsPage() {
       {/* Summary Row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard icon={MessageSquare} label="Emails total" value={summary.totalEmails} />
-        <StatCard icon={Clock} label="Ausstehend" value={summary.pendingEmails} color="text-amber-600" />
-        <StatCard icon={CheckCircle} label="Beantwortet" value={summary.sentEmails} color="text-green-600" />
+        <button onClick={() => openDrilldown('Ausstehende E-Mails', dd.pending)} className="text-left hover:ring-2 hover:ring-amber-200 rounded-lg transition-all">
+          <StatCard icon={Clock} label="Ausstehend" value={summary.pendingEmails} color="text-amber-600" />
+        </button>
+        <button onClick={() => openDrilldown('Beantwortete E-Mails', dd.sent)} className="text-left hover:ring-2 hover:ring-green-200 rounded-lg transition-all">
+          <StatCard icon={CheckCircle} label="Beantwortet" value={summary.sentEmails} color="text-green-600" />
+        </button>
         <StatCard icon={BookOpen} label="KB Einträge" value={summary.kbChunkCount} color="text-blue-600" />
         <StatCard
           icon={Star}
@@ -376,7 +456,11 @@ export default function InsightsPage() {
                 ) : (
                   <div className="space-y-3">
                     {sales.hotLeads.slice(0, 8).map(lead => (
-                      <div key={lead.id} className="p-3 border rounded-lg space-y-2">
+                      <button
+                        key={lead.id}
+                        onClick={() => router.push(`/inbox?emailId=${lead.id}`)}
+                        className="w-full text-left p-3 border rounded-lg space-y-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <p className="font-medium text-sm">{lead.from_name || lead.from_email}</p>
@@ -387,7 +471,7 @@ export default function InsightsPage() {
                           </span>
                         </div>
                         <BuyingIntentBar score={lead.buying_intent_score || 0} />
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -412,7 +496,11 @@ export default function InsightsPage() {
                 ) : (
                   <div className="space-y-2">
                     {sales.churnRisks.map(risk => (
-                      <div key={risk.id} className="flex items-center justify-between p-3 border border-red-200 dark:border-red-800 rounded-lg">
+                      <button
+                        key={risk.id}
+                        onClick={() => router.push(`/inbox?emailId=${risk.id}`)}
+                        className="w-full text-left flex items-center justify-between p-3 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                      >
                         <div>
                           <p className="font-medium text-sm">{risk.from_name || risk.from_email}</p>
                           <p className="text-xs text-slate-500 line-clamp-1">{risk.subject}</p>
@@ -423,7 +511,7 @@ export default function InsightsPage() {
                             {risk.status === 'sent' ? 'Beantwortet' : 'Offen'}
                           </Badge>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -445,7 +533,11 @@ export default function InsightsPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {sales.upsellOpportunities.map(opp => (
-                      <div key={opp.id} className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2">
+                      <button
+                        key={opp.id}
+                        onClick={() => router.push(`/inbox?emailId=${opp.id}`)}
+                        className="w-full text-left p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                      >
                         <div className="flex items-start justify-between">
                           <div>
                             <p className="font-medium text-sm">{opp.from_name || opp.from_email}</p>
@@ -454,7 +546,7 @@ export default function InsightsPage() {
                           <span className="text-xs text-slate-400">{formatRelativeDate(opp.received_at)}</span>
                         </div>
                         {opp.buying_intent_score && <BuyingIntentBar score={opp.buying_intent_score} />}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -484,7 +576,11 @@ export default function InsightsPage() {
                 ) : (
                   <div className="space-y-2">
                     {product.knowledgeGaps.map(gap => (
-                      <div key={gap.id} className="flex items-center justify-between p-3 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <button
+                        key={gap.id}
+                        onClick={() => router.push(`/inbox?emailId=${gap.id}`)}
+                        className="w-full text-left flex items-center justify-between p-3 border border-amber-200 dark:border-amber-800 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-colors"
+                      >
                         <div>
                           <p className="text-sm font-medium line-clamp-1">{gap.subject}</p>
                           <p className="text-xs text-slate-500">{gap.from_email}</p>
@@ -492,7 +588,7 @@ export default function InsightsPage() {
                         <span className="text-xs text-slate-400 flex-shrink-0">
                           {formatRelativeDate(gap.received_at)}
                         </span>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -581,18 +677,27 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <button
+                    onClick={() => openDrilldown('Positive Kundenstimmen', sentiment.emails?.positive || [])}
+                    className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg hover:ring-2 hover:ring-green-300 transition-all cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-green-600">{sentiment.distribution.positive}</p>
                     <p className="text-xs text-green-700 dark:text-green-400">Positiv</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  </button>
+                  <button
+                    onClick={() => openDrilldown('Neutrale Kundenstimmen', sentiment.emails?.neutral || [])}
+                    className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg hover:ring-2 hover:ring-slate-300 transition-all cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-slate-600">{sentiment.distribution.neutral}</p>
                     <p className="text-xs text-slate-600 dark:text-slate-400">Neutral</p>
-                  </div>
-                  <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  </button>
+                  <button
+                    onClick={() => openDrilldown('Negative Kundenstimmen', sentiment.emails?.negative || [])}
+                    className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg hover:ring-2 hover:ring-red-300 transition-all cursor-pointer"
+                  >
                     <p className="text-2xl font-bold text-red-600">{sentiment.distribution.negative}</p>
                     <p className="text-xs text-red-700 dark:text-red-400">Negativ</p>
-                  </div>
+                  </button>
                 </div>
 
                 {totalSentiment > 0 && (
@@ -690,8 +795,12 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard icon={CheckCircle} label="SLA eingehalten" value={summary.slaOk} color="text-green-600" />
-                  <StatCard icon={AlertTriangle} label="SLA verletzt" value={summary.slaBreached} color={summary.slaBreached > 0 ? 'text-red-500' : 'text-slate-500'} />
+                  <button onClick={() => openDrilldown('SLA eingehalten', dd.slaOk)} className="text-left hover:ring-2 hover:ring-green-200 rounded-lg transition-all">
+                    <StatCard icon={CheckCircle} label="SLA eingehalten" value={summary.slaOk} color="text-green-600" />
+                  </button>
+                  <button onClick={() => openDrilldown('SLA verletzt', dd.slaBreached)} className="text-left hover:ring-2 hover:ring-red-200 rounded-lg transition-all">
+                    <StatCard icon={AlertTriangle} label="SLA verletzt" value={summary.slaBreached} color={summary.slaBreached > 0 ? 'text-red-500' : 'text-slate-500'} />
+                  </button>
                   <StatCard
                     icon={BarChart3}
                     label="Compliance Rate"
@@ -700,13 +809,22 @@ export default function InsightsPage() {
                       : '—'}
                     color="text-blue-600"
                   />
-                  <StatCard icon={Clock} label="Noch offen" value={summary.pendingEmails} color="text-amber-600" />
+                  <button onClick={() => openDrilldown('Noch offen', dd.pending)} className="text-left hover:ring-2 hover:ring-amber-200 rounded-lg transition-all">
+                    <StatCard icon={Clock} label="Noch offen" value={summary.pendingEmails} color="text-amber-600" />
+                  </button>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
+
+      <DrilldownDialog
+        open={!!drilldown}
+        onOpenChange={(open) => !open && setDrilldown(null)}
+        title={drilldown?.title || ''}
+        emails={drilldown?.emails || []}
+      />
     </div>
   )
 }

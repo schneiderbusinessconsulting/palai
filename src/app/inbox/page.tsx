@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -172,6 +173,7 @@ function formatDate(dateString: string) {
 }
 
 export default function InboxPage() {
+  const searchParams = useSearchParams()
   const [emails, setEmails] = useState<Email[]>([])
   const [filter, setFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
@@ -304,6 +306,25 @@ export default function InboxPage() {
     fetchEmails()
     fetchOwners()
   }, [filter])
+
+  // Deep-link: open email detail from ?emailId= query param (e.g. from Insights page)
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false)
+  useEffect(() => {
+    const emailId = searchParams.get('emailId')
+    if (!emailId || deepLinkHandled || emails.length === 0) return
+    // Temporarily disable filters to find the email
+    const email = emails.find(e => e.id === emailId)
+    if (email) {
+      openEmailDetail(email)
+      setDeepLinkHandled(true)
+    } else if (!isLoading) {
+      // Email might be filtered out — try fetching all emails
+      setFilter('all')
+      setHideSent(false)
+      setHideSystemMails(false)
+      setDeepLinkHandled(true)
+    }
+  }, [emails, searchParams, deepLinkHandled, isLoading])
 
   // Auto-sync every 60 seconds (background, no loading indicator)
   useEffect(() => {

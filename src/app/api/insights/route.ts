@@ -165,9 +165,21 @@ export async function GET() {
 
     // ── SENTIMENT: Distribution + CSAT trend ─────────────────────────────────
     const sentimentDist = { positive: 0, neutral: 0, negative: 0 }
+    const sentimentEmails: Record<string, Array<{ id: string; from_name?: string; from_email: string; subject: string; received_at: string }>> = {
+      positive: [], neutral: [], negative: [],
+    }
     for (const email of emails) {
       const s = email.tone_sentiment as keyof typeof sentimentDist
-      if (s in sentimentDist) sentimentDist[s]++
+      if (s in sentimentDist) {
+        sentimentDist[s]++
+        sentimentEmails[s].push({
+          id: email.id,
+          from_name: email.from_name,
+          from_email: email.from_email,
+          subject: email.subject,
+          received_at: email.received_at,
+        })
+      }
     }
 
     // CSAT average and last 7 days trend
@@ -200,6 +212,15 @@ export async function GET() {
     const slaOk = slaEmails.filter(e => e.sla_status === 'ok').length
     const slaBreached = slaEmails.filter(e => e.sla_status === 'breached').length
 
+    // Drill-down email lists
+    const mapEmail = (e: typeof emails[0]) => ({
+      id: e.id, from_name: e.from_name, from_email: e.from_email, subject: e.subject, received_at: e.received_at,
+    })
+    const slaOkEmails = slaEmails.filter(e => e.sla_status === 'ok').map(mapEmail)
+    const slaBreachedEmails = slaEmails.filter(e => e.sla_status === 'breached').map(mapEmail)
+    const pendingEmailsList = emails.filter(e => e.status === 'pending' || e.status === 'draft_ready').map(mapEmail)
+    const sentEmailsList = emails.filter(e => e.status === 'sent').map(mapEmail)
+
     // Summary stats
     const totalEmails = emails.length
     const pendingEmails = emails.filter(e => e.status === 'pending' || e.status === 'draft_ready').length
@@ -231,8 +252,15 @@ export async function GET() {
       },
       sentiment: {
         distribution: sentimentDist,
+        emails: sentimentEmails,
         csatAvg,
         csatTrend,
+      },
+      drilldown: {
+        slaOk: slaOkEmails,
+        slaBreached: slaBreachedEmails,
+        pending: pendingEmailsList,
+        sent: sentEmailsList,
       },
     })
   } catch (error) {

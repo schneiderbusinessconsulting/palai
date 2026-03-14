@@ -30,6 +30,7 @@
     "openai": "^6.15.0",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^4.0.379",
+    "playwright": "^1.58.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",

@@ -600,7 +600,7 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.txt"
+                accept=".pdf,.txt,.md"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0]

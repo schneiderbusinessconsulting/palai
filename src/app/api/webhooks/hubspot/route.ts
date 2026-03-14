@@ -61,14 +61,117 @@ export async function POST(request: NextRequest) {
     for (const event of events) {
       console.log('Processing HubSpot event:', event.subscriptionType, event.objectId)
 
-      // Handle conversation/email events (multiple possible event types)
-      const isConversationEvent =
-        event.subscriptionType.includes('conversation') ||
-        event.subscriptionType.includes('email') ||
-        event.subscriptionType.includes('message')
+      // Handle conversation events (Conversations Inbox API)
+      if (event.subscriptionType.includes('conversation')) {
+        const threadId = event.objectId
 
-      if (isConversationEvent) {
-        // Fetch email/conversation details from HubSpot
+        // Fetch messages from the conversation thread
+        const messagesResponse = await fetch(
+          `https://api.hubapi.com/conversations/v3/conversations/threads/${threadId}/messages`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
+            },
+          }
+        )
+
+        if (!messagesResponse.ok) {
+          // Try alternative endpoint for conversation details
+          const threadResponse = await fetch(
+            `https://api.hubapi.com/conversations/v3/conversations/threads/${threadId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${process.env.HUBSPOT_ACCESS_TOKEN}`,
+              },
+            }
+          )
+
+          if (!threadResponse.ok) {
+            console.error('Failed to fetch conversation from HubSpot:', await threadResponse.text())
+            continue
+          }
+
+          const threadData = await threadResponse.json()
+          console.log('Thread data:', JSON.stringify(threadData, null, 2))
+          continue
+        }
+
+        const messagesData = await messagesResponse.json()
+        const messages = messagesData.results || []
+
+        // Process each incoming message
+        for (const message of messages) {
+          // Skip outgoing messages
+          if (message.direction === 'OUTGOING' || message.createdBy?.type === 'USER') {
+            continue
+          }
+
+          const messageId = message.id || `${threadId}-${message.createdAt}`
+
+          // Check if message already exists
+          const { data: existingEmail } = await supabase
+            .from('incoming_emails')
+            .select('id')
+            .eq('hubspot_email_id', String(messageId))
+            .single()
+
+          if (existingEmail) {
+            continue
+          }
+
+          // Parse sender info
+          const senderEmail = message.senders?.[0]?.email ||
+                             message.from?.email ||
+                             'unknown@example.com'
+          const senderName = message.senders?.[0]?.name ||
+                            message.from?.name ||
+                            null
+
+          // Get message content
+          const subject = message.subject || 'Kein Betreff'
+          const bodyText = message.text || message.richText || ''
+
+          // Parse timestamp
+          let receivedAt = new Date()
+          if (message.createdAt) {
+            const ts = typeof message.createdAt === 'number'
+              ? message.createdAt
+              : parseInt(message.createdAt)
+            if (!isNaN(ts)) {
+              receivedAt = new Date(ts)
+            }
+          }
+
+          // Store in database
+          const { error: insertError } = await supabase
+            .from('incoming_emails')
+            .insert({
+              hubspot_email_id: String(messageId),
+              hubspot_thread_id: String(threadId),
+              from_email: senderEmail,
+              from_name: senderName,
+              subject: subject,
+              body_text: bodyText,
+              body_html: message.richText || null,
+              received_at: receivedAt.toISOString(),
+              status: 'pending',
+            })
+
+          if (insertError) {
+            console.error('Failed to store conversation message:', insertError)
+          } else {
+            console.log('Conversation message stored:', messageId)
+
+            await supabase.from('audit_log').insert({
+              action: 'received',
+              details: { hubspot_email_id: messageId, thread_id: threadId },
+            })
+          }
+        }
+      }
+
+      // Handle CRM email events (legacy email objects)
+      if (event.subscriptionType.includes('email') && !event.subscriptionType.includes('conversation')) {
         const emailResponse = await fetch(
           `https://api.hubapi.com/crm/v3/objects/emails/${event.objectId}?properties=hs_email_subject,hs_email_text,hs_email_html,hs_email_from_email,hs_email_from_firstname,hs_email_from_lastname,hs_timestamp,hs_createdate,hs_email_thread_id,hs_email_direction`,
           {

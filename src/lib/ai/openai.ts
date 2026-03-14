@@ -127,7 +127,8 @@ Formatierung:
 
 Wichtig:
 - Erfinde KEINE Preise, Daten oder Fakten
-- Wenn die Knowledge Base keine Antwort liefert, bitte den Kunden höflich um Geduld und sage, dass sich jemand persönlich melden wird${dynamicRules}`
+- Wenn die Knowledge Base keine Antwort liefert, bitte den Kunden höflich um Geduld und sage, dass sich jemand persönlich melden wird
+- Wenn du Beispiele von früheren GESENDETEN ANTWORTEN siehst, orientiere dich an Tonfall und Stil${dynamicRules}`
 
   const feedbackSection = regenerationFeedback
     ? `\n\nFEEDBACK ZUR VERBESSERUNG:\n${regenerationFeedback}\n\nBitte berücksichtige dieses Feedback bei der Erstellung der Antwort.`

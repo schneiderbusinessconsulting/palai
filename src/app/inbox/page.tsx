@@ -169,6 +169,9 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const [editedResponse, setEditedResponse] = useState('')
   const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
+  const [isManualMode, setIsManualMode] = useState(false)
 
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
@@ -384,6 +387,10 @@ export default function InboxPage() {
     try {
       const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          editedResponse: editedResponse || undefined,
+        }),
       })
 
       if (response.ok) {
@@ -394,6 +401,41 @@ export default function InboxPage() {
       console.error('Mark as sent failed:', error)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  // Save edited draft
+  const handleSaveDraft = async () => {
+    if (!selectedEmail) return
+
+    setIsSaving(true)
+    setSaveMessage('')
+    try {
+      const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedResponse }),
+      })
+
+      if (response.ok) {
+        // Update local state so preview shows saved text
+        setSelectedEmail((prev) => {
+          if (!prev) return prev
+          const updatedDrafts = prev.email_drafts?.map((d) => ({
+            ...d,
+            edited_response: editedResponse,
+          }))
+          return { ...prev, email_drafts: updatedDrafts }
+        })
+        setSaveMessage('Gespeichert!')
+        setTimeout(() => setSaveMessage(''), 2000)
+      }
+    } catch (error) {
+      console.error('Save draft failed:', error)
+      setSaveMessage('Fehler beim Speichern')
+      setTimeout(() => setSaveMessage(''), 3000)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -417,6 +459,7 @@ export default function InboxPage() {
     setSelectedEmail(email)
     setIsDetailOpen(true)
     setIsEditing(false)
+    setIsManualMode(false)
     setIsCopied(false)
     setEditedResponse(email.email_drafts?.[0]?.ai_generated_response || '')
     // Set formality from draft if available
@@ -857,35 +900,60 @@ export default function InboxPage() {
                     </div>
                   )}
                 </div>
+              ) : isManualMode ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Edit className="h-4 w-4 text-blue-500" />
+                    <h4 className="font-medium">Manuelle Antwort</h4>
+                  </div>
+                  <Textarea
+                    value={editedResponse}
+                    onChange={(e) => setEditedResponse(e.target.value)}
+                    rows={10}
+                    className="font-mono text-sm"
+                    placeholder="Antwort hier eingeben..."
+                    autoFocus
+                  />
+                </div>
               ) : (
                 <div className="text-center py-6">
-                  <Sparkles className="h-8 w-8 mx-auto text-slate-300 mb-2" />
-                  <p className="text-slate-500 dark:text-slate-400">
-                    Noch kein AI-Vorschlag generiert
+                  <p className="text-slate-500 dark:text-slate-400 mb-4">
+                    Noch keine Antwort verfasst
                   </p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => handleGenerateDraft(selectedEmail.id)}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Generiere...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        AI Vorschlag generieren
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-3 justify-center">
+                    <Button
+                      onClick={() => handleGenerateDraft(selectedEmail.id)}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generiere...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          AI Vorschlag
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsManualMode(true)
+                        setEditedResponse('')
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Manuell antworten
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {currentDraft && (
+          {(currentDraft || isManualMode) && (
             <DialogFooter className="flex-col sm:flex-row gap-3">
               {/* Owner Selection */}
               {owners.length > 0 && (
@@ -906,28 +974,51 @@ export default function InboxPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
                 <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
                   Schliessen
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditing(!isEditing)
-                    if (!isEditing) {
-                      setEditedResponse(
-                        currentDraft.edited_response || currentDraft.ai_generated_response
-                      )
-                    }
-                  }}
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {isEditing ? 'Vorschau' : 'Bearbeiten'}
-                </Button>
+                {saveMessage && (
+                  <span className="text-sm text-green-600">{saveMessage}</span>
+                )}
+                {(isEditing || isManualMode) && (
+                  <Button
+                    variant="outline"
+                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                    onClick={handleSaveDraft}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Speichern
+                  </Button>
+                )}
+                {currentDraft && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (isEditing) {
+                        // Switching to preview - auto-save
+                        handleSaveDraft()
+                      } else {
+                        setEditedResponse(
+                          currentDraft.edited_response || currentDraft.ai_generated_response
+                        )
+                      }
+                      setIsEditing(!isEditing)
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {isEditing ? 'Vorschau' : 'Bearbeiten'}
+                  </Button>
+                )}
                 <Button
                   className="bg-green-600 hover:bg-green-700"
                   onClick={handleMarkAsSent}
-                  disabled={isSending}
+                  disabled={isSending || (isManualMode && !editedResponse.trim())}
                 >
                   {isSending ? (
                     <>

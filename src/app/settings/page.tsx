@@ -446,6 +446,34 @@ export default function SettingsPage() {
     }
   }
 
+  // ── Insights Backfill (CSAT, Learning Cases, KB from sent emails) ─────────
+  const [backfillRunning, setBackfillRunning] = useState(false)
+  const [backfillResult, setBackfillResult] = useState<{ message: string; editDistanceCalculated: number; learningCasesCreated: number; csatRatingsCreated: number; knowledgeChunksCreated: number } | null>(null)
+  const [backfillError, setBackfillError] = useState<string | null>(null)
+
+  const handleBackfill = async () => {
+    setBackfillRunning(true)
+    setBackfillResult(null)
+    setBackfillError(null)
+    try {
+      // Step 1: Classify + Tone + BI scan for unanalyzed emails
+      await fetch('/api/emails', { method: 'PATCH' })
+      // Step 2: Learning cases, CSAT, KB backfill
+      const res = await fetch('/api/insights/backfill', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setBackfillError(data.error || 'Backfill fehlgeschlagen')
+      } else {
+        setBackfillResult(data)
+        fetchTrainingStats()
+      }
+    } catch (e) {
+      setBackfillError(String(e))
+    } finally {
+      setBackfillRunning(false)
+    }
+  }
+
   const handleBulkImport = async () => {
     setBulkRunning(true)
     setBulkResult(null)
@@ -1179,6 +1207,76 @@ export default function SettingsPage() {
                       {bulkResult.errors.map((e, i) => <p key={i}>{e}</p>)}
                     </div>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Insights Backfill */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Insights Backfill</CardTitle>
+              <CardDescription>
+                Analysiert alle E-Mails und füllt Insights mit historischen Daten: Klassifikation, Tone, Buying Intent, CSAT, Learning Cases und Knowledge Base
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg text-sm text-purple-800 dark:text-purple-300">
+                <p className="font-medium mb-1">Was passiert beim Backfill?</p>
+                <ol className="list-decimal list-inside space-y-1 text-purple-700 dark:text-purple-400">
+                  <li>Unklassifizierte E-Mails werden analysiert (Typ, Tone, Priority, BI-Scan)</li>
+                  <li>Edit-Distance wird für bearbeitete Drafts berechnet</li>
+                  <li>Learning Cases werden aus editierten Drafts erstellt</li>
+                  <li>CSAT-Bewertungen werden aus Edit-Distance abgeleitet</li>
+                  <li>Knowledge Base Einträge aus gesendeten Antworten generiert</li>
+                </ol>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleBackfill}
+                  disabled={backfillRunning}
+                  className="gap-2"
+                  variant="outline"
+                >
+                  {backfillRunning ? (
+                    <><Loader2 className="h-4 w-4 animate-spin" />Backfill läuft…</>
+                  ) : (
+                    <><RefreshCw className="h-4 w-4" />Insights Backfill starten</>
+                  )}
+                </Button>
+              </div>
+
+              {backfillError && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>{backfillError}</p>
+                </div>
+              )}
+
+              {backfillResult && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+                  <p className="font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />{backfillResult.message}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-700">{backfillResult.editDistanceCalculated}</p>
+                      <p className="text-xs text-slate-500">Edit-Distances</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-amber-700">{backfillResult.learningCasesCreated}</p>
+                      <p className="text-xs text-slate-500">Learning Cases</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-700">{backfillResult.csatRatingsCreated}</p>
+                      <p className="text-xs text-slate-500">CSAT Ratings</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-purple-700">{backfillResult.knowledgeChunksCreated}</p>
+                      <p className="text-xs text-slate-500">KB Einträge</p>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

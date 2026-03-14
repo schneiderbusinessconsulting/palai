@@ -244,6 +244,13 @@ async function generateDraftForEmail(
 
 export async function GET(request: NextRequest) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase nicht konfiguriert — .env.local prüfen (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY)' },
+        { status: 503 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const limit = parseInt(searchParams.get('limit') || '100')
@@ -298,6 +305,19 @@ export async function GET(request: NextRequest) {
 // Manual sync from HubSpot - uses CRM Search API for recent incoming emails
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json(
+        { error: 'Supabase nicht konfiguriert — .env.local prüfen' },
+        { status: 503 }
+      )
+    }
+    if (!process.env.HUBSPOT_ACCESS_TOKEN) {
+      return NextResponse.json(
+        { error: 'HubSpot nicht konfiguriert — HUBSPOT_ACCESS_TOKEN in .env.local fehlt' },
+        { status: 503 }
+      )
+    }
+
     // Check if auto-draft is enabled
     const { searchParams } = new URL(request.url)
     const autoDraftEnabled = searchParams.get('autoDraft') === 'true'

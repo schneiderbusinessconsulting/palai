@@ -181,6 +181,7 @@ export default function InboxPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
+  const [fetchError, setFetchError] = useState('')
 
   // Detail modal state
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
@@ -261,12 +262,17 @@ export default function InboxPage() {
     if (showLoading) setIsLoading(true)
     try {
       const response = await fetch(`/api/emails?status=${filter}`)
+      const data = await response.json()
       if (response.ok) {
-        const data = await response.json()
         setEmails(data.emails || [])
+        setFetchError('')
+      } else {
+        console.error('Email API error:', data)
+        setFetchError(data.error || `Fehler beim Laden (HTTP ${response.status})`)
       }
     } catch (error) {
       console.error('Failed to fetch emails:', error)
+      setFetchError('Verbindung zum Server fehlgeschlagen')
     } finally {
       if (showLoading) setIsLoading(false)
     }
@@ -331,34 +337,43 @@ export default function InboxPage() {
   const handleSync = async () => {
     setIsSyncing(true)
     setSyncMessage('')
+    setFetchError('')
     try {
       // First: Import new emails (pass autoDraft setting)
       const importResponse = await fetch(`/api/emails?autoDraft=${autoDraftEnabled}`, { method: 'POST' })
       const importData = await importResponse.json()
 
+      if (!importResponse.ok) {
+        const errorMsg = importData.error || `Sync fehlgeschlagen (HTTP ${importResponse.status})`
+        setSyncMessage(errorMsg)
+        setFetchError(errorMsg)
+        return
+      }
+
       // Second: Sync conversation statuses (mark closed as sent)
       const statusResponse = await fetch('/api/emails?action=sync-status', { method: 'PATCH' })
       const statusData = await statusResponse.json()
 
-      if (importResponse.ok) {
-        const messages = []
-        if (importData.imported > 0) {
-          messages.push(`${importData.imported} neue E-Mails`)
-        }
-        if (statusData.closedEmails > 0) {
-          messages.push(`${statusData.closedEmails} geschlossen`)
-        }
-        setSyncMessage(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
-        fetchEmails(false) // Silent refresh - button already shows loading state
-      } else {
-        setSyncMessage(importData.error || 'Sync fehlgeschlagen')
+      const messages = []
+      if (importData.imported > 0) {
+        messages.push(`${importData.imported} neue E-Mails`)
       }
+      if (statusData.closedEmails > 0) {
+        messages.push(`${statusData.closedEmails} geschlossen`)
+      }
+      setSyncMessage(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
+      fetchEmails(false) // Silent refresh - button already shows loading state
     } catch (error) {
       console.error('Sync failed:', error)
-      setSyncMessage('Sync fehlgeschlagen')
+      const msg = 'Sync fehlgeschlagen — Serververbindung prüfen'
+      setSyncMessage(msg)
+      setFetchError(msg)
     } finally {
       setIsSyncing(false)
-      setTimeout(() => setSyncMessage(''), 3000)
+      // Only auto-hide success messages, keep errors visible
+      if (!fetchError) {
+        setTimeout(() => setSyncMessage(''), 5000)
+      }
     }
   }
 
@@ -743,8 +758,29 @@ export default function InboxPage() {
 
       {/* Sync Message */}
       {syncMessage && (
-        <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg text-sm">
+        <div className={`p-3 rounded-lg text-sm ${
+          fetchError
+            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+        }`}>
           {syncMessage}
+        </div>
+      )}
+
+      {/* Error Message */}
+      {fetchError && (
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <p className="text-sm font-medium">Fehler beim Laden der E-Mails</p>
+          </div>
+          <p className="text-xs text-red-600 dark:text-red-500 mt-1 ml-6">{fetchError}</p>
+          <button
+            onClick={() => fetchEmails()}
+            className="mt-2 ml-6 text-xs text-red-700 dark:text-red-400 underline hover:no-underline"
+          >
+            Erneut versuchen
+          </button>
         </div>
       )}
 
@@ -753,6 +789,16 @@ export default function InboxPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
         </div>
+      ) : fetchError ? (
+        <div className="text-center py-12">
+          <AlertTriangle className="h-12 w-12 mx-auto text-red-300 dark:text-red-600 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400">
+            E-Mails konnten nicht geladen werden
+          </p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
+            Bitte prüfe die Serververbindung und Umgebungsvariablen
+          </p>
+        </div>
       ) : filteredEmails.length === 0 ? (
         <div className="text-center py-12">
           <Mail className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
@@ -760,7 +806,7 @@ export default function InboxPage() {
             Keine E-Mails gefunden
           </p>
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-            Klicke auf "HubSpot Sync" um E-Mails zu importieren
+            Klicke auf &quot;HubSpot Sync&quot; um E-Mails zu importieren
           </p>
         </div>
       ) : (

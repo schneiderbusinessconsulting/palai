@@ -26,6 +26,11 @@ import {
   Frown,
   Meh,
   FileCheck,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Mail,
+  MailCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -80,6 +85,13 @@ interface SlaStats {
   overdue: SlaEmail[]
   later: number
   totalTarget: number
+}
+
+interface WorkloadStats {
+  open: { today: number; week: number; month: number }
+  done: { today: number; week: number; month: number }
+  avg: { dayOpen: number; dayDone: number; weekOpen: number; weekDone: number; monthOpen: number; monthDone: number }
+  trend: { openVsLastWeek: number; doneVsLastWeek: number } // percentage change
 }
 
 interface DashboardStats {
@@ -221,6 +233,94 @@ function getPriorityBadgeColor(priority: string): string {
   }
 }
 
+function computeWorkload(
+  allEmails: Email[],
+  daily: Array<{ day: string; total: number; sent: number; pending: number }>
+): WorkloadStats {
+  const now = new Date()
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+
+  // Monday of this week
+  const weekStart = new Date(todayStart)
+  const dow = weekStart.getDay()
+  weekStart.setDate(weekStart.getDate() - (dow === 0 ? 6 : dow - 1))
+
+  // 1st of this month
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+  // Filter actionable (exclude system/notification)
+  const isActionable = (e: Email) =>
+    e.email_type !== 'system_alert' &&
+    e.email_type !== 'notification' &&
+    (e.email_type !== 'form_submission' || e.needs_response)
+
+  const actionable = allEmails.filter(isActionable)
+
+  // Open: currently open emails received in each period
+  const openEmails = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected')
+  const openToday = openEmails.filter(e => new Date(e.received_at) >= todayStart).length
+  const openWeek = openEmails.filter(e => new Date(e.received_at) >= weekStart).length
+  const openMonth = openEmails.filter(e => new Date(e.received_at) >= monthStart).length
+
+  // Done: sent emails resolved in each period (use updated_at)
+  const sentEmails = actionable.filter(e => e.status === 'sent')
+  const doneToday = sentEmails.filter(e => {
+    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
+    return d >= todayStart
+  }).length
+  const doneWeek = sentEmails.filter(e => {
+    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
+    return d >= weekStart
+  }).length
+  const doneMonth = sentEmails.filter(e => {
+    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
+    return d >= monthStart
+  }).length
+
+  // Averages from analytics daily data
+  const daysInData = Math.max(daily.length, 1)
+  const totalIncoming = daily.reduce((s, d) => s + d.total, 0)
+  const totalSent = daily.reduce((s, d) => s + d.sent, 0)
+  const totalPending = daily.reduce((s, d) => s + d.pending, 0)
+
+  const avgDayDone = Math.round((totalSent / daysInData) * 10) / 10
+  const avgDayOpen = Math.round((totalPending / daysInData) * 10) / 10
+  const weeksInData = Math.max(daysInData / 7, 1)
+  const monthsInData = Math.max(daysInData / 30, 1)
+
+  // Trend: compare this week vs last week using daily data
+  const todayStr = now.toISOString().split('T')[0]
+  const lastWeekStart = new Date(weekStart)
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7)
+  const lastWeekEnd = new Date(weekStart)
+  lastWeekEnd.setDate(lastWeekEnd.getDate() - 1)
+
+  const thisWeekDaily = daily.filter(d => d.day >= weekStart.toISOString().split('T')[0] && d.day <= todayStr)
+  const lastWeekDaily = daily.filter(d => d.day >= lastWeekStart.toISOString().split('T')[0] && d.day <= lastWeekEnd.toISOString().split('T')[0])
+
+  const thisWeekSent = thisWeekDaily.reduce((s, d) => s + d.sent, 0)
+  const lastWeekSent = lastWeekDaily.reduce((s, d) => s + d.sent, 0)
+  const thisWeekPending = thisWeekDaily.reduce((s, d) => s + d.pending, 0)
+  const lastWeekPending = lastWeekDaily.reduce((s, d) => s + d.pending, 0)
+
+  const doneVsLastWeek = lastWeekSent > 0 ? Math.round(((thisWeekSent - lastWeekSent) / lastWeekSent) * 100) : 0
+  const openVsLastWeek = lastWeekPending > 0 ? Math.round(((thisWeekPending - lastWeekPending) / lastWeekPending) * 100) : 0
+
+  return {
+    open: { today: openToday, week: openWeek, month: openMonth },
+    done: { today: doneToday, week: doneWeek, month: doneMonth },
+    avg: {
+      dayOpen: avgDayOpen,
+      dayDone: avgDayDone,
+      weekOpen: Math.round(totalPending / weeksInData),
+      weekDone: Math.round(totalSent / weeksInData),
+      monthOpen: Math.round(totalPending / monthsInData),
+      monthDone: Math.round(totalSent / monthsInData),
+    },
+    trend: { openVsLastWeek, doneVsLastWeek },
+  }
+}
+
 function getPriorityColor(email: Email) {
   if ((email.buying_intent_score ?? 0) >= 60) return 'border-l-emerald-500'
   if (email.email_drafts?.[0]?.confidence_score === 0 || !email.email_drafts?.length) return 'border-l-amber-400'
@@ -237,6 +337,7 @@ export default function DashboardPage() {
   const [sentimentDist, setSentimentDist] = useState<Record<string, number>>({})
   const [urgencyDist, setUrgencyDist] = useState<Record<string, number>>({})
   const [avgResponseHours, setAvgResponseHours] = useState<number | null>(null)
+  const [workload, setWorkload] = useState<WorkloadStats | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     pendingEmails: 0,
     draftReadyEmails: 0,
@@ -255,9 +356,12 @@ export default function DashboardPage() {
         fetch('/api/analytics?period=30d'),
       ])
 
+      let allEmails: Email[] = []
+
       if (emailRes.ok) {
         const data = await emailRes.json()
         const all: Email[] = data.emails || []
+        allEmails = all
 
         // Filter actionable emails (exclude system/notification, exclude sent)
         const actionable = all.filter(e =>
@@ -317,13 +421,20 @@ export default function DashboardPage() {
         setStats(prev => ({ ...prev, pendingEmails: pending, draftReadyEmails: draftReady, urgentEmails: noDraft.length, sentToday }))
       }
 
+      let dailyData: Array<{ day: string; total: number; sent: number; pending: number }> = []
       if (analyticsRes.ok) {
-        const data = await analyticsRes.json()
+        const analyticsJson = await analyticsRes.json()
+        dailyData = analyticsJson.summary?.daily || []
         setAnalyticsData({
-          drafts: data.summary?.drafts || { total: 0, approved: 0, edited: 0, rejected: 0, avg_confidence: 0 },
-          tone: data.summary?.tone || { positive: 0, neutral: 0, negative: 0, frustrated: 0 },
-          daily: data.summary?.daily || [],
+          drafts: analyticsJson.summary?.drafts || { total: 0, approved: 0, edited: 0, rejected: 0, avg_confidence: 0 },
+          tone: analyticsJson.summary?.tone || { positive: 0, neutral: 0, negative: 0, frustrated: 0 },
+          daily: dailyData,
         })
+      }
+
+      // Compute workload from emails + analytics daily
+      if (allEmails.length > 0 || dailyData.length > 0) {
+        setWorkload(computeWorkload(allEmails, dailyData))
       }
 
       if (insightsRes.ok) {
@@ -432,6 +543,143 @@ export default function DashboardPage() {
           </Link>
         ))}
       </div>
+
+      {/* Workload Overview */}
+      {!isLoading && workload && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-indigo-500" />
+              Workload Übersicht
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Left: Noch Offen */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-amber-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Noch offen</h3>
+                </div>
+
+                {/* Absolute values */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Heute', value: workload.open.today, color: workload.open.today > 5 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200' },
+                    { label: 'Diese Woche', value: workload.open.week, color: workload.open.week > 20 ? 'text-amber-600' : 'text-slate-700 dark:text-slate-200' },
+                    { label: 'Dieser Monat', value: workload.open.month, color: 'text-slate-700 dark:text-slate-200' },
+                  ].map(item => (
+                    <div key={item.label} className="p-3 rounded-lg bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/20">
+                      <p className="text-xs text-slate-500 mb-1">{item.label}</p>
+                      <p className={`text-xl font-bold ${item.color}`}>{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Averages */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Durchschnitt (30 Tage)</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Ø Tag', value: workload.avg.dayOpen },
+                      { label: 'Ø Woche', value: workload.avg.weekOpen },
+                      { label: 'Ø Monat', value: workload.avg.monthOpen },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
+                        <span className="text-xs text-slate-500">{item.label}</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trend */}
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg ${
+                  workload.trend.openVsLastWeek > 0 ? 'bg-red-50 dark:bg-red-900/10' :
+                  workload.trend.openVsLastWeek < 0 ? 'bg-green-50 dark:bg-green-900/10' :
+                  'bg-slate-50 dark:bg-slate-800/30'
+                }`}>
+                  {workload.trend.openVsLastWeek > 0 ? (
+                    <ArrowUpRight className="h-4 w-4 text-red-500" />
+                  ) : workload.trend.openVsLastWeek < 0 ? (
+                    <ArrowDownRight className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Minus className="h-4 w-4 text-slate-400" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    workload.trend.openVsLastWeek > 0 ? 'text-red-600' :
+                    workload.trend.openVsLastWeek < 0 ? 'text-green-600' :
+                    'text-slate-500'
+                  }`}>
+                    {workload.trend.openVsLastWeek > 0 ? '+' : ''}{workload.trend.openVsLastWeek}% vs. letzte Woche
+                  </span>
+                </div>
+              </div>
+
+              {/* Right: Erledigt */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <MailCheck className="h-4 w-4 text-green-500" />
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Erledigt</h3>
+                </div>
+
+                {/* Absolute values */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Heute', value: workload.done.today },
+                    { label: 'Diese Woche', value: workload.done.week },
+                    { label: 'Dieser Monat', value: workload.done.month },
+                  ].map(item => (
+                    <div key={item.label} className="p-3 rounded-lg bg-green-50/50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/20">
+                      <p className="text-xs text-slate-500 mb-1">{item.label}</p>
+                      <p className="text-xl font-bold text-green-700 dark:text-green-400">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Averages */}
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Durchschnitt (30 Tage)</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Ø Tag', value: workload.avg.dayDone },
+                      { label: 'Ø Woche', value: workload.avg.weekDone },
+                      { label: 'Ø Monat', value: workload.avg.monthDone },
+                    ].map(item => (
+                      <div key={item.label} className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50">
+                        <span className="text-xs text-slate-500">{item.label}</span>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Trend */}
+                <div className={`flex items-center gap-2 p-2.5 rounded-lg ${
+                  workload.trend.doneVsLastWeek > 0 ? 'bg-green-50 dark:bg-green-900/10' :
+                  workload.trend.doneVsLastWeek < 0 ? 'bg-red-50 dark:bg-red-900/10' :
+                  'bg-slate-50 dark:bg-slate-800/30'
+                }`}>
+                  {workload.trend.doneVsLastWeek > 0 ? (
+                    <ArrowUpRight className="h-4 w-4 text-green-500" />
+                  ) : workload.trend.doneVsLastWeek < 0 ? (
+                    <ArrowDownRight className="h-4 w-4 text-red-500" />
+                  ) : (
+                    <Minus className="h-4 w-4 text-slate-400" />
+                  )}
+                  <span className={`text-sm font-medium ${
+                    workload.trend.doneVsLastWeek > 0 ? 'text-green-600' :
+                    workload.trend.doneVsLastWeek < 0 ? 'text-red-600' :
+                    'text-slate-500'
+                  }`}>
+                    {workload.trend.doneVsLastWeek > 0 ? '+' : ''}{workload.trend.doneVsLastWeek}% vs. letzte Woche
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* SLA Tagesziel */}
       {!isLoading && (slaStats.totalTarget > 0 || slaStats.overdue.length > 0) && (

@@ -108,7 +108,8 @@ async function generateDraftForEmail(
       .from('email_drafts')
       .select('id')
       .eq('email_id', emailId)
-      .single()
+      .limit(1)
+      .maybeSingle()
 
     if (existingDraft) {
       return // Already has a draft

@@ -41,7 +41,7 @@ export async function PATCH(
       const { data: chunk, error: chunkError } = await supabase
         .from('knowledge_chunks')
         .insert({
-          title: chunkTitle,
+          source_title: chunkTitle,
           content,
           source_type: 'email',
           embedding,

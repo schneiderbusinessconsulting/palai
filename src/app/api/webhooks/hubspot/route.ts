@@ -29,7 +29,8 @@ function verifySignature(
   signature: string | null,
   secret: string
 ): boolean {
-  if (!signature || !secret) return true // Skip verification if not configured
+  if (!secret) return true // Skip verification if secret not configured
+  if (!signature) return false // Reject unsigned requests when secret is configured
 
   const hash = crypto
     .createHmac('sha256', secret)

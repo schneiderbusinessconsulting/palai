@@ -109,7 +109,6 @@ export async function POST(
       .from('incoming_emails')
       .update({
         status: draftOnly ? 'draft_saved' : 'sent',
-        assigned_owner_id: ownerId || null,
         // Phase 4: SLA tracking — mark resolved when sent
         ...(draftOnly ? {} : { resolved_at: now }),
       })

@@ -26,7 +26,9 @@ export async function POST(
         .from('email_drafts')
         .select('id')
         .eq('email_id', emailId)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (existingDraft) {
         // Update existing draft
@@ -91,7 +93,9 @@ export async function POST(
         .from('email_drafts')
         .select('ai_generated_response, edited_response')
         .eq('email_id', emailId)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (email && draft) {
         const finalResponse = editedResponse || draft.edited_response || draft.ai_generated_response
@@ -153,7 +157,9 @@ export async function PATCH(
       .from('email_drafts')
       .select('id')
       .eq('email_id', emailId)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (existingDraft) {
       // Update existing draft
@@ -164,7 +170,7 @@ export async function PATCH(
           status: 'edited',
           updated_at: new Date().toISOString(),
         })
-        .eq('email_id', emailId)
+        .eq('id', existingDraft.id)
 
       if (error) {
         console.error('Save draft error:', error)

@@ -125,12 +125,16 @@ export default function LearningPage() {
   const handleDismiss = async (id: string) => {
     setDismissingId(id)
     try {
-      await fetch(`/api/learning/${id}`, {
+      const res = await fetch(`/api/learning/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'dismiss' }),
       })
-      fetchCases()
+      if (res.ok) {
+        fetchCases()
+      } else {
+        console.error('Dismiss failed:', res.status)
+      }
     } catch (err) {
       console.error(err)
     } finally {

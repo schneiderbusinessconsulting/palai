@@ -157,8 +157,12 @@ export default function SettingsPage() {
     setInstrLoading(true)
     try {
       const res = await fetch('/api/settings/ai-instructions')
-      const data = await res.json()
-      setInstructions(data.instructions || [])
+      if (res.ok) {
+        const data = await res.json()
+        setInstructions(data.instructions || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch instructions:', err)
     } finally {
       setInstrLoading(false)
     }
@@ -284,12 +288,16 @@ export default function SettingsPage() {
     setSlaLoading(true)
     try {
       const res = await fetch('/api/settings/sla')
-      const data = await res.json()
-      const targets: SlaTarget[] = data.targets || []
-      setSlaTargets(targets)
-      const edits: Record<string, { first: number; resolution: number }> = {}
-      targets.forEach((t) => { edits[t.id] = { first: t.first_response_minutes, resolution: t.resolution_minutes } })
-      setSlaEdits(edits)
+      if (res.ok) {
+        const data = await res.json()
+        const targets: SlaTarget[] = data.targets || []
+        setSlaTargets(targets)
+        const edits: Record<string, { first: number; resolution: number }> = {}
+        targets.forEach((t) => { edits[t.id] = { first: t.first_response_minutes, resolution: t.resolution_minutes } })
+        setSlaEdits(edits)
+      }
+    } catch (err) {
+      console.error('Failed to fetch SLA targets:', err)
     } finally {
       setSlaLoading(false)
     }

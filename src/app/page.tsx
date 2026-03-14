@@ -19,6 +19,13 @@ import {
   Target,
   Timer,
   Shield,
+  BarChart3,
+  ThumbsUp,
+  Zap,
+  SmilePlus,
+  Frown,
+  Meh,
+  FileCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -28,13 +35,22 @@ interface Email {
   from_name?: string
   subject: string
   received_at: string
+  updated_at?: string
   status: string
   email_type?: string
   needs_response?: boolean
   buying_intent_score?: number
   priority?: string
   sla_status?: string
+  tone_sentiment?: string
+  tone_urgency?: string
   email_drafts?: Array<{ confidence_score: number }>
+}
+
+interface AnalyticsData {
+  drafts: { total: number; approved: number; edited: number; rejected: number; avg_confidence: number }
+  tone: { positive: number; neutral: number; negative: number; frustrated: number }
+  daily: Array<{ day: string; total: number; sent: number; pending: number }>
 }
 
 interface HotLead {
@@ -216,6 +232,11 @@ export default function DashboardPage() {
   const [urgentEmails, setUrgentEmails] = useState<Email[]>([])
   const [hotLeads, setHotLeads] = useState<HotLead[]>([])
   const [slaStats, setSlaStats] = useState<SlaStats>({ doneToday: 0, dueNow: [], overdue: [], later: 0, totalTarget: 0 })
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
+  const [priorityDist, setPriorityDist] = useState<Record<string, number>>({})
+  const [sentimentDist, setSentimentDist] = useState<Record<string, number>>({})
+  const [urgencyDist, setUrgencyDist] = useState<Record<string, number>>({})
+  const [avgResponseHours, setAvgResponseHours] = useState<number | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     pendingEmails: 0,
     draftReadyEmails: 0,
@@ -228,9 +249,10 @@ export default function DashboardPage() {
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const [emailRes, insightsRes] = await Promise.all([
+      const [emailRes, insightsRes, analyticsRes] = await Promise.all([
         fetch('/api/emails?limit=200'),
         fetch('/api/insights'),
+        fetch('/api/analytics?period=30d'),
       ])
 
       if (emailRes.ok) {
@@ -258,9 +280,50 @@ export default function DashboardPage() {
           .sort((a, b) => new Date(b.received_at).getTime() - new Date(a.received_at).getTime())
           .slice(0, 4)
 
+        // Compute distributions from all emails
+        const pDist: Record<string, number> = { critical: 0, high: 0, normal: 0, low: 0 }
+        const sDist: Record<string, number> = { positive: 0, neutral: 0, negative: 0, frustrated: 0 }
+        const uDist: Record<string, number> = { high: 0, medium: 0, low: 0 }
+        const responseTimes: number[] = []
+
+        for (const e of all) {
+          if (e.email_type === 'system_alert' || e.email_type === 'notification') continue
+          // Priority
+          const p = e.priority || 'normal'
+          pDist[p] = (pDist[p] || 0) + 1
+          // Sentiment
+          if (e.tone_sentiment) sDist[e.tone_sentiment] = (sDist[e.tone_sentiment] || 0) + 1
+          // Urgency
+          if (e.tone_urgency) uDist[e.tone_urgency] = (uDist[e.tone_urgency] || 0) + 1
+          // Response time for sent emails
+          if (e.status === 'sent' && e.updated_at) {
+            const received = new Date(e.received_at).getTime()
+            const resolved = new Date(e.updated_at).getTime()
+            if (resolved > received) responseTimes.push(resolved - received)
+          }
+        }
+
+        setPriorityDist(pDist)
+        setSentimentDist(sDist)
+        setUrgencyDist(uDist)
+        setAvgResponseHours(
+          responseTimes.length > 0
+            ? Math.round((responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length / 3600000) * 10) / 10
+            : null
+        )
+
         setUrgentEmails(noDraft)
         setSlaStats(computeSlaStats(all))
         setStats(prev => ({ ...prev, pendingEmails: pending, draftReadyEmails: draftReady, urgentEmails: noDraft.length, sentToday }))
+      }
+
+      if (analyticsRes.ok) {
+        const data = await analyticsRes.json()
+        setAnalyticsData({
+          drafts: data.summary?.drafts || { total: 0, approved: 0, edited: 0, rejected: 0, avg_confidence: 0 },
+          tone: data.summary?.tone || { positive: 0, neutral: 0, negative: 0, frustrated: 0 },
+          daily: data.summary?.daily || [],
+        })
       }
 
       if (insightsRes.ok) {
@@ -610,6 +673,227 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Team Performance KPIs */}
+      {!isLoading && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-slate-500" />
+            Team Performance
+            <span className="text-xs font-normal text-slate-400">(letzte 30 Tage)</span>
+          </h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+            {/* Avg Response Time */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Ø Antwortzeit</p>
+                    <p className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                      {avgResponseHours !== null ? (
+                        avgResponseHours < 1 ? `${Math.round(avgResponseHours * 60)}min` : `${avgResponseHours}h`
+                      ) : '—'}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {avgResponseHours !== null
+                    ? avgResponseHours <= 4 ? 'Gut — unter 4h Ziel' : avgResponseHours <= 24 ? 'Im SLA-Rahmen' : 'Über SLA-Ziel'
+                    : 'Noch keine Daten'
+                  }
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Sentiment Overview */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-violet-50 dark:bg-violet-900/20">
+                    <SmilePlus className="h-4 w-4 text-violet-600" />
+                  </div>
+                  <p className="text-xs text-slate-500">Kunden-Stimmung</p>
+                </div>
+                {(() => {
+                  const total = (sentimentDist.positive || 0) + (sentimentDist.neutral || 0) + (sentimentDist.negative || 0) + (sentimentDist.frustrated || 0)
+                  if (total === 0) return <p className="text-xs text-slate-400">Noch keine Daten</p>
+                  const pct = (v: number) => Math.round((v / total) * 100)
+                  return (
+                    <div className="space-y-1.5">
+                      {[
+                        { label: 'Positiv', value: sentimentDist.positive || 0, color: 'bg-green-500', icon: SmilePlus },
+                        { label: 'Neutral', value: sentimentDist.neutral || 0, color: 'bg-slate-400', icon: Meh },
+                        { label: 'Negativ', value: (sentimentDist.negative || 0) + (sentimentDist.frustrated || 0), color: 'bg-red-400', icon: Frown },
+                      ].map(s => (
+                        <div key={s.label} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 w-14">{s.label}</span>
+                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${s.color}`} style={{ width: `${pct(s.value)}%` }} />
+                          </div>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 w-8 text-right">{pct(s.value)}%</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Draft Acceptance Rate */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+                    <FileCheck className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <p className="text-xs text-slate-500">Draft Akzeptanz</p>
+                </div>
+                {(() => {
+                  const d = analyticsData?.drafts
+                  if (!d || d.total === 0) return <p className="text-xs text-slate-400">Noch keine Daten</p>
+                  const acceptRate = Math.round(((d.approved + d.edited) / d.total) * 100)
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{acceptRate}%</span>
+                        <span className="text-xs text-slate-400">akzeptiert</span>
+                      </div>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-green-600">{d.approved} direkt</span>
+                        <span className="text-amber-600">{d.edited} bearbeitet</span>
+                        <span className="text-red-500">{d.rejected} abgelehnt</span>
+                      </div>
+                      <p className="text-xs text-slate-400">Ø Konfidenz: {Math.round(d.avg_confidence * 100)}%</p>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Priority Distribution */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-orange-50 dark:bg-orange-900/20">
+                    <Zap className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <p className="text-xs text-slate-500">Prioritätsverteilung</p>
+                </div>
+                {(() => {
+                  const total = Object.values(priorityDist).reduce((a, b) => a + b, 0)
+                  if (total === 0) return <p className="text-xs text-slate-400">Noch keine Daten</p>
+                  return (
+                    <div className="space-y-1.5">
+                      {[
+                        { key: 'critical', label: 'Kritisch', color: 'bg-red-500' },
+                        { key: 'high', label: 'Hoch', color: 'bg-orange-500' },
+                        { key: 'normal', label: 'Normal', color: 'bg-blue-500' },
+                        { key: 'low', label: 'Niedrig', color: 'bg-slate-400' },
+                      ].filter(p => (priorityDist[p.key] || 0) > 0).map(p => (
+                        <div key={p.key} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 w-14">{p.label}</span>
+                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${p.color}`} style={{ width: `${Math.round(((priorityDist[p.key] || 0) / total) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 w-6 text-right">{priorityDist[p.key] || 0}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Urgency Distribution */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-red-50 dark:bg-red-900/20">
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  </div>
+                  <p className="text-xs text-slate-500">Dringlichkeit</p>
+                </div>
+                {(() => {
+                  const total = Object.values(urgencyDist).reduce((a, b) => a + b, 0)
+                  if (total === 0) return <p className="text-xs text-slate-400">Noch keine Daten</p>
+                  return (
+                    <div className="space-y-1.5">
+                      {[
+                        { key: 'high', label: 'Hoch', color: 'bg-red-500' },
+                        { key: 'medium', label: 'Mittel', color: 'bg-amber-500' },
+                        { key: 'low', label: 'Niedrig', color: 'bg-green-500' },
+                      ].filter(u => (urgencyDist[u.key] || 0) > 0).map(u => (
+                        <div key={u.key} className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 w-14">{u.label}</span>
+                          <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${u.color}`} style={{ width: `${Math.round(((urgencyDist[u.key] || 0) / total) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs font-medium text-slate-600 dark:text-slate-400 w-6 text-right">{urgencyDist[u.key] || 0}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* 7-Day Trend */}
+            <Card>
+              <CardContent className="pt-5 pb-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+                    <TrendingUp className="h-4 w-4 text-indigo-600" />
+                  </div>
+                  <p className="text-xs text-slate-500">7-Tage Trend</p>
+                </div>
+                {(() => {
+                  const daily = analyticsData?.daily || []
+                  const last7 = daily.slice(-7)
+                  if (last7.length === 0) return <p className="text-xs text-slate-400">Noch keine Daten</p>
+                  const maxVal = Math.max(...last7.map(d => d.total), 1)
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-end gap-1 h-16">
+                        {last7.map((d, i) => {
+                          const h = Math.max((d.total / maxVal) * 100, 4)
+                          const sentH = d.sent > 0 ? Math.max((d.sent / maxVal) * 100, 2) : 0
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                              <div className="w-full relative" style={{ height: `${h}%` }}>
+                                <div className="absolute bottom-0 w-full bg-blue-200 dark:bg-blue-800 rounded-t" style={{ height: '100%' }} />
+                                {sentH > 0 && (
+                                  <div className="absolute bottom-0 w-full bg-green-500 rounded-t" style={{ height: `${sentH}%` }} />
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      <div className="flex gap-1">
+                        {last7.map((d, i) => (
+                          <span key={i} className="flex-1 text-center text-[10px] text-slate-400">
+                            {new Date(d.day).toLocaleDateString('de', { weekday: 'short' }).slice(0, 2)}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-200 dark:bg-blue-800" />Eingegangen</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Beantwortet</span>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+          </div>
+        </div>
+      )}
     </div>
   )
 }

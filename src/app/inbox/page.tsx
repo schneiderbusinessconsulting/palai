@@ -268,7 +268,7 @@ export default function InboxPage() {
         setFetchError('')
       } else {
         console.error('Email API error:', data)
-        setFetchError(data.error || `Fehler beim Laden (HTTP ${response.status})`)
+        setFetchError(data.details ? `${data.error}: ${data.details}` : (data.error || `Fehler beim Laden (HTTP ${response.status})`))
       }
     } catch (error) {
       console.error('Failed to fetch emails:', error)

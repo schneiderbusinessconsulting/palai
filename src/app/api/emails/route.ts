@@ -281,9 +281,9 @@ export async function GET(request: NextRequest) {
     const { data: emails, error, count } = await query
 
     if (error) {
-      console.error('Failed to fetch emails:', error)
+      console.error('Failed to fetch emails:', error.message, error.code, error.details)
       return NextResponse.json(
-        { error: 'Failed to fetch emails' },
+        { error: 'Failed to fetch emails', details: error.message },
         { status: 500 }
       )
     }
@@ -294,9 +294,9 @@ export async function GET(request: NextRequest) {
       hasMore: (count || 0) > offset + limit,
     })
   } catch (error) {
-    console.error('Emails API error:', error)
+    console.error('Emails API error:', error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: 'Failed to fetch emails' },
+      { error: 'Failed to fetch emails', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }

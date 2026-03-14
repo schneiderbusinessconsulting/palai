@@ -45,6 +45,8 @@ import {
   Bell,
   FileText,
   User,
+  AlertTriangle,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -74,6 +76,7 @@ interface Email {
   email_type?: 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
   needs_response?: boolean
   classification_reason?: string
+  buying_intent_score?: number
   email_drafts?: EmailDraft[]
 }
 
@@ -138,6 +141,23 @@ function getEmailTypeBadge(emailType?: string, needsResponse?: boolean) {
   }
 }
 
+function getBuyingIntentBadge(score?: number) {
+  if (!score || score <= 0) return null
+  if (score >= 70) return (
+    <Badge className="bg-emerald-500 hover:bg-emerald-600 gap-1">
+      <TrendingUp className="h-3 w-3" />
+      {score}% Intent
+    </Badge>
+  )
+  if (score >= 40) return (
+    <Badge className="bg-amber-500 hover:bg-amber-600 gap-1">
+      <TrendingUp className="h-3 w-3" />
+      {score}%
+    </Badge>
+  )
+  return null // Low intent not shown
+}
+
 function formatDate(dateString: string) {
   const date = new Date(dateString)
   const now = new Date()
@@ -184,6 +204,41 @@ export default function InboxPage() {
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [isClassifying, setIsClassifying] = useState(false)
 
+  // Save to KB state
+  const [isSavingToKb, setIsSavingToKb] = useState(false)
+  const [kbSaveMsg, setKbSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
+
+  // Conflict detection: lock state
+  const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
+
+  // Agent name helper (from profile localStorage)
+  const getAgentName = () => {
+    try {
+      const profile = localStorage.getItem('palai_profile')
+      if (profile) {
+        const p = JSON.parse(profile)
+        return [p.firstName, p.lastName].filter(Boolean).join(' ') || 'Unbekannt'
+      }
+    } catch { /* ignore */ }
+    return 'Unbekannt'
+  }
+
+  // Release lock helper (fire-and-forget)
+  const releaseLock = (emailId: string) => {
+    fetch(`/api/emails/${emailId}/lock`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_name: getAgentName() }),
+    }).catch(() => {})
+  }
+
+  // Close modal and release any held lock
+  const handleClose = () => {
+    if (selectedEmail) releaseLock(selectedEmail.id)
+    setIsDetailOpen(false)
+    setLockWarning(null)
+  }
+
   // Load auto-draft preference from localStorage
   useEffect(() => {
     const stored = localStorage.getItem('autoDraftEnabled')
@@ -221,9 +276,14 @@ export default function InboxPage() {
       if (response.ok) {
         const data = await response.json()
         setOwners(data.owners || [])
-        // Auto-select first owner if available
+        // Auto-select owner based on profile email, fallback to first
         if (data.owners?.length > 0 && !selectedOwnerId) {
-          setSelectedOwnerId(data.owners[0].id)
+          const profile = localStorage.getItem('palai_profile')
+          const profileEmail = profile ? JSON.parse(profile).email : null
+          const match = profileEmail
+            ? data.owners.find((o: HubSpotOwner) => o.email === profileEmail)
+            : null
+          setSelectedOwnerId(match?.id || data.owners[0].id)
         }
       }
     } catch (error) {
@@ -328,6 +388,23 @@ export default function InboxPage() {
     } else {
       setIsGenerating(true)
     }
+
+    // Acquire lock — prevent two agents from generating simultaneously
+    try {
+      const lockRes = await fetch(`/api/emails/${emailId}/lock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_name: getAgentName() }),
+      })
+      if (lockRes.status === 409) {
+        const data = await lockRes.json()
+        setLockWarning({ locked_by: data.locked_by, locked_at: data.locked_at })
+        setIsGenerating(false)
+        setIsRegenerating(false)
+        return
+      }
+    } catch { /* network error — proceed anyway */ }
+
     try {
       const response = await fetch(`/api/emails/${emailId}/generate-draft`, {
         method: 'POST',
@@ -376,6 +453,38 @@ export default function InboxPage() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
+  // Send via Resend + HubSpot (full send pipeline)
+  const handleSend = async () => {
+    if (!selectedEmail || !currentDraft) return
+
+    setIsSending(true)
+    try {
+      const finalText = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draftId: currentDraft.id,
+          finalText,
+          ownerId: selectedOwnerId || undefined,
+        }),
+      })
+
+      if (response.ok) {
+        releaseLock(selectedEmail.id)
+        setIsDetailOpen(false)
+        fetchEmails()
+      } else {
+        const data = await response.json()
+        console.error('Send failed:', data.error)
+      }
+    } catch (error) {
+      console.error('Send failed:', error)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
   // Mark as sent (just update status, no actual sending)
   const handleMarkAsSent = async () => {
     if (!selectedEmail) return
@@ -387,6 +496,7 @@ export default function InboxPage() {
       })
 
       if (response.ok) {
+        if (selectedEmail) releaseLock(selectedEmail.id)
         setIsDetailOpen(false)
         fetchEmails()
       }
@@ -394,6 +504,38 @@ export default function InboxPage() {
       console.error('Mark as sent failed:', error)
     } finally {
       setIsSending(false)
+    }
+  }
+
+  // Save current draft to Knowledge Base
+  const handleSaveToKb = async () => {
+    if (!selectedEmail || !currentDraft) return
+    setIsSavingToKb(true)
+    setKbSaveMsg(null)
+    try {
+      const text = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const res = await fetch('/api/knowledge/from-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject: selectedEmail.subject,
+          content: text,
+          emailId: selectedEmail.id,
+        }),
+      })
+      const data = await res.json()
+      if (res.status === 409) {
+        setKbSaveMsg({ ok: false, text: 'Bereits in der KB vorhanden.' })
+      } else if (res.ok) {
+        setKbSaveMsg({ ok: true, text: 'In Knowledge Base gespeichert!' })
+      } else {
+        setKbSaveMsg({ ok: false, text: data.error || 'Fehler beim Speichern.' })
+      }
+    } catch {
+      setKbSaveMsg({ ok: false, text: 'Fehler beim Speichern.' })
+    } finally {
+      setIsSavingToKb(false)
+      setTimeout(() => setKbSaveMsg(null), 3000)
     }
   }
 
@@ -617,6 +759,7 @@ export default function InboxPage() {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                          {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -680,7 +823,7 @@ export default function InboxPage() {
       )}
 
       {/* Email Detail Modal */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+      <Dialog open={isDetailOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>{selectedEmail?.subject}</DialogTitle>
@@ -688,6 +831,20 @@ export default function InboxPage() {
 
           {selectedEmail && (
             <div className="space-y-4 py-4">
+              {/* Conflict warning */}
+              {lockWarning && (
+                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                  <span>
+                    <strong>{lockWarning.locked_by}</strong> bearbeitet diese E-Mail gerade seit{' '}
+                    {new Date(lockWarning.locked_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <button onClick={() => setLockWarning(null)} className="ml-auto flex-shrink-0">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Email Info */}
               <div className="text-sm text-slate-500 dark:text-slate-400">
                 <p>
@@ -906,10 +1063,36 @@ export default function InboxPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap">
-                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
+                {kbSaveMsg && (
+                  <span className={`text-xs ${kbSaveMsg.ok ? 'text-green-600' : 'text-amber-600'}`}>
+                    {kbSaveMsg.text}
+                  </span>
+                )}
+                <Button variant="outline" onClick={handleClose}>
                   Schliessen
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={handleSaveToKb}
+                        disabled={isSavingToKb}
+                      >
+                        {isSavingToKb ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <BookOpen className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Antwort zur Knowledge Base hinzufügen</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -924,20 +1107,40 @@ export default function InboxPage() {
                   <Edit className="h-4 w-4 mr-2" />
                   {isEditing ? 'Vorschau' : 'Bearbeiten'}
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        onClick={handleMarkAsSent}
+                        disabled={isSending}
+                      >
+                        {isSending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Nur als gesendet markieren (kein echtes Senden)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={handleMarkAsSent}
+                  className="bg-blue-600 hover:bg-blue-700"
+                  onClick={handleSend}
                   disabled={isSending}
                 >
                   {isSending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Markiere...
+                      Sende...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Als gesendet markieren
+                      <Send className="h-4 w-4 mr-2" />
+                      Senden
                     </>
                   )}
                 </Button>
@@ -946,6 +1149,7 @@ export default function InboxPage() {
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   )
 }

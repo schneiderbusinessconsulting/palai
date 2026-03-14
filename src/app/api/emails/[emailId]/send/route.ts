@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createHubSpotClient } from '@/lib/hubspot/client'
+import { wordEditDistance } from '@/lib/text-utils'
 
 export async function POST(
   request: NextRequest,
@@ -61,7 +62,6 @@ export async function POST(
         threadId: email.hubspot_thread_id,
       })
 
-      // Check if email was actually sent
       if (!sentEmail.actualSent) {
         console.log('Email logged to HubSpot but not actually sent - RESEND_API_KEY not configured')
       }
@@ -71,7 +71,6 @@ export async function POST(
     if (ownerId && !draftOnly) {
       try {
         await hubspot.assignOwnerToEmail(sentEmail.id, ownerId)
-        // Also mark original incoming email as replied in HubSpot
         if (email.hubspot_email_id) {
           await hubspot.updateEmailStatus(email.hubspot_email_id, 'REPLIED')
           await hubspot.assignOwnerToEmail(email.hubspot_email_id, ownerId)
@@ -81,34 +80,107 @@ export async function POST(
       }
     }
 
-    // 4. Update draft status
+    // 4. Self-learning: calculate edit distance if draft was manually edited
+    const wasEdited = !!finalText
+    let editDist: number | null = null
+
+    if (wasEdited && draft.ai_generated_response) {
+      editDist = wordEditDistance(draft.ai_generated_response, finalText)
+    }
+
+    // 5. Update draft status (with learning fields)
+    const draftStatus = draftOnly ? 'saved_to_hubspot' : (finalText ? 'edited' : 'approved')
     await supabase
       .from('email_drafts')
       .update({
-        status: draftOnly ? 'saved_to_hubspot' : (finalText ? 'edited' : 'approved'),
+        status: draftStatus,
         edited_response: finalText || null,
         sent_at: draftOnly ? null : new Date().toISOString(),
         hubspot_sent_email_id: sentEmail.id,
+        // Phase 2: Self-learning fields (graceful: ignore error if columns missing)
+        was_manually_rewritten: wasEdited || null,
+        edit_distance: editDist,
       })
       .eq('id', draftId)
 
-    // 5. Update email status
+    // 6. Update email status + SLA resolution time
+    const now = new Date().toISOString()
     await supabase
       .from('incoming_emails')
       .update({
         status: draftOnly ? 'draft_saved' : 'sent',
         assigned_owner_id: ownerId || null,
+        // Phase 4: SLA tracking — mark resolved when sent
+        ...(draftOnly ? {} : { resolved_at: now }),
       })
       .eq('id', emailId)
 
-    // 6. Log to audit
+    // 7. Phase 4: Compute and store SLA status
+    if (!draftOnly && email.received_at) {
+      try {
+        const receivedMs = new Date(email.received_at).getTime()
+        const resolvedMs = new Date(now).getTime()
+        const resolutionMinutes = Math.floor((resolvedMs - receivedMs) / (1000 * 60))
+
+        // Determine SLA compliance based on priority
+        const slaThresholds: Record<string, number> = {
+          critical: 240,  // 4h
+          high: 480,      // 8h
+          normal: 1440,   // 24h
+          low: 2880,      // 48h
+        }
+        const priority = email.priority || 'normal'
+        const threshold = slaThresholds[priority] || slaThresholds.normal
+        const slaStatus = resolutionMinutes <= threshold ? 'ok' : 'breached'
+
+        await supabase
+          .from('incoming_emails')
+          .update({ sla_status: slaStatus })
+          .eq('id', emailId)
+      } catch {
+        // Ignore SLA update errors (columns may not exist yet)
+      }
+    }
+
+    // 8. Phase 2: Create learning case if draft was significantly edited
+    // Use dynamic threshold from app_config (fallback to 0.1)
+    let learningThreshold = 0.1
+    try {
+      const { data: configRow } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'learning_min_edit_distance')
+        .single()
+      if (configRow) learningThreshold = parseFloat(configRow.value) || 0.1
+    } catch { /* use default */ }
+
+    if (wasEdited && editDist !== null && editDist > learningThreshold) {
+      try {
+        await supabase.from('learning_cases').insert({
+          email_id: emailId,
+          draft_id: draftId,
+          original_draft: draft.ai_generated_response,
+          corrected_response: finalText,
+          edit_distance: editDist,
+          difficulty_score: editDist, // initially same as edit distance
+          was_escalated: false,
+          knowledge_extracted: false,
+          status: 'pending',
+        })
+      } catch {
+        // Ignore if learning_cases table doesn't exist yet
+      }
+    }
+
+    // 9. Log to audit
     await supabase.from('audit_log').insert({
       email_id: emailId,
       draft_id: draftId,
       action: draftOnly ? 'saved_to_hubspot' : 'sent',
       details: {
         hubspot_sent_email_id: sentEmail.id,
-        was_edited: !!finalText,
+        was_edited: wasEdited,
+        edit_distance: editDist,
         assigned_owner_id: ownerId,
         draft_only: draftOnly,
       },

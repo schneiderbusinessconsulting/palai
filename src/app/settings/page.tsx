@@ -44,8 +44,10 @@ import {
   BarChart3,
   Inbox,
   Workflow,
+  ScrollText,
 } from 'lucide-react'
 import { AutomationTab } from '@/components/settings/automation-tab'
+import { AuditTrailTab } from '@/components/settings/audit-trail-tab'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -513,6 +515,7 @@ export default function SettingsPage() {
           <TabsTrigger value="training" className="gap-2" onClick={fetchTrainingStats}><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
           <TabsTrigger value="automation" className="gap-2"><Workflow className="h-4 w-4" />Automatisierung</TabsTrigger>
+          <TabsTrigger value="audit" className="gap-2"><ScrollText className="h-4 w-4" />Audit Trail</TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2" onClick={fetchIntegrationStatus}><Database className="h-4 w-4" />Integrationen</TabsTrigger>
         </TabsList>
 
@@ -1417,6 +1420,10 @@ export default function SettingsPage() {
         {/* ── INTEGRATIONEN ──────────────────────────────────────────────────── */}
         <TabsContent value="automation" className="space-y-6">
           <AutomationTab />
+        </TabsContent>
+
+        <TabsContent value="audit" className="space-y-6">
+          <AuditTrailTab />
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-6">

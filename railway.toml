@@ -1,3 +1,6 @@
+[project]
+id = "c09519b0-ff8a-490f-9419-deff40b9f397"
+
 [build]
 builder = "NIXPACKS"
 buildCommand = "npm run build"

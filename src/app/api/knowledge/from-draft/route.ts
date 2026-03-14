@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       .insert({
         content,
         embedding,
-        source_type: 'email_training',
+        source_type: 'sent_response',
         source_title: title,
         metadata: {
           saved_from_inbox: true,

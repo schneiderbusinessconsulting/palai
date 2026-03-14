@@ -80,23 +80,22 @@ export function Header({ title, description }: HeaderProps) {
         })
       }
 
-      // Check for SLA warnings
+      // Check for SLA warnings (breached or at-risk emails)
       const { data: slaEmails } = await supabase
         .from('incoming_emails')
-        .select('id, subject, sla_deadline')
-        .eq('status', 'open')
-        .not('sla_deadline', 'is', null)
-        .lt('sla_deadline', new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString())
-        .gt('sla_deadline', new Date().toISOString())
+        .select('id, subject, sla_status')
+        .in('status', ['pending', 'draft_ready'])
+        .in('sla_status', ['breached', 'at_risk'])
+        .order('received_at', { ascending: true })
         .limit(2)
 
       slaEmails?.forEach(email => {
         notifs.push({
           id: `sla-${email.id}`,
           icon: 'clock',
-          title: 'SLA Warnung',
+          title: email.sla_status === 'breached' ? 'SLA Verletzt' : 'SLA Warnung',
           description: email.subject || 'E-Mail nahe SLA-Deadline',
-          time: 'Bald fällig',
+          time: email.sla_status === 'breached' ? 'Überfällig' : 'Bald fällig',
           read: false,
         })
       })

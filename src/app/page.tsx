@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { DashboardBriefing } from '@/components/dashboard/briefing'
 import {
   Inbox,
   TrendingUp,
@@ -422,6 +423,9 @@ export default function DashboardPage() {
         title={`${greeting}, Philipp`}
         description="Hier ist dein heutiger Stand auf einen Blick."
       />
+
+      {/* Daily Briefing */}
+      <DashboardBriefing />
 
       {/* Refresh */}
       <div className="flex justify-end -mt-4">

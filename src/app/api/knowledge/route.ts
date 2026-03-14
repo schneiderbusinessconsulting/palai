@@ -1,29 +1,100 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { createEmbedding } from '@/lib/ai/openai'
 
-// Import pdf-parse - use require for better compatibility
-let pdfParse: ((buffer: Buffer) => Promise<{ text: string }>) | null = null
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  pdfParse = require('pdf-parse')
-} catch (e) {
-  console.warn('pdf-parse not available:', e)
+// Admin client for knowledge (bypasses RLS)
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured')
+  }
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
 }
 
-// Split text into chunks of roughly 500 tokens (approx 2000 chars)
-function chunkText(text: string, maxChunkSize = 2000): string[] {
+// Dynamic import for pdfjs-dist to avoid bundler issues
+async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
+  // Import pdfjs-dist legacy build which works without a worker
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+  // Configure worker - use path to worker file
+  const path = await import('path')
+  const workerPath = path.join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath
+
+  const data = new Uint8Array(buffer)
+
+  // Load the PDF document
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    useSystemFonts: true,
+    disableFontFace: true,
+    isEvalSupported: false,
+  })
+
+  const pdf = await loadingTask.promise
+  let fullText = ''
+
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const textContent = await page.getTextContent()
+    const pageText = textContent.items
+      .map((item) => {
+        // Extract str property if it exists (TextItem has str, TextMarkedContent does not)
+        const textItem = item as { str?: string }
+        return textItem.str || ''
+      })
+      .filter(Boolean)
+      .join(' ')
+    fullText += pageText + '\n\n'
+  }
+
+  return fullText.trim()
+}
+
+// Split text into chunks - max 6000 chars (~1500 tokens) to stay safely under 8192 token limit
+function chunkText(text: string, maxChunkSize = 6000): string[] {
   const chunks: string[] = []
   const paragraphs = text.split(/\n\n+/)
 
   let currentChunk = ''
 
   for (const paragraph of paragraphs) {
-    if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
+    // If single paragraph is too long, split it by sentences or force-split
+    if (paragraph.length > maxChunkSize) {
+      // Save current chunk first
+      if (currentChunk.trim().length > 0) {
+        chunks.push(currentChunk.trim())
+        currentChunk = ''
+      }
+      // Split long paragraph by sentences
+      const sentences = paragraph.split(/(?<=[.!?])\s+/)
+      let sentenceChunk = ''
+      for (const sentence of sentences) {
+        if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+          chunks.push(sentenceChunk.trim())
+          sentenceChunk = ''
+        }
+        // If single sentence is still too long, force-split by character
+        if (sentence.length > maxChunkSize) {
+          for (let i = 0; i < sentence.length; i += maxChunkSize) {
+            chunks.push(sentence.slice(i, i + maxChunkSize))
+          }
+        } else {
+          sentenceChunk += sentence + ' '
+        }
+      }
+      if (sentenceChunk.trim().length > 0) {
+        currentChunk = sentenceChunk
+      }
+    } else if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
       chunks.push(currentChunk.trim())
-      currentChunk = ''
+      currentChunk = paragraph + '\n\n'
+    } else {
+      currentChunk += paragraph + '\n\n'
     }
-    currentChunk += paragraph + '\n\n'
   }
 
   if (currentChunk.trim().length > 0) {
@@ -49,14 +120,23 @@ export async function POST(request: NextRequest) {
 
     // Handle PDF upload
     if (file && file.type === 'application/pdf') {
-      if (!pdfParse) {
-        return NextResponse.json({ error: 'PDF parsing is not available' }, { status: 500 })
+      try {
+        console.log('Starting PDF extraction for:', file.name, 'size:', file.size)
+        const arrayBuffer = await file.arrayBuffer()
+        console.log('ArrayBuffer created, size:', arrayBuffer.byteLength)
+        textContent = await extractPdfText(arrayBuffer)
+        console.log('PDF text extracted, length:', textContent.length)
+      } catch (pdfError) {
+        console.error('PDF parsing error details:', {
+          name: (pdfError as Error).name,
+          message: (pdfError as Error).message,
+          stack: (pdfError as Error).stack,
+        })
+        return NextResponse.json({
+          error: 'PDF konnte nicht gelesen werden: ' + (pdfError as Error).message
+        }, { status: 500 })
       }
-      const arrayBuffer = await file.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      const pdfData = await pdfParse(buffer)
-      textContent = pdfData.text
-    } else if (file && file.type === 'text/plain') {
+    } else if (file && (file.type === 'text/plain' || file.type === 'text/markdown' || file.type === 'text/x-markdown' || file.name.endsWith('.md'))) {
       textContent = await file.text()
     }
 
@@ -64,7 +144,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No content provided' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // Split into chunks
     const chunks = chunkText(textContent)
@@ -94,13 +174,42 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (error) {
-          console.error('Error storing chunk:', error)
+          console.error('Error storing chunk:', error.message, error.code, error.details)
         } else {
           storedChunks.push(data)
         }
       } catch (embeddingError) {
-        console.error('Error creating embedding:', embeddingError)
+        console.error('Error creating embedding:', (embeddingError as Error).message)
       }
+    }
+
+    // Return error if no chunks were stored
+    if (storedChunks.length === 0) {
+      // Try one more time with detailed error to return to user
+      const testChunk = chunks[0] || 'test'
+      let detailedError = 'Unknown error'
+      try {
+        const testEmbedding = await createEmbedding(testChunk)
+        const { error: testError } = await supabase
+          .from('knowledge_chunks')
+          .insert({
+            content: testChunk,
+            embedding: testEmbedding,
+            source_type: sourceType,
+            source_title: title,
+          })
+        if (testError) {
+          detailedError = `DB Error: ${testError.message} (Code: ${testError.code})`
+        }
+      } catch (e) {
+        detailedError = `Embedding Error: ${(e as Error).message}`
+      }
+
+      console.error('No chunks stored. Chunks attempted:', chunks.length, 'Error:', detailedError)
+      return NextResponse.json(
+        { error: `Speichern fehlgeschlagen: ${detailedError}` },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({
@@ -124,7 +233,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const sourceType = searchParams.get('source_type')
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     let query = supabase
       .from('knowledge_chunks')
@@ -178,7 +287,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Title required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     const { error } = await supabase
       .from('knowledge_chunks')
@@ -206,7 +315,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Old title required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
 
     // If only updating title/sourceType/published without new content
     if (!content) {

@@ -46,14 +46,12 @@ export async function POST(request: NextRequest) {
     // Log incoming webhook for debugging
     console.log('HubSpot webhook received')
 
-    // Skip signature verification for now - HubSpot signature can be tricky
-    // TODO: Re-enable once working
-    // const signature = request.headers.get('x-hubspot-signature-v3')
-    // const webhookSecret = process.env.HUBSPOT_WEBHOOK_SECRET
-    // if (webhookSecret && !verifySignature(body, signature, webhookSecret)) {
-    //   console.error('Invalid HubSpot webhook signature')
-    //   return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-    // }
+    const signature = request.headers.get('x-hubspot-signature-v3')
+    const webhookSecret = process.env.HUBSPOT_WEBHOOK_SECRET
+    if (webhookSecret && !verifySignature(body, signature, webhookSecret)) {
+      console.error('Invalid HubSpot webhook signature')
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    }
 
     const events: HubSpotWebhookEvent[] = JSON.parse(body)
     const supabase = getSupabaseAdmin()

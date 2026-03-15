@@ -43,6 +43,9 @@ import {
   EyeOff,
   Plus,
   ChevronDown,
+  Check,
+  X,
+  Brain,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -64,6 +67,9 @@ interface KnowledgeItem {
   updated_at: string
   ids: string[]
   published: boolean
+  approved: boolean
+  learning_context: string | null
+  source_learning_id: string | null
 }
 
 function getSourceIcon(type: string) {
@@ -396,7 +402,26 @@ export default function KnowledgePage() {
     }
   }
 
+  // Handle approve/reject
+  const handleApprove = async (itemTitle: string) => {
+    setItems((prev) =>
+      prev.map((item) => item.title === itemTitle ? { ...item, approved: true } : item)
+    )
+    await fetch('/api/knowledge', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldTitle: itemTitle, approved: true }),
+    })
+  }
+
+  const handleReject = async (itemTitle: string) => {
+    if (!confirm(`"${itemTitle}" ablehnen und löschen?`)) return
+    await handleDelete(itemTitle)
+  }
+
+  const pendingItems = items.filter((item) => item.approved === false)
   const filteredItems = items.filter((item) => {
+    if (item.approved === false) return false // shown separately in pending section
     if (searchQuery) {
       return item.title.toLowerCase().includes(searchQuery.toLowerCase())
     }
@@ -409,6 +434,7 @@ export default function KnowledgePage() {
     help_articles: items.filter((i) => i.source_type === 'help_article').length,
     faqs: items.filter((i) => i.source_type === 'faq').length,
     course_info: items.filter((i) => i.source_type === 'course_info').length,
+    pending_approval: items.filter((i) => i.approved === false).length,
   }
 
   return (
@@ -508,6 +534,79 @@ export default function KnowledgePage() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Pending Approval Section */}
+      {pendingItems.length > 0 && (
+        <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Brain className="h-5 w-5" />
+              Warten auf Freigabe ({pendingItems.length})
+              <span className="text-xs font-normal text-amber-600/70 dark:text-amber-500/70 ml-1">
+                – werden erst nach Freigabe für AI-Drafts verwendet
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-amber-100 dark:divide-amber-900/30">
+              {pendingItems.map((item, index) => (
+                <div
+                  key={`pending-${item.title}-${index}`}
+                  className="p-4 space-y-3"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30 mt-0.5">
+                      <Brain className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-slate-900 dark:text-white">
+                        {item.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          Aus Learning
+                        </Badge>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {item.chunks} {item.chunks === 1 ? 'Chunk' : 'Chunks'}
+                        </span>
+                        <span className="text-xs text-slate-400">•</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
+                          {formatDate(item.updated_at)}
+                        </span>
+                      </div>
+                      {item.learning_context && (
+                        <div className="mt-2 p-2 bg-white dark:bg-slate-800 rounded border border-amber-200 dark:border-amber-800 text-sm text-slate-600 dark:text-slate-300">
+                          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Erkenntnis: </span>
+                          {item.learning_context}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        className="gap-1.5 bg-green-500 hover:bg-green-600 text-white"
+                        onClick={() => handleApprove(item.title)}
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                        Freigeben
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:hover:bg-red-900/20"
+                        onClick={() => handleReject(item.title)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Ablehnen
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Knowledge Items List */}
       <Card>

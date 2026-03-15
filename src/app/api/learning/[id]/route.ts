@@ -8,7 +8,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
-    const { action, title } = await request.json()
+    const { action, title, learning_context } = await request.json()
     const supabase = await createClient()
 
     if (action === 'dismiss') {
@@ -37,7 +37,7 @@ export async function PATCH(
       // 2. Generate embedding
       const embedding = await createEmbedding(content)
 
-      // 3. Create knowledge chunk
+      // 3. Create knowledge chunk (pending approval)
       const { data: chunk, error: chunkError } = await supabase
         .from('knowledge_chunks')
         .insert({
@@ -46,6 +46,9 @@ export async function PATCH(
           source_type: 'email',
           embedding,
           published: false, // don't auto-publish to Help Center
+          approved: false, // requires manual approval before used in AI drafts
+          learning_context: learning_context || null,
+          source_learning_id: id,
         })
         .select('id')
         .single()

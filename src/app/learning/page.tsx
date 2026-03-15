@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,7 @@ export default function LearningPage() {
   // Extract dialog
   const [extractDialogCase, setExtractDialogCase] = useState<LearningCase | null>(null)
   const [extractTitle, setExtractTitle] = useState('')
+  const [extractContext, setExtractContext] = useState('')
 
   const fetchCases = useCallback(async () => {
     setIsLoading(true)
@@ -109,10 +111,11 @@ export default function LearningPage() {
       const res = await fetch(`/api/learning/${extractDialogCase.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'extract', title: extractTitle }),
+        body: JSON.stringify({ action: 'extract', title: extractTitle, learning_context: extractContext || null }),
       })
       if (res.ok) {
         setExtractDialogCase(null)
+        setExtractContext('')
         fetchCases()
       }
     } catch (err) {
@@ -276,6 +279,7 @@ export default function LearningPage() {
                       onClick={() => {
                         setExtractDialogCase(lc)
                         setExtractTitle(`Gelernt: ${lc.incoming_emails?.subject || 'Antwortkorrektur'}`)
+                        setExtractContext('')
                       }}
                       disabled={extractingId === lc.id}
                     >
@@ -323,7 +327,7 @@ export default function LearningPage() {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              Die korrigierte Antwort wird in der Knowledge Base gespeichert und verbessert künftige AI-Antworten zu ähnlichen Themen.
+              Die korrigierte Antwort wird in der Knowledge Base gespeichert und muss dort freigegeben werden, bevor sie für AI-Antworten verwendet wird.
             </p>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -334,6 +338,18 @@ export default function LearningPage() {
                 onChange={(e) => setExtractTitle(e.target.value)}
                 placeholder="z.B. Gelernt: Antwort zu Hypnose-Ausbildung"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Was war die Erkenntnis? <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <Textarea
+                value={extractContext}
+                onChange={(e) => setExtractContext(e.target.value)}
+                placeholder="z.B. Kunde fragte nach Ratenzahlung – AI hatte nur Vollpreis genannt. Korrekt ist: 3 Raten à CHF 600 möglich."
+                rows={3}
+              />
+              <p className="text-xs text-slate-400">Wird in der Knowledge Base als Kontext angezeigt, damit du beim Freigeben weißt, warum dieser Eintrag erstellt wurde.</p>
             </div>
           </div>
           <DialogFooter>

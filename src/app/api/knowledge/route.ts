@@ -237,7 +237,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('knowledge_chunks')
-      .select('id, source_title, source_type, created_at, updated_at, published')
+      .select('id, source_title, source_type, created_at, updated_at, published, approved, learning_context, source_learning_id')
       .order('created_at', { ascending: false })
 
     if (sourceType && sourceType !== 'all') {
@@ -262,10 +262,15 @@ export async function GET(request: NextRequest) {
           updated_at: item.updated_at,
           ids: [],
           published: item.published ?? true, // Default to true for backwards compat
+          approved: item.approved ?? true, // Default to true for existing entries
+          learning_context: item.learning_context ?? null,
+          source_learning_id: item.source_learning_id ?? null,
         }
       }
       acc[key].chunks++
       acc[key].ids.push(item.id)
+      // If any chunk is unapproved, mark group as unapproved
+      if (item.approved === false) acc[key].approved = false
       return acc
     }, {})
 
@@ -309,7 +314,7 @@ export async function DELETE(request: NextRequest) {
 // Update knowledge item (title, content, category, published)
 export async function PATCH(request: NextRequest) {
   try {
-    const { oldTitle, newTitle, content, sourceType, published } = await request.json()
+    const { oldTitle, newTitle, content, sourceType, published, approved } = await request.json()
 
     if (!oldTitle) {
       return NextResponse.json({ error: 'Old title required' }, { status: 400 })
@@ -317,7 +322,7 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = getSupabaseAdmin()
 
-    // If only updating title/sourceType/published without new content
+    // If only updating title/sourceType/published/approved without new content
     if (!content) {
       const updateData: Record<string, unknown> = {
         updated_at: new Date().toISOString(),
@@ -325,6 +330,7 @@ export async function PATCH(request: NextRequest) {
       if (newTitle) updateData.source_title = newTitle
       if (sourceType) updateData.source_type = sourceType
       if (typeof published === 'boolean') updateData.published = published
+      if (typeof approved === 'boolean') updateData.approved = approved
 
       const { error } = await supabase
         .from('knowledge_chunks')

@@ -20,6 +20,7 @@ import {
   Loader2,
   X,
   Check,
+  FileText,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -367,10 +368,19 @@ export default function TemplatesPage() {
       </div>
 
       {filteredTemplates.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-slate-500 dark:text-slate-400">
-            Keine Templates gefunden
+        <div className="text-center py-16">
+          <FileText className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
+          <p className="text-slate-500 dark:text-slate-400 font-medium">
+            {searchQuery ? 'Keine Templates gefunden' : 'Noch keine Templates erstellt'}
           </p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 mb-4">
+            {searchQuery ? 'Versuche einen anderen Suchbegriff' : 'Templates beschleunigen deine Antworten — erstelle dein erstes!'}
+          </p>
+          {!searchQuery && (
+            <Button onClick={() => { setEditingTemplate(null); setDialogOpen(true) }} className="gap-2">
+              <Plus className="h-4 w-4" /> Erstes Template erstellen
+            </Button>
+          )}
         </div>
       )}
 

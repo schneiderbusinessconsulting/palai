@@ -72,7 +72,7 @@ export async function POST() {
     const supabase = await createClient()
 
     if (!process.env.HUBSPOT_ACCESS_TOKEN) {
-      return NextResponse.json({ error: 'HUBSPOT_ACCESS_TOKEN nicht konfiguriert' }, { status: 400 })
+      return NextResponse.json({ success: false, total_emails: 0, threads: 0, extracted: 0, skipped: 0, errors: [], unconfigured: true }, { status: 200 })
     }
 
     // Fetch all emails from HubSpot (max 1000)

@@ -56,6 +56,7 @@ import {
   Square,
   ShieldAlert,
   Clock,
+  Settings,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
@@ -116,6 +117,7 @@ function InboxPageContent() {
   const [isSyncing, setIsSyncing] = useState(false)
   // Inline messages replaced by toast notifications
   const [fetchError, setFetchError] = useState('')
+  const [dbUnconfigured, setDbUnconfigured] = useState(false)
 
   // Sorting
   const [sortBy, setSortBy] = useState<'date' | 'confidence' | 'status' | 'sender'>('date')
@@ -407,6 +409,7 @@ function InboxPageContent() {
       if (response.ok) {
         setEmails(data.emails || [])
         setFetchError('')
+        setDbUnconfigured(!!data.unconfigured)
       } else {
         console.error('Email API error:', data)
         setFetchError(data.details ? `${data.error}: ${data.details}` : (data.error || `Fehler beim Laden (HTTP ${response.status})`))
@@ -1660,6 +1663,21 @@ function InboxPageContent() {
           <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
             Bitte prüfe die Serververbindung und Umgebungsvariablen
           </p>
+        </div>
+      ) : dbUnconfigured ? (
+        <div className="text-center py-12">
+          <Settings className="h-12 w-12 mx-auto text-gold-400 dark:text-gold-600 mb-4" />
+          <p className="text-slate-600 dark:text-slate-300 font-medium">
+            Supabase nicht konfiguriert
+          </p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 max-w-md mx-auto">
+            Bitte trage die Supabase-Zugangsdaten in der <code className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-xs">.env.local</code> Datei ein:
+          </p>
+          <div className="mt-3 text-xs text-left inline-block bg-slate-50 dark:bg-slate-800 rounded-lg p-3 font-mono">
+            <p>NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co</p>
+            <p>NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...</p>
+            <p>SUPABASE_SERVICE_ROLE_KEY=eyJ...</p>
+          </div>
         </div>
       ) : sortedEmails.length === 0 ? (
         <div className="text-center py-12">

@@ -106,6 +106,10 @@ function chunkText(text: string, maxChunkSize = 6000): string[] {
 
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ chunks: [], unconfigured: true }, { status: 200 })
+    }
+
     const formData = await request.formData()
     const content = formData.get('content') as string | null
     const file = formData.get('file') as File | null
@@ -230,6 +234,10 @@ export async function POST(request: NextRequest) {
 // Get all knowledge items grouped by source
 export async function GET(request: NextRequest) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ items: [], unconfigured: true }, { status: 200 })
+    }
+
     const { searchParams } = new URL(request.url)
     const sourceType = searchParams.get('source_type')
 
@@ -292,6 +300,10 @@ export async function GET(request: NextRequest) {
 // Delete knowledge by title
 export async function DELETE(request: NextRequest) {
   try {
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      return NextResponse.json({ success: false, unconfigured: true }, { status: 200 })
+    }
+
     const { title } = await request.json()
 
     if (!title) {

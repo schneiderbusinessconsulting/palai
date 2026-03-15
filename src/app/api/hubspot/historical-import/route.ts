@@ -89,8 +89,8 @@ export async function POST(request: NextRequest) {
   try {
     if (!process.env.HUBSPOT_ACCESS_TOKEN) {
       return NextResponse.json(
-        { error: 'HUBSPOT_ACCESS_TOKEN fehlt in .env.local' },
-        { status: 503 }
+        { success: false, imported: 0, skipped: 0, errors: 0, totalFetched: 0, unconfigured: true },
+        { status: 200 }
       )
     }
 

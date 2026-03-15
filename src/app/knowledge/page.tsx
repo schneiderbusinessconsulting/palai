@@ -656,7 +656,7 @@ export default function KnowledgePage() {
                 Noch keine Einträge vorhanden
               </p>
               <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                Klicke auf "Hinzufügen" um Wissen hochzuladen
+                Klicke auf &quot;Hinzufügen&quot; um Wissen hochzuladen
               </p>
             </div>
           ) : (

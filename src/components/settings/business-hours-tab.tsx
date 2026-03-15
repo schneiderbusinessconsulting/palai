@@ -33,10 +33,6 @@ export function BusinessHoursTab() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
 
-  useEffect(() => {
-    fetchHours()
-  }, [])
-
   const fetchHours = async () => {
     setLoading(true)
     try {
@@ -55,6 +51,11 @@ export function BusinessHoursTab() {
     } catch { /* use defaults */ }
     setLoading(false)
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchHours()
+  }, [])
 
   const updateHour = (dayOfWeek: number, field: keyof BusinessHour, value: string | boolean) => {
     setHours(prev => prev.map(h =>

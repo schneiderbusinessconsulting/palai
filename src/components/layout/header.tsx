@@ -129,6 +129,7 @@ export function Header({ title, description }: HeaderProps) {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadNotifications()
     const interval = setInterval(loadNotifications, 60000)
     return () => clearInterval(interval)

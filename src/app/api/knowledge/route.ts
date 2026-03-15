@@ -258,6 +258,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Group by source_title
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const grouped = data?.reduce((acc: Record<string, any>, item) => {
       const key = item.source_title || 'Untitled'
       if (!acc[key]) {

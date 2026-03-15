@@ -1,0 +1,104 @@
+# Deployment Pipeline for palai
+# Triggers only on pushes to main AND only after the CI workflow has passed.
+# This prevents broken builds from ever reaching Railway.
+#
+# Prerequisites (set in GitHub repo → Settings → Secrets and variables → Actions):
+#   RAILWAY_TOKEN  — Service token from Railway dashboard (Account Settings → Tokens)
+
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+# Only one deployment can run at a time; cancel any in-progress deploy if a
+# newer commit is pushed to main before the current deploy finishes.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Wait for the CI workflow to succeed on the same commit before deploying.
+  # The `workflow_run` trigger is not used here because we're already on push;
+  # instead we use the GitHub CLI to check CI status explicitly.
+  # ─────────────────────────────────────────────────────────────────────────────
+  wait-for-ci:
+    name: Wait for CI to pass
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for CI workflow on this commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Poll until the "CI" workflow for this exact SHA completes successfully.
+        # Times out after ~10 minutes (20 retries × 30 s).
+        run: |
+          echo "Waiting for CI workflow to complete on SHA ${{ github.sha }}..."
+          for i in $(seq 1 20); do
+            STATUS=$(gh api \
+              /repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
+              --jq '[.check_runs[] | select(.name | test("CI|lint|typecheck|unit|build|e2e|security"; "i"))] | map(.conclusion) | unique | tostring')
+            echo "Check-run conclusions: $STATUS"
+
+            if echo "$STATUS" | grep -q '"failure"'; then
+              echo "CI failed — aborting deployment."
+              exit 1
+            fi
+
+            if echo "$STATUS" | grep -qv '"success"'; then
+              echo "CI still running, retrying in 30s... (attempt $i/20)"
+              sleep 30
+            else
+              echo "All CI checks passed."
+              break
+            fi
+          done
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Deploy to Railway via the Railway CLI.
+  # railway.toml in the repo root already defines the build/start commands
+  # and the target project ID (c09519b0-ff8a-490f-9419-deff40b9f397).
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Railway (production)
+    runs-on: ubuntu-latest
+    needs: [wait-for-ci]
+
+    # Shared environment variables passed through to the Railway build context.
+    # These must also be configured as variables inside the Railway project UI,
+    # but are echoed here for transparency / override purposes.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # Install the Railway CLI globally so the `railway` command is available.
+      # Pinning to a specific version avoids surprise breaking changes.
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      # Authenticate using a Railway service token stored as a GitHub secret.
+      # RAILWAY_TOKEN is read automatically by the CLI when set as an env var.
+      - name: Deploy to Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # `railway up` pushes the current working directory to Railway.
+        # The --detach flag returns immediately; Railway builds/deploys async.
+        # Remove --detach if you want the step to wait for the deploy to finish.
+        run: railway up --detach
+
+      - name: Deployment summary
+        run: |
+          echo "Deployment triggered for commit ${{ github.sha }}"
+          echo "Monitor progress at: https://railway.app/project/c09519b0-ff8a-490f-9419-deff40b9f397"

@@ -260,7 +260,7 @@ export default function LearningPage() {
         <p className="font-medium mb-1">So lernt die AI:</p>
         <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400">
           <li>Du bearbeitest einen AI-Entwurf in der Inbox → wird hier automatisch erfasst</li>
-          <li>Du klickst "Als Wissen extrahieren" → Korrektur wird in die Knowledge Base gespeichert</li>
+          <li>Du klickst &quot;Als Wissen extrahieren&quot; → Korrektur wird in die Knowledge Base gespeichert</li>
           <li>Beim nächsten ähnlichen Thema nutzt die AI diese Information für bessere Antworten</li>
         </ol>
       </div>

@@ -628,7 +628,7 @@ Nächster Start: ${formatDate(course.next_start)}`
           <AlertDialogHeader>
             <AlertDialogTitle>Kurs löschen?</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie den Kurs "{deleteConfirmCourse?.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
+              Möchten Sie den Kurs &quot;{deleteConfirmCourse?.name}&quot; wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

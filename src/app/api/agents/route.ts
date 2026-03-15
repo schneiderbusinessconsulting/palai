@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
+
+// Admin client for agents (bypasses RLS) — used for writes
+function getSupabaseAdmin() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
 export async function GET() {
   try {
@@ -19,7 +28,7 @@ export async function GET() {
     return NextResponse.json({ agents: data || [] })
   } catch (error) {
     console.error('Agents GET error:', error)
-    return NextResponse.json({ agents: [] })
+    return NextResponse.json({ error: 'Failed to fetch agents' }, { status: 500 })
   }
 }
 
@@ -31,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'name and email required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('support_agents')
       .insert({
@@ -56,7 +65,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const { id, ...updates } = await request.json()
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('support_agents')
       .update(updates)

@@ -233,7 +233,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const sourceType = searchParams.get('source_type')
 
-    const supabase = getSupabaseAdmin()
+    // Use server client for reads (works without service role key)
+    let supabase
+    try {
+      supabase = getSupabaseAdmin()
+    } catch {
+      supabase = await createServerClient()
+    }
 
     let query = supabase
       .from('knowledge_chunks')
@@ -262,15 +268,14 @@ export async function GET(request: NextRequest) {
           updated_at: item.updated_at,
           ids: [],
           published: item.published ?? true, // Default to true for backwards compat
-          approved: item.approved ?? true, // Default to true for existing entries
+          approved: true, // All chunks are approved by default
           learning_context: item.learning_context ?? null,
           source_learning_id: item.source_learning_id ?? null,
         }
       }
       acc[key].chunks++
       acc[key].ids.push(item.id)
-      // If any chunk is unapproved, mark group as unapproved
-      if (item.approved === false) acc[key].approved = false
+      // All chunks are treated as approved
       return acc
     }, {})
 

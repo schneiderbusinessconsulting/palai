@@ -455,6 +455,19 @@ export async function POST(request: NextRequest) {
     // Phase 4: Fetch SLA targets once for this batch
     const slaTargets = await getSlaTargets()
 
+    // Default agent: assign to Philipp (L1) by default
+    let defaultAgentId: string | null = null
+    try {
+      const { data: defaultAgent } = await supabase
+        .from('support_agents')
+        .select('id')
+        .eq('role', 'L1')
+        .eq('is_active', true)
+        .limit(1)
+        .single()
+      defaultAgentId = defaultAgent?.id || null
+    } catch { /* no default agent */ }
+
     for (const email of emails) {
       const props = email.properties
 
@@ -466,6 +479,17 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (existing) {
+        skipped++
+        continue
+      }
+
+      // Skip outgoing emails (team replies) — but mark their thread as resolved
+      if (props.hs_email_direction === 'EMAIL' && props.hs_email_thread_id) {
+        await supabase
+          .from('incoming_emails')
+          .update({ status: 'sent', updated_at: new Date().toISOString() })
+          .eq('hubspot_thread_id', props.hs_email_thread_id)
+          .in('status', ['pending', 'draft_ready'])
         skipped++
         continue
       }
@@ -526,6 +550,8 @@ export async function POST(request: NextRequest) {
           tone_formality: tone.formality,
           tone_sentiment: tone.sentiment,
           tone_urgency: tone.urgency,
+          // Default assignment
+          assigned_agent_id: defaultAgentId,
         })
         .select('id')
         .single()

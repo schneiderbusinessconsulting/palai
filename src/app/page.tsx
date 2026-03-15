@@ -287,7 +287,11 @@ function computeWorkload(
   // Use last 30 days of email counts for averages
   const last30Start = new Date(todayStart); last30Start.setDate(last30Start.getDate() - 30)
   const inboundLast30 = actionable.filter(e => new Date(e.received_at) >= last30Start).length
-  const resolvedLast30 = actionable.filter(e => e.status === 'sent' && new Date(e.received_at) >= last30Start).length
+  const resolvedLast30 = actionable.filter(e => {
+    if (e.status !== 'sent') return false
+    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
+    return d >= last30Start
+  }).length
 
   const daysInData = Math.max(daily.length, 1)
   const totalIncoming = daily.reduce((s, d) => s + d.total, 0)

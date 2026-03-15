@@ -12,11 +12,12 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search')
     const limit = parseInt(searchParams.get('limit') || '50')
 
-    // Get all customer emails (excluding system/notification)
+    // Get all customer emails (excluding system/notification and own emails)
     let query = supabase
       .from('incoming_emails')
       .select('id, from_email, from_name, subject, received_at, status, tone_sentiment, buying_intent_score, priority')
       .in('email_type', ['customer_inquiry', 'form_submission'])
+      .not('from_email', 'in', '("info@palacios-relations.ch","rafael@palacios-relations.ch","philipp@palacios-relations.ch","noreply@palacios-relations.ch")')
       .order('received_at', { ascending: false })
       .limit(500)
 

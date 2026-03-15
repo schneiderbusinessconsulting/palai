@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Search,
@@ -408,13 +409,12 @@ export default function TemplatesPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="content">Inhalt</Label>
-              <textarea
+              <Textarea
                 id="content"
                 value={formContent}
                 onChange={(e) => setFormContent(e.target.value)}
                 placeholder="Template-Text eingeben..."
                 rows={6}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </div>
             <div className="flex justify-end gap-2">

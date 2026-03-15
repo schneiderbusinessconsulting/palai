@@ -58,6 +58,7 @@ export default function CustomersPage() {
   const [sortBy, setSortBy] = useState<CustomerSortField>('lastContact')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [sentimentFilter, setSentimentFilter] = useState<string>('all')
+  const [page, setPage] = useState(1)
   const router = useRouter()
 
   const fetchCustomers = async (query?: string) => {
@@ -79,9 +80,14 @@ export default function CustomersPage() {
 
   useEffect(() => { fetchCustomers() }, [])
 
-  const handleSearch = () => {
-    fetchCustomers(search)
-  }
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchCustomers(search)
+      setPage(1)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [search])
 
   // Filter + sort customers
   const displayCustomers = (() => {
@@ -114,11 +120,9 @@ export default function CustomersPage() {
             placeholder="Name oder E-Mail suchen..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             className="pl-10"
           />
         </div>
-        <Button onClick={handleSearch} variant="outline">Suchen</Button>
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as CustomerSortField)}>
           <SelectTrigger className="w-full sm:w-48">
             <ArrowUpDown className="h-4 w-4 mr-2" />
@@ -155,7 +159,7 @@ export default function CustomersPage() {
             key={key}
             variant={sentimentFilter === key ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setSentimentFilter(key)}
+            onClick={() => { setSentimentFilter(key); setPage(1) }}
           >
             {label}
           </Button>
@@ -226,7 +230,7 @@ export default function CustomersPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {displayCustomers.map((customer) => (
+              {displayCustomers.slice((page - 1) * 20, page * 20).map((customer) => (
                 <button
                   key={customer.email}
                   onClick={() => router.push(`/customers/${encodeURIComponent(customer.email)}`)}
@@ -265,6 +269,30 @@ export default function CustomersPage() {
                 </button>
               ))}
             </div>
+            {/* Pagination Controls */}
+            {displayCustomers.length > 20 && (
+              <div className="flex items-center justify-between pt-4 mt-4 border-t">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  Zurück
+                </Button>
+                <span className="text-sm text-slate-500">
+                  Seite {page} von {Math.ceil(displayCustomers.length / 20)}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(p => Math.min(Math.ceil(displayCustomers.length / 20), p + 1))}
+                  disabled={page >= Math.ceil(displayCustomers.length / 20)}
+                >
+                  Weiter
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

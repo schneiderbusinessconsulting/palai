@@ -58,6 +58,16 @@ interface AnalyticsData {
   daily: Array<{ day: string; total: number; sent: number; pending: number }>
 }
 
+interface DailyKPI {
+  day: string
+  backlog: number
+  frtMinutes: number | null
+  slaCompliance: number | null
+  resolutionRate: number | null
+  avgResponseHours: number | null
+  csatAvg: number | null
+}
+
 interface HotLead {
   id: string
   from_name?: string
@@ -287,6 +297,118 @@ function computeWorkload(
   }
 }
 
+// ─── Sparkline SVG Component ─────────────────────────────────────────────────
+const Sparkline = memo(function Sparkline({ data, color = '#3b82f6', height = 24, width = 64 }: { data: number[]; color?: string; height?: number; width?: number }) {
+  if (data.length < 2) return null
+  const min = Math.min(...data)
+  const max = Math.max(...data)
+  const range = max - min || 1
+  const points = data.map((v, i) => {
+    const x = (i / (data.length - 1)) * width
+    const y = height - ((v - min) / range) * (height - 4) - 2
+    return `${x},${y}`
+  }).join(' ')
+  return (
+    <svg width={width} height={height} className="inline-block">
+      <polyline fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={points} />
+    </svg>
+  )
+})
+
+// ─── Daily KPI Computation ───────────────────────────────────────────────────
+function computeDailyKPIs(allEmails: Email[], csatRatings: Array<{ rating: number; created_at: string }>): DailyKPI[] {
+  const dayMap = new Map<string, { emails: Email[]; csatRatings: number[] }>()
+
+  // Group emails by day
+  for (const e of allEmails) {
+    if (!isActionable(e)) continue
+    const day = e.received_at.split('T')[0]
+    if (!dayMap.has(day)) dayMap.set(day, { emails: [], csatRatings: [] })
+    dayMap.get(day)!.emails.push(e)
+  }
+
+  // Group CSAT ratings by day
+  for (const r of csatRatings) {
+    const day = r.created_at.split('T')[0]
+    if (!dayMap.has(day)) dayMap.set(day, { emails: [], csatRatings: [] })
+    dayMap.get(day)!.csatRatings.push(r.rating)
+  }
+
+  const days = Array.from(dayMap.keys()).sort()
+  let runningBacklog = 0
+
+  return days.map(day => {
+    const { emails, csatRatings: dayRatings } = dayMap.get(day)!
+    const resolved = emails.filter(e => e.status === 'sent').length
+    const total = emails.length
+    runningBacklog += total - resolved
+
+    // SLA compliance
+    const withSla = emails.filter(e => e.sla_status)
+    const slaOk = withSla.filter(e => e.sla_status === 'ok' || e.sla_status === 'at_risk').length
+    const slaBreached = withSla.filter(e => e.sla_status === 'breached').length
+    const slaCompliance = (slaOk + slaBreached) > 0 ? Math.round((slaOk / (slaOk + slaBreached)) * 100) : null
+
+    // FRT
+    const frtTimes: number[] = []
+    for (const e of emails) {
+      if (e.first_response_at) {
+        const ms = new Date(e.first_response_at).getTime() - new Date(e.received_at).getTime()
+        if (ms > 0) frtTimes.push(ms / 60000)
+      }
+    }
+    const frtMinutes = frtTimes.length > 0 ? Math.round(frtTimes.reduce((a, b) => a + b, 0) / frtTimes.length) : null
+
+    // Resolution rate
+    const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : null
+
+    // Avg response hours
+    const responseTimes: number[] = []
+    for (const e of emails) {
+      if (e.status === 'sent' && e.updated_at) {
+        const ms = new Date(e.updated_at).getTime() - new Date(e.received_at).getTime()
+        if (ms > 0) responseTimes.push(ms)
+      }
+    }
+    const avgResponseHours = responseTimes.length > 0
+      ? Math.round((responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length / 3600000) * 10) / 10
+      : null
+
+    // CSAT
+    const csatAvg = dayRatings.length > 0
+      ? Math.round((dayRatings.reduce((a, b) => a + b, 0) / dayRatings.length) * 10) / 10
+      : null
+
+    return { day, backlog: Math.max(runningBacklog, 0), frtMinutes, slaCompliance, resolutionRate, avgResponseHours, csatAvg }
+  })
+}
+
+// ─── Period Comparison ───────────────────────────────────────────────────────
+function computePeriodComparison(dailyKPIs: DailyKPI[]): Record<string, number> {
+  if (dailyKPIs.length < 14) return {}
+  const mid = Math.floor(dailyKPIs.length / 2)
+  const firstHalf = dailyKPIs.slice(0, mid)
+  const secondHalf = dailyKPIs.slice(mid)
+
+  const avg = (arr: DailyKPI[], key: keyof DailyKPI) => {
+    const vals = arr.map(d => d[key]).filter((v): v is number => v !== null)
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null
+  }
+
+  const pctChange = (prev: number | null, curr: number | null) => {
+    if (prev === null || curr === null || prev === 0) return 0
+    return Math.round(((curr - prev) / prev) * 100)
+  }
+
+  return {
+    frt: pctChange(avg(firstHalf, 'frtMinutes'), avg(secondHalf, 'frtMinutes')),
+    sla: pctChange(avg(firstHalf, 'slaCompliance'), avg(secondHalf, 'slaCompliance')),
+    resolution: pctChange(avg(firstHalf, 'resolutionRate'), avg(secondHalf, 'resolutionRate')),
+    responseTime: pctChange(avg(firstHalf, 'avgResponseHours'), avg(secondHalf, 'avgResponseHours')),
+    csat: pctChange(avg(firstHalf, 'csatAvg'), avg(secondHalf, 'csatAvg')),
+  }
+}
+
 const TrendPill = memo(function TrendPill({ value, invertColor }: { value: number; invertColor?: boolean }) {
   const positive = invertColor ? value < 0 : value > 0
   const negative = invertColor ? value > 0 : value < 0
@@ -313,6 +435,8 @@ export default function DashboardPage() {
   const [sentimentDist, setSentimentDist] = useState<Record<string, number>>({})
   const [workload, setWorkload] = useState<WorkloadStats | null>(null)
   const [level1, setLevel1] = useState<Level1Stats>({ backlog: 0, avgResponseHours: null, slaCompliance: null, resolutionRate: null, frtMinutes: null, csatAvg: null })
+  const [dailyKPIs, setDailyKPIs] = useState<DailyKPI[]>([])
+  const [periodComparison, setPeriodComparison] = useState<Record<string, number>>({})
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const fetchData = useCallback(async () => {
@@ -383,12 +507,19 @@ export default function DashboardPage() {
 
         // CSAT
         let csatAvg: number | null = null
+        let csatRatings: Array<{ rating: number; created_at: string }> = []
         if (csatRes.ok) {
           const csatData = await csatRes.json()
           csatAvg = csatData.avg > 0 ? csatData.avg : null
+          csatRatings = csatData.ratings || []
         }
 
         setLevel1({ backlog, avgResponseHours, slaCompliance, resolutionRate, frtMinutes, csatAvg })
+
+        // Compute daily KPIs for sparklines and trend charts
+        const kpis = computeDailyKPIs(all, csatRatings)
+        setDailyKPIs(kpis)
+        setPeriodComparison(computePeriodComparison(kpis))
       }
 
       let dailyData: Array<{ day: string; total: number; sent: number; pending: number }> = []
@@ -438,7 +569,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <Header
-        title={`${greeting}, Philipp`}
+        title={greeting}
         description="Hier ist dein heutiger Stand auf einen Blick."
       />
 
@@ -506,6 +637,7 @@ export default function DashboardPage() {
               level1.avgResponseHours !== null && level1.avgResponseHours > 4 ? 'text-amber-600' :
               'text-blue-600'
             }`} />
+            {periodComparison.responseTime !== undefined && <TrendPill value={periodComparison.responseTime} invertColor />}
           </div>
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
@@ -513,7 +645,10 @@ export default function DashboardPage() {
                 level1.avgResponseHours < 1 ? `${Math.round(level1.avgResponseHours * 60)}m` : `${level1.avgResponseHours}h`
               ) : '—'}
           </p>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Ø Antwortzeit</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Ø Antwortzeit</p>
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.avgResponseHours ?? 0)} color={level1.avgResponseHours !== null && level1.avgResponseHours > 4 ? '#d97706' : '#3b82f6'} />
+          </div>
         </div>
 
         {/* SLA Quote */}
@@ -528,12 +663,16 @@ export default function DashboardPage() {
               level1.slaCompliance !== null && level1.slaCompliance >= 80 ? 'text-amber-600' :
               'text-slate-500'
             }`} />
+            {periodComparison.sla !== undefined && <TrendPill value={periodComparison.sla} />}
           </div>
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
               level1.slaCompliance !== null ? `${level1.slaCompliance}%` : '—'}
           </p>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">SLA Quote</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">SLA Quote</p>
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.slaCompliance ?? 100)} color={level1.slaCompliance !== null && level1.slaCompliance >= 95 ? '#16a34a' : '#d97706'} />
+          </div>
         </div>
 
         {/* Resolution Rate */}
@@ -544,12 +683,16 @@ export default function DashboardPage() {
               level1.resolutionRate !== null && level1.resolutionRate >= 50 ? 'text-amber-600' :
               'text-slate-500'
             }`} />
+            {periodComparison.resolution !== undefined && <TrendPill value={periodComparison.resolution} />}
           </div>
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
               level1.resolutionRate !== null ? `${level1.resolutionRate}%` : '—'}
           </p>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Heute gelöst</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Heute gelöst</p>
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.resolutionRate ?? 0)} color="#16a34a" />
+          </div>
         </div>
 
         {/* FRT (First Response Time) */}
@@ -564,6 +707,7 @@ export default function DashboardPage() {
               level1.frtMinutes !== null && level1.frtMinutes <= 480 ? 'text-amber-600' :
               'text-slate-500'
             }`} />
+            {periodComparison.frt !== undefined && <TrendPill value={periodComparison.frt} invertColor />}
           </div>
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
@@ -572,7 +716,10 @@ export default function DashboardPage() {
                 `${Math.round(level1.frtMinutes / 60 * 10) / 10}h`
               ) : '—'}
           </p>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Ø Erste Antwort</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Ø Erste Antwort</p>
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.frtMinutes ?? 0)} color={level1.frtMinutes !== null && level1.frtMinutes <= 120 ? '#16a34a' : '#d97706'} />
+          </div>
         </div>
 
         {/* CSAT */}
@@ -589,12 +736,16 @@ export default function DashboardPage() {
               level1.csatAvg !== null ? 'text-red-600' :
               'text-slate-500'
             }`} />
+            {periodComparison.csat !== undefined && <TrendPill value={periodComparison.csat} />}
           </div>
           <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
             {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
               level1.csatAvg !== null ? `${level1.csatAvg}` : '—'}
           </p>
-          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">CSAT (Ø 5)</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-400">CSAT (Ø 5)</p>
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.csatAvg ?? 0)} color={level1.csatAvg !== null && level1.csatAvg >= 4.0 ? '#16a34a' : '#d97706'} />
+          </div>
         </div>
       </div>
 
@@ -723,6 +874,128 @@ export default function DashboardPage() {
           </Card>
 
         </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+          LEVEL 2.5 — 30-Tage KPI Trends
+          ═══════════════════════════════════════════════════ */}
+      {!isLoading && dailyKPIs.length >= 7 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-indigo-500" />
+              KPI Trends (30 Tage)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* SLA Compliance Trend */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <Shield className="h-3 w-3" /> SLA Quote
+                </p>
+                <div className="h-16 flex items-end gap-[2px]">
+                  {dailyKPIs.slice(-30).map((d, i) => {
+                    const val = d.slaCompliance ?? 100
+                    return (
+                      <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.day}: ${val}%`}>
+                        <div
+                          className={`rounded-t ${val >= 95 ? 'bg-green-400' : val >= 80 ? 'bg-amber-400' : 'bg-red-400'}`}
+                          style={{ height: `${Math.max(val * 0.64, 2)}px` }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{dailyKPIs.slice(-30)[0]?.day.slice(5)}</span>
+                  <span>Heute</span>
+                </div>
+              </div>
+
+              {/* FRT Trend */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> Ø Erste Antwort (min)
+                </p>
+                <div className="h-16 flex items-end gap-[2px]">
+                  {(() => {
+                    const data = dailyKPIs.slice(-30)
+                    const maxFrt = Math.max(...data.map(d => d.frtMinutes ?? 0), 1)
+                    return data.map((d, i) => {
+                      const val = d.frtMinutes ?? 0
+                      const h = val > 0 ? Math.max((val / maxFrt) * 64, 2) : 0
+                      return (
+                        <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.day}: ${val}min`}>
+                          <div
+                            className={`rounded-t ${val <= 60 ? 'bg-green-400' : val <= 240 ? 'bg-amber-400' : 'bg-red-400'}`}
+                            style={{ height: `${h}px` }}
+                          />
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{dailyKPIs.slice(-30)[0]?.day.slice(5)}</span>
+                  <span>Heute</span>
+                </div>
+              </div>
+
+              {/* Resolution Rate Trend */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Resolution Rate
+                </p>
+                <div className="h-16 flex items-end gap-[2px]">
+                  {dailyKPIs.slice(-30).map((d, i) => {
+                    const val = d.resolutionRate ?? 0
+                    return (
+                      <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.day}: ${val}%`}>
+                        <div
+                          className={`rounded-t ${val >= 80 ? 'bg-green-400' : val >= 50 ? 'bg-amber-400' : 'bg-red-400'}`}
+                          style={{ height: `${Math.max(val * 0.64, val > 0 ? 2 : 0)}px` }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{dailyKPIs.slice(-30)[0]?.day.slice(5)}</span>
+                  <span>Heute</span>
+                </div>
+              </div>
+
+              {/* CSAT Trend */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                  <Star className="h-3 w-3" /> CSAT
+                </p>
+                <div className="h-16 flex items-end gap-[2px]">
+                  {(() => {
+                    const data = dailyKPIs.slice(-30)
+                    return data.map((d, i) => {
+                      const val = d.csatAvg ?? 0
+                      const h = val > 0 ? Math.max((val / 5) * 64, 2) : 0
+                      return (
+                        <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.day}: ${val}`}>
+                          <div
+                            className={`rounded-t ${val >= 4.0 ? 'bg-green-400' : val >= 3.0 ? 'bg-amber-400' : val > 0 ? 'bg-red-400' : 'bg-slate-200 dark:bg-slate-700'}`}
+                            style={{ height: `${h}px` }}
+                          />
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>{dailyKPIs.slice(-30)[0]?.day.slice(5)}</span>
+                  <span>Heute</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* ═══════════════════════════════════════════════════

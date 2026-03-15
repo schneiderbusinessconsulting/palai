@@ -69,7 +69,7 @@ function DiffView({ original, corrected }: { original: string; corrected: string
       </div>
       <div>
         <p className="text-xs font-medium text-green-600 mb-1.5 flex items-center gap-1">
-          <Edit2 className="h-3 w-3" /> Korrigiert von Sandro
+          <Edit2 className="h-3 w-3" /> Korrigierte Version
         </p>
         <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-slate-700 dark:text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto">
           {corrected}

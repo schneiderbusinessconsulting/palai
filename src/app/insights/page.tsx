@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -207,14 +207,15 @@ export default function InsightsPage() {
   const [data, setData] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [period, setPeriod] = useState<string>('30d')
   const [drilldown, setDrilldown] = useState<{ title: string; emails: DrilldownEmail[] } | null>(null)
   const router = useRouter()
 
-  const fetchInsights = async () => {
+  const fetchInsights = useCallback(async (selectedPeriod: string) => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/insights')
+      const res = await fetch(`/api/insights?period=${selectedPeriod}`)
       if (!res.ok) throw new Error('Failed to load insights')
       setData(await res.json())
     } catch (e) {
@@ -222,9 +223,13 @@ export default function InsightsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  useEffect(() => { fetchInsights() }, [])
+  useEffect(() => { fetchInsights(period) }, [fetchInsights, period])
+
+  const handlePeriodChange = (newPeriod: string) => {
+    setPeriod(newPeriod)
+  }
 
   if (loading) {
     return (
@@ -247,7 +252,7 @@ export default function InsightsPage() {
             <>
               <p className="text-slate-700 dark:text-slate-300 font-medium">Insights konnten nicht geladen werden</p>
               <p className="text-sm text-slate-400 mt-1">{error}</p>
-              <Button variant="outline" size="sm" className="mt-4" onClick={fetchInsights}>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => fetchInsights(period)}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Erneut laden
               </Button>
@@ -282,7 +287,20 @@ export default function InsightsPage() {
           title="Insights"
           description="Marketing, Sales, Product & Kundenstimmung"
         />
-        <div className="flex gap-2 flex-shrink-0 mt-1">
+        <div className="flex gap-2 flex-shrink-0 mt-1 items-center">
+          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+            {['7d', '30d', '90d'].map(p => (
+              <Button
+                key={p}
+                variant={period === p ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => handlePeriodChange(p)}
+                className={period === p ? '' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}
+              >
+                {p}
+              </Button>
+            ))}
+          </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
@@ -305,7 +323,7 @@ export default function InsightsPage() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button variant="outline" size="sm" onClick={fetchInsights} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => fetchInsights(period)} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Aktualisieren
           </Button>
@@ -385,18 +403,6 @@ export default function InsightsPage() {
                     <p className="text-xs text-slate-600 dark:text-slate-400">Niedrig (0-30%)</p>
                     <p className="text-xs text-slate-500 mt-0.5">Kalt</p>
                   </div>
-                </div>
-                {/* Visual intent scale */}
-                <div className="space-y-2">
-                  {[100, 80, 60, 40, 20, 0].map((threshold, i) => {
-                    const nextThreshold = [80, 60, 40, 20, 0][i] ?? 0
-                    const count = sales.hotLeads.filter(h =>
-                      (h.buying_intent_score || 0) >= nextThreshold &&
-                      (h.buying_intent_score || 0) < (threshold === 100 ? 101 : threshold + 1)
-                    ).length
-                    if (threshold === 0) return null
-                    return null
-                  })}
                 </div>
               </CardContent>
             </Card>

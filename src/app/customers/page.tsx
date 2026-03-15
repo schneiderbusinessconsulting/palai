@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -230,10 +231,10 @@ export default function CustomersPage() {
           <CardContent>
             <div className="space-y-2">
               {displayCustomers.slice((page - 1) * 20, page * 20).map((customer) => (
-                <button
+                <Link
                   key={customer.email}
-                  onClick={() => router.push(`/customers/${encodeURIComponent(customer.email)}`)}
-                  className="w-full text-left flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
+                  href={`/customers/${encodeURIComponent(customer.email)}`}
+                  className="block w-full text-left flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center flex-shrink-0">
@@ -265,7 +266,7 @@ export default function CustomersPage() {
                     <span className="text-xs text-slate-400">{formatRelativeDate(customer.lastContact)}</span>
                     <ExternalLink className="h-3 w-3 text-slate-400 opacity-0 group-hover:opacity-100" />
                   </div>
-                </button>
+                </Link>
               ))}
             </div>
             {/* Pagination Controls */}

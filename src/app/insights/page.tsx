@@ -37,7 +37,33 @@ import {
   ExternalLink,
   Download,
 } from 'lucide-react'
+import {
+  PieChart, Pie, Cell,
+  BarChart, Bar, XAxis, YAxis, Tooltip, Legend,
+  LineChart, Line,
+  AreaChart, Area,
+  ResponsiveContainer,
+} from 'recharts'
 import { formatRelativeDate } from '@/lib/utils'
+
+const COLORS = {
+  green: '#10b981',
+  blue: '#3b82f6',
+  amber: '#f59e0b',
+  red: '#ef4444',
+  gray: '#94a3b8',
+  purple: '#8b5cf6',
+}
+
+const darkTooltipStyle = {
+  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' },
+  itemStyle: { color: '#e2e8f0' },
+  labelStyle: { color: '#e2e8f0' },
+}
+
+function renderPieLabel({ name, percent }: { name: string; percent: number }) {
+  return `${name} ${(percent * 100).toFixed(0)}%`
+}
 
 interface InsightsData {
   summary: {
@@ -386,24 +412,39 @@ export default function InsightsPage() {
                 </CardTitle>
                 <CardDescription>Kaufabsicht über alle Kundenanfragen</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-3 gap-3 text-center">
-                  <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-emerald-600">{marketing.buyingIntentDistribution.high}</p>
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400">Hoch (61-100%)</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Hot Leads</p>
-                  </div>
-                  <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                    <p className="text-2xl font-bold text-amber-600">{marketing.buyingIntentDistribution.medium}</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400">Mittel (31-60%)</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Warm</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                    <p className="text-2xl font-bold text-slate-500">{marketing.buyingIntentDistribution.low}</p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">Niedrig (0-30%)</p>
-                    <p className="text-xs text-slate-500 mt-0.5">Kalt</p>
-                  </div>
-                </div>
+              <CardContent>
+                {(() => {
+                  const biPieData = [
+                    { name: 'Hoch', value: marketing.buyingIntentDistribution.high },
+                    { name: 'Mittel', value: marketing.buyingIntentDistribution.medium },
+                    { name: 'Niedrig', value: marketing.buyingIntentDistribution.low },
+                  ].filter(d => d.value > 0)
+                  const biPieColors = [COLORS.green, COLORS.amber, COLORS.gray]
+                  return biPieData.length === 0 ? (
+                    <p className="text-sm text-slate-500">Noch keine Daten verfügbar.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
+                        <Pie
+                          data={biPieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={90}
+                          paddingAngle={3}
+                          dataKey="value"
+                          label={renderPieLabel}
+                        >
+                          {biPieData.map((_, idx) => (
+                            <Cell key={idx} fill={biPieColors[idx]} />
+                          ))}
+                        </Pie>
+                        <Tooltip {...darkTooltipStyle} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )
+                })()}
               </CardContent>
             </Card>
 
@@ -416,38 +457,32 @@ export default function InsightsPage() {
                 </CardTitle>
                 <CardDescription>{totalBiSignals} Signale total erkannt</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {Object.entries(marketing.biByCategory).length === 0 ? (
-                  <p className="text-sm text-slate-500">Noch keine BI-Signale erfasst.</p>
-                ) : (
-                  Object.entries(marketing.biByCategory)
+              <CardContent>
+                {(() => {
+                  const biBarData = Object.entries(marketing.biByCategory)
                     .sort(([, a], [, b]) => b - a)
-                    .map(([category, count]) => (
-                      <div key={category} className="flex items-center gap-3">
-                        <div className="w-28 flex-shrink-0">
-                          <Badge variant="outline" className={
-                            category === 'buying_signal' ? 'text-green-700 border-green-300' :
-                            category === 'churn_risk' ? 'text-red-700 border-red-300' :
-                            'text-amber-700 border-amber-300'
-                          }>
-                            {category === 'buying_signal' ? 'Kaufsignal' :
-                             category === 'churn_risk' ? 'Churn' : 'Einwand'}
-                          </Badge>
-                        </div>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={
-                              category === 'buying_signal' ? 'bg-green-500 h-full rounded-full' :
-                              category === 'churn_risk' ? 'bg-red-500 h-full rounded-full' :
-                              'bg-amber-500 h-full rounded-full'
-                            }
-                            style={{ width: `${totalBiSignals > 0 ? (count / totalBiSignals) * 100 : 0}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium w-8 text-right">{count}</span>
-                      </div>
-                    ))
-                )}
+                    .map(([category, count]) => ({
+                      name: category === 'buying_signal' ? 'Kaufsignal' : category === 'churn_risk' ? 'Churn' : 'Einwand',
+                      count,
+                      fill: category === 'buying_signal' ? COLORS.green : category === 'churn_risk' ? COLORS.red : COLORS.amber,
+                    }))
+                  return biBarData.length === 0 ? (
+                    <p className="text-sm text-slate-500">Noch keine BI-Signale erfasst.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={biBarData} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
+                        <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                        <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} width={80} />
+                        <Tooltip {...darkTooltipStyle} />
+                        <Bar dataKey="count" name="Signale" radius={[0, 4, 4, 0]}>
+                          {biBarData.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )
+                })()}
               </CardContent>
             </Card>
 
@@ -464,15 +499,18 @@ export default function InsightsPage() {
                 {topTopics.length === 0 ? (
                   <p className="text-sm text-slate-500">Noch keine Daten verfügbar.</p>
                 ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {topTopics.map(([topic, count]) => (
-                      <div key={topic} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                        <p className="font-medium text-sm">{topic}</p>
-                        <p className="text-2xl font-bold text-blue-600">{count}</p>
-                        <p className="text-xs text-slate-500">Anfragen</p>
-                      </div>
-                    ))}
-                  </div>
+                  <ResponsiveContainer width="100%" height={topTopics.length * 44 + 20}>
+                    <BarChart
+                      data={topTopics.map(([topic, count]) => ({ name: topic, count }))}
+                      layout="vertical"
+                      margin={{ left: 20, right: 30, top: 5, bottom: 5 }}
+                    >
+                      <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} width={120} />
+                      <Tooltip {...darkTooltipStyle} />
+                      <Bar dataKey="count" name="Anfragen" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
@@ -496,6 +534,28 @@ export default function InsightsPage() {
                 <CardDescription>Offene Anfragen mit Buying Intent &gt; 60%</CardDescription>
               </CardHeader>
               <CardContent>
+                {sales.hotLeads.length > 1 && (
+                  <div className="mb-4">
+                    <ResponsiveContainer width="100%" height={100}>
+                      <AreaChart
+                        data={(() => {
+                          const byDate: Record<string, number> = {}
+                          sales.hotLeads.forEach(l => {
+                            const d = new Date(l.received_at).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' })
+                            byDate[d] = (byDate[d] || 0) + 1
+                          })
+                          return Object.entries(byDate).map(([date, count]) => ({ date, count }))
+                        })()}
+                        margin={{ top: 5, right: 5, bottom: 0, left: -20 }}
+                      >
+                        <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                        <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} allowDecimals={false} />
+                        <Tooltip {...darkTooltipStyle} />
+                        <Area type="monotone" dataKey="count" name="Leads" stroke={COLORS.green} fill={COLORS.green} fillOpacity={0.2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
                 {sales.hotLeads.length === 0 ? (
                   <p className="text-sm text-slate-500">Keine Hot Leads aktuell.</p>
                 ) : (
@@ -649,27 +709,22 @@ export default function InsightsPage() {
                 </CardTitle>
                 <CardDescription>Was fragen Kunden am häufigsten?</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent>
                 {topTopics.length === 0 ? (
                   <p className="text-sm text-slate-500">Noch keine Daten.</p>
                 ) : (
-                  topTopics.map(([topic, count]) => {
-                    const maxCount = topTopics[0][1]
-                    return (
-                      <div key={topic} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{topic}</span>
-                          <span className="text-sm text-slate-500">{count}</span>
-                        </div>
-                        <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-purple-500 rounded-full"
-                            style={{ width: `${(count / maxCount) * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })
+                  <ResponsiveContainer width="100%" height={topTopics.length * 44 + 20}>
+                    <BarChart
+                      data={topTopics.map(([topic, count]) => ({ name: topic, count }))}
+                      layout="vertical"
+                      margin={{ left: 20, right: 20, top: 5, bottom: 5 }}
+                    >
+                      <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                      <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} width={100} />
+                      <Tooltip {...darkTooltipStyle} />
+                      <Bar dataKey="count" name="Anfragen" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 )}
               </CardContent>
             </Card>
@@ -683,25 +738,44 @@ export default function InsightsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <StatCard
-                    icon={BookOpen}
-                    label="Training-Einträge"
-                    value={summary.kbChunkCount}
-                    color="text-blue-600"
-                  />
-                  <StatCard
-                    icon={Users}
-                    label="Knowledge Gaps"
-                    value={product.knowledgeGaps.length}
-                    color={product.knowledgeGaps.length > 0 ? 'text-amber-600' : 'text-green-600'}
-                  />
-                </div>
-                {product.knowledgeGaps.length > 0 && (
-                  <p className="text-sm text-amber-600 dark:text-amber-400 mt-3">
-                    {product.knowledgeGaps.length} Themen sollten in die Knowledge Base aufgenommen werden.
-                  </p>
-                )}
+                {(() => {
+                  const kbPieData = [
+                    { name: 'Abgedeckt', value: summary.kbChunkCount },
+                    { name: 'Gaps', value: product.knowledgeGaps.length },
+                  ].filter(d => d.value > 0)
+                  const kbColors = [COLORS.blue, COLORS.amber]
+                  return kbPieData.length === 0 ? (
+                    <p className="text-sm text-slate-500">Noch keine KB-Daten.</p>
+                  ) : (
+                    <>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={kbPieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={40}
+                            outerRadius={75}
+                            paddingAngle={3}
+                            dataKey="value"
+                            label={renderPieLabel}
+                          >
+                            {kbPieData.map((_, idx) => (
+                              <Cell key={idx} fill={kbColors[idx]} />
+                            ))}
+                          </Pie>
+                          <Tooltip {...darkTooltipStyle} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                      {product.knowledgeGaps.length > 0 && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400 mt-3 text-center">
+                          {product.knowledgeGaps.length} Themen sollten in die Knowledge Base aufgenommen werden.
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
               </CardContent>
             </Card>
           </div>
@@ -721,6 +795,7 @@ export default function InsightsPage() {
                 <CardDescription>Sentiment-Analyse aller Anfragen</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Clickable summary counters */}
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <button
                     onClick={() => openDrilldown('Positive Kundenstimmen', sentiment.emails?.positive || [])}
@@ -745,28 +820,35 @@ export default function InsightsPage() {
                   </button>
                 </div>
 
-                {totalSentiment > 0 && (
-                  <div className="space-y-2">
-                    {[
-                      { key: 'positive', label: 'Positiv', color: 'bg-green-500', count: sentiment.distribution.positive },
-                      { key: 'neutral', label: 'Neutral', color: 'bg-slate-400', count: sentiment.distribution.neutral },
-                      { key: 'negative', label: 'Negativ', color: 'bg-red-500', count: sentiment.distribution.negative },
-                    ].map(item => (
-                      <div key={item.key} className="flex items-center gap-3">
-                        <span className="text-sm w-16">{item.label}</span>
-                        <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                          <div
-                            className={`${item.color} h-full rounded-full`}
-                            style={{ width: `${(item.count / totalSentiment) * 100}%` }}
-                          />
-                        </div>
-                        <span className="text-sm text-slate-500 w-12 text-right">
-                          {Math.round((item.count / totalSentiment) * 100)}%
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {totalSentiment > 0 && (() => {
+                  const sentimentPieData = [
+                    { name: 'Positiv', value: sentiment.distribution.positive, color: COLORS.green },
+                    { name: 'Neutral', value: sentiment.distribution.neutral, color: COLORS.gray },
+                    { name: 'Negativ', value: sentiment.distribution.negative, color: COLORS.red },
+                  ].filter(d => d.value > 0)
+                  return (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={sentimentPieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={85}
+                          paddingAngle={3}
+                          dataKey="value"
+                          label={renderPieLabel}
+                        >
+                          {sentimentPieData.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip {...darkTooltipStyle} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  )
+                })()}
               </CardContent>
             </Card>
 
@@ -800,23 +882,27 @@ export default function InsightsPage() {
                 {sentiment.csatTrend.length > 0 && (
                   <div>
                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Wochentrend</p>
-                    <div className="space-y-2">
-                      {sentiment.csatTrend.map(week => (
-                        <div key={week.week} className="flex items-center gap-3">
-                          <span className="text-xs text-slate-500 w-20">
-                            {new Date(week.week).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' })}
-                          </span>
-                          <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div
-                              className="bg-amber-400 h-full rounded-full"
-                              style={{ width: `${(week.avg / 5) * 100}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-medium w-8 text-right">{week.avg}</span>
-                          <span className="text-xs text-slate-400">({week.count})</span>
-                        </div>
-                      ))}
-                    </div>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <LineChart
+                        data={sentiment.csatTrend.map(w => ({
+                          date: new Date(w.week).toLocaleDateString('de-CH', { day: '2-digit', month: '2-digit' }),
+                          avg: w.avg,
+                          count: w.count,
+                        }))}
+                        margin={{ top: 5, right: 10, bottom: 5, left: -10 }}
+                      >
+                        <XAxis dataKey="date" tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                        <YAxis domain={[0, 5]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                        <Tooltip
+                          {...darkTooltipStyle}
+                          formatter={(value: number, name: string) => [
+                            name === 'avg' ? `${value}/5` : value,
+                            name === 'avg' ? 'CSAT' : 'Bewertungen',
+                          ]}
+                        />
+                        <Line type="monotone" dataKey="avg" name="avg" stroke={COLORS.amber} strokeWidth={2} dot={{ fill: COLORS.amber, r: 4 }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 )}
 
@@ -839,24 +925,56 @@ export default function InsightsPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <button onClick={() => openDrilldown('SLA eingehalten', dd.slaOk)} className="text-left hover:ring-2 hover:ring-green-200 rounded-lg transition-all">
-                    <StatCard icon={CheckCircle} label="SLA eingehalten" value={summary.slaOk} color="text-green-600" />
-                  </button>
-                  <button onClick={() => openDrilldown('SLA verletzt', dd.slaBreached)} className="text-left hover:ring-2 hover:ring-red-200 rounded-lg transition-all">
-                    <StatCard icon={AlertTriangle} label="SLA verletzt" value={summary.slaBreached} color={summary.slaBreached > 0 ? 'text-red-500' : 'text-slate-500'} />
-                  </button>
-                  <StatCard
-                    icon={BarChart3}
-                    label="Compliance Rate"
-                    value={summary.slaOk + summary.slaBreached > 0
-                      ? `${Math.round(summary.slaOk / (summary.slaOk + summary.slaBreached) * 100)}%`
-                      : '—'}
-                    color="text-blue-600"
-                  />
-                  <button onClick={() => openDrilldown('Noch offen', dd.pending)} className="text-left hover:ring-2 hover:ring-amber-200 rounded-lg transition-all">
-                    <StatCard icon={Clock} label="Noch offen" value={summary.pendingEmails} color="text-amber-600" />
-                  </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* SLA PieChart */}
+                  {(summary.slaOk > 0 || summary.slaBreached > 0) && (() => {
+                    const slaPieData = [
+                      { name: 'Eingehalten', value: summary.slaOk, color: COLORS.green },
+                      { name: 'Verletzt', value: summary.slaBreached, color: COLORS.red },
+                    ].filter(d => d.value > 0)
+                    return (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <PieChart>
+                          <Pie
+                            data={slaPieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={45}
+                            outerRadius={85}
+                            paddingAngle={3}
+                            dataKey="value"
+                            label={renderPieLabel}
+                          >
+                            {slaPieData.map((entry, idx) => (
+                              <Cell key={idx} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip {...darkTooltipStyle} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )
+                  })()}
+                  {/* Stat buttons */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <button onClick={() => openDrilldown('SLA eingehalten', dd.slaOk)} className="text-left hover:ring-2 hover:ring-green-200 rounded-lg transition-all">
+                      <StatCard icon={CheckCircle} label="SLA eingehalten" value={summary.slaOk} color="text-green-600" />
+                    </button>
+                    <button onClick={() => openDrilldown('SLA verletzt', dd.slaBreached)} className="text-left hover:ring-2 hover:ring-red-200 rounded-lg transition-all">
+                      <StatCard icon={AlertTriangle} label="SLA verletzt" value={summary.slaBreached} color={summary.slaBreached > 0 ? 'text-red-500' : 'text-slate-500'} />
+                    </button>
+                    <StatCard
+                      icon={BarChart3}
+                      label="Compliance Rate"
+                      value={summary.slaOk + summary.slaBreached > 0
+                        ? `${Math.round(summary.slaOk / (summary.slaOk + summary.slaBreached) * 100)}%`
+                        : '—'}
+                      color="text-blue-600"
+                    />
+                    <button onClick={() => openDrilldown('Noch offen', dd.pending)} className="text-left hover:ring-2 hover:ring-amber-200 rounded-lg transition-all">
+                      <StatCard icon={Clock} label="Noch offen" value={summary.pendingEmails} color="text-amber-600" />
+                    </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -140,10 +140,6 @@ function getSourceBadge(type: string) {
   return <Badge className={className}>{label}</Badge>
 }
 
-function formatDate(dateString: string) {
-  return formatRelativeDate(dateString)
-}
-
 export default function KnowledgePage() {
   const router = useRouter()
   const [items, setItems] = useState<KnowledgeItem[]>([])
@@ -609,7 +605,7 @@ export default function KnowledgePage() {
                         </span>
                         <span className="text-xs text-slate-400">•</span>
                         <span className="text-xs text-slate-500 dark:text-slate-400">
-                          {formatDate(item.updated_at)}
+                          {formatRelativeDate(item.updated_at)}
                         </span>
                       </div>
                       {item.learning_context && (
@@ -684,7 +680,7 @@ export default function KnowledgePage() {
                       </span>
                       <span className="text-xs text-slate-400">•</span>
                       <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Aktualisiert {formatDate(item.updated_at)}
+                        Aktualisiert {formatRelativeDate(item.updated_at)}
                       </span>
                     </div>
                   </div>

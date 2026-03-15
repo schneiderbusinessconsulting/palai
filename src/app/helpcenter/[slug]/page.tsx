@@ -53,10 +53,6 @@ const categoryConfig: Record<string, {
   },
 }
 
-function formatDate(dateString: string): string {
-  return formatAbsoluteDate(dateString)
-}
-
 export default function ArticlePage() {
   const params = useParams()
   const slug = params.slug as string
@@ -165,7 +161,7 @@ export default function ArticlePage() {
           </h1>
           <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
             <Clock className="h-4 w-4" />
-            <span>Zuletzt aktualisiert am {formatDate(article.updated_at)}</span>
+            <span>Zuletzt aktualisiert am {formatAbsoluteDate(article.updated_at)}</span>
           </div>
         </header>
 

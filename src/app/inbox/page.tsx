@@ -65,8 +65,8 @@ import {
   getStatusBadge,
   getEmailTypeBadge,
   getBuyingIntentBadge,
-  formatDate,
 } from '@/components/inbox/inbox-utils'
+import { formatRelativeDate } from '@/lib/utils'
 import {
   Tooltip,
   TooltipContent,
@@ -162,7 +162,7 @@ function InboxPageContent() {
   const [autoDraftEnabled, setAutoDraftEnabled] = useState(false) // Auto-draft disabled by default to save credits
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
-  const [syncMessage, setSyncMessage] = useState('')
+  // syncMessage replaced by toast notifications
   const [fetchError, setFetchError] = useState('')
 
   // Sorting
@@ -188,7 +188,7 @@ function InboxPageContent() {
   const [editedResponse, setEditedResponse] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState('')
+  // saveMessage replaced by toast notifications
   const [isManualMode, setIsManualMode] = useState(false)
 
   // Owner selection
@@ -207,7 +207,7 @@ function InboxPageContent() {
 
   // Save to KB state
   const [isSavingToKb, setIsSavingToKb] = useState(false)
-  const [kbSaveMsg, setKbSaveMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  // kbSaveMsg replaced by toast notifications
 
   // Conflict detection: lock state
   const [lockWarning, setLockWarning] = useState<{ locked_by: string; locked_at: string } | null>(null)
@@ -631,7 +631,6 @@ function InboxPageContent() {
   // Sync from HubSpot (including status sync for closed conversations)
   const handleSync = async () => {
     setIsSyncing(true)
-    setSyncMessage('')
     setFetchError('')
     try {
       // First: Import new emails (pass autoDraft setting)
@@ -640,7 +639,7 @@ function InboxPageContent() {
 
       if (!importResponse.ok) {
         const errorMsg = importData.error || `Sync fehlgeschlagen (HTTP ${importResponse.status})`
-        setSyncMessage(errorMsg)
+        toast.error(errorMsg)
         setFetchError(errorMsg)
         return
       }
@@ -656,41 +655,35 @@ function InboxPageContent() {
       if (statusData.closedEmails > 0) {
         messages.push(`${statusData.closedEmails} geschlossen`)
       }
-      setSyncMessage(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
+      toast.success(messages.length > 0 ? messages.join(', ') : 'Alles aktuell')
       fetchEmails(false) // Silent refresh - button already shows loading state
     } catch (error) {
       console.error('Sync failed:', error)
       const msg = 'Sync fehlgeschlagen — Serververbindung prüfen'
-      setSyncMessage(msg)
+      toast.error(msg)
       setFetchError(msg)
     } finally {
       setIsSyncing(false)
-      // Only auto-hide success messages, keep errors visible
-      if (!fetchError) {
-        setTimeout(() => setSyncMessage(''), 5000)
-      }
     }
   }
 
   // Re-classify existing emails
   const handleReclassify = async () => {
     setIsClassifying(true)
-    setSyncMessage('')
     try {
       const response = await fetch('/api/emails', { method: 'PATCH' })
       const data = await response.json()
       if (response.ok) {
-        setSyncMessage(data.message || `${data.classified || 0} klassifiziert, ${data.toneAnalyzed || 0} Tone, ${data.biScanned || 0} BI`)
+        toast.success(data.message || `${data.classified || 0} klassifiziert, ${data.toneAnalyzed || 0} Tone, ${data.biScanned || 0} BI`)
         fetchEmails(false) // Silent refresh
       } else {
-        setSyncMessage(data.error || 'Klassifizierung fehlgeschlagen')
+        toast.error(data.error || 'Klassifizierung fehlgeschlagen')
       }
     } catch (error) {
       console.error('Reclassify failed:', error)
-      setSyncMessage('Klassifizierung fehlgeschlagen')
+      toast.error('Klassifizierung fehlgeschlagen')
     } finally {
       setIsClassifying(false)
-      setTimeout(() => setSyncMessage(''), 5000)
     }
   }
 
@@ -837,7 +830,6 @@ function InboxPageContent() {
   const handleSaveToKb = async () => {
     if (!selectedEmail || !currentDraft) return
     setIsSavingToKb(true)
-    setKbSaveMsg(null)
     try {
       const text = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
       const res = await fetch('/api/knowledge/from-draft', {
@@ -851,17 +843,16 @@ function InboxPageContent() {
       })
       const data = await res.json()
       if (res.status === 409) {
-        setKbSaveMsg({ ok: false, text: 'Bereits in der KB vorhanden.' })
+        toast.warning('Bereits in der KB vorhanden.')
       } else if (res.ok) {
-        setKbSaveMsg({ ok: true, text: 'In Knowledge Base gespeichert!' })
+        toast.success('In Knowledge Base gespeichert!')
       } else {
-        setKbSaveMsg({ ok: false, text: data.error || 'Fehler beim Speichern.' })
+        toast.error(data.error || 'Fehler beim Speichern.')
       }
     } catch {
-      setKbSaveMsg({ ok: false, text: 'Fehler beim Speichern.' })
+      toast.error('Fehler beim Speichern.')
     } finally {
       setIsSavingToKb(false)
-      setTimeout(() => setKbSaveMsg(null), 3000)
     }
   }
 
@@ -870,7 +861,6 @@ function InboxPageContent() {
     if (!selectedEmail) return
 
     setIsSaving(true)
-    setSaveMessage('')
     try {
       const response = await fetch(`/api/emails/${selectedEmail.id}/mark-sent`, {
         method: 'PATCH',
@@ -888,16 +878,13 @@ function InboxPageContent() {
           }))
           return { ...prev, email_drafts: updatedDrafts }
         })
-        setSaveMessage('ok:Gespeichert!')
-        setTimeout(() => setSaveMessage(''), 2000)
+        toast.success('Gespeichert!')
       } else {
-        setSaveMessage('err:Speichern fehlgeschlagen – bitte erneut versuchen')
-        setTimeout(() => setSaveMessage(''), 4000)
+        toast.error('Speichern fehlgeschlagen – bitte erneut versuchen')
       }
     } catch (error) {
       console.error('Save draft failed:', error)
-      setSaveMessage('err:Netzwerkfehler – bitte erneut versuchen')
-      setTimeout(() => setSaveMessage(''), 4000)
+      toast.error('Netzwerkfehler – bitte erneut versuchen')
     } finally {
       setIsSaving(false)
     }
@@ -1332,17 +1319,6 @@ function InboxPageContent() {
         </div>
       )}
 
-      {/* Sync Message */}
-      {syncMessage && (
-        <div className={`p-3 rounded-lg text-sm ${
-          fetchError
-            ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-        }`}>
-          {syncMessage}
-        </div>
-      )}
-
       {/* Error Message */}
       {fetchError && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -1505,7 +1481,7 @@ function InboxPageContent() {
                             </Badge>
                           )}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {formatDate(email.received_at)}
+                            {formatRelativeDate(email.received_at)}
                           </span>
                           <TooltipProvider>
                             <Tooltip>
@@ -2221,16 +2197,6 @@ function InboxPageContent() {
               )}
 
               <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
-                {kbSaveMsg && (
-                  <span className={`text-xs ${kbSaveMsg.ok ? 'text-green-600' : 'text-amber-600'}`}>
-                    {kbSaveMsg.text}
-                  </span>
-                )}
-                {saveMessage && (
-                  <span className={`text-sm ${saveMessage.startsWith('err:') ? 'text-red-600' : 'text-green-600'}`}>
-                    {saveMessage.replace(/^(ok:|err:)/, '')}
-                  </span>
-                )}
                 <Button variant="outline" onClick={handleClose}>
                   Schliessen
                 </Button>

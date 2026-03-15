@@ -29,6 +29,7 @@ import {
   Square,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { formatRelativeDate } from '@/lib/utils'
 
 interface LearningCase {
   id: string
@@ -362,7 +363,7 @@ export default function LearningPage() {
                     </CardTitle>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                       {lc.incoming_emails?.from_name || lc.incoming_emails?.from_email} ·{' '}
-                      {new Date(lc.created_at).toLocaleDateString('de-CH')}
+                      {formatRelativeDate(lc.created_at)}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">

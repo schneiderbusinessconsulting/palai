@@ -142,6 +142,8 @@ export default function SettingsPage() {
 
   // Unsaved changes warning
   const [isDirty, setIsDirty] = useState(false)
+  const [activeTab, setActiveTab] = useState('profile')
+  const [pendingTab, setPendingTab] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isDirty) return
@@ -151,6 +153,29 @@ export default function SettingsPage() {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
+
+  const handleTabChange = (newTab: string) => {
+    if (isDirty) {
+      setPendingTab(newTab)
+    } else {
+      setActiveTab(newTab)
+    }
+  }
+
+  // Fetch data when tab changes
+  useEffect(() => {
+    const tabFetchers: Record<string, () => void> = {
+      'ai-instructions': fetchInstructions,
+      'ai-style': fetchLearningConfig,
+      'sla': fetchSlaTargets,
+      'bi': fetchTriggerWords,
+      'team': fetchAgents,
+      'training': fetchTrainingStats,
+      'integrations': fetchIntegrationStatus,
+    }
+    tabFetchers[activeTab]?.()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
 
   // ── Profil ──────────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', signature: '' })
@@ -588,20 +613,42 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <Header title="Einstellungen" description="Profil, AI, Learning und System-Konfiguration" />
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      {/* Unsaved changes warning dialog */}
+      <AlertDialog open={!!pendingTab} onOpenChange={(open) => !open && setPendingTab(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Ungespeicherte Änderungen</AlertDialogTitle>
+            <AlertDialogDescription>
+              Du hast ungespeicherte Änderungen. Möchtest du wirklich den Tab wechseln? Deine Änderungen gehen verloren.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setIsDirty(false)
+              setActiveTab(pendingTab!)
+              setPendingTab(null)
+            }}>
+              Verwerfen & wechseln
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" />Profil</TabsTrigger>
-          <TabsTrigger value="ai-instructions" className="gap-2" onClick={fetchInstructions}><Brain className="h-4 w-4" />AI Anweisungen</TabsTrigger>
-          <TabsTrigger value="ai-style" className="gap-2" onClick={fetchLearningConfig}><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
-          <TabsTrigger value="sla" className="gap-2" onClick={fetchSlaTargets}><Clock className="h-4 w-4" />SLA</TabsTrigger>
-          <TabsTrigger value="bi" className="gap-2" onClick={fetchTriggerWords}><ShoppingCart className="h-4 w-4" />BI Trigger</TabsTrigger>
-          <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}><Shield className="h-4 w-4" />Team</TabsTrigger>
-          <TabsTrigger value="training" className="gap-2" onClick={fetchTrainingStats}><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
+          <TabsTrigger value="ai-instructions" className="gap-2"><Brain className="h-4 w-4" />AI Anweisungen</TabsTrigger>
+          <TabsTrigger value="ai-style" className="gap-2"><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
+          <TabsTrigger value="sla" className="gap-2"><Clock className="h-4 w-4" />SLA</TabsTrigger>
+          <TabsTrigger value="bi" className="gap-2"><ShoppingCart className="h-4 w-4" />BI Trigger</TabsTrigger>
+          <TabsTrigger value="team" className="gap-2"><Shield className="h-4 w-4" />Team</TabsTrigger>
+          <TabsTrigger value="training" className="gap-2"><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
           <TabsTrigger value="business-hours" className="gap-2"><Clock className="h-4 w-4" />Geschäftszeiten</TabsTrigger>
           <TabsTrigger value="automation" className="gap-2"><Workflow className="h-4 w-4" />Automatisierung</TabsTrigger>
           <TabsTrigger value="audit" className="gap-2"><ScrollText className="h-4 w-4" />Audit Trail</TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-2" onClick={fetchIntegrationStatus}><Database className="h-4 w-4" />Integrationen</TabsTrigger>
+          <TabsTrigger value="integrations" className="gap-2"><Database className="h-4 w-4" />Integrationen</TabsTrigger>
         </TabsList>
 
         {/* ── PROFIL ─────────────────────────────────────────────────────────── */}

@@ -79,14 +79,20 @@ function slugify(text: string): string {
     .replace(/(^-|-$)/g, '')
 }
 
-function formatDate(dateString: string): string {
-  return formatAbsoluteDate(dateString)
-}
-
 function getExcerpt(content: string, maxLength: number = 120): string {
   const cleaned = content.replace(/[#*_`]/g, '').replace(/\n+/g, ' ').trim()
   if (cleaned.length <= maxLength) return cleaned
   return cleaned.substring(0, maxLength).trim() + '...'
+}
+
+function simpleHash(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36)
 }
 
 function HelpCenterContent() {
@@ -102,7 +108,7 @@ function HelpCenterContent() {
   const [question, setQuestion] = useState('')
   const [isAskingAI, setIsAskingAI] = useState(false)
   const [aiAnswer, setAiAnswer] = useState<AIAnswer | null>(null)
-  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
+  const [aiFeedback, setAiFeedback] = useState<'up' | 'down' | null>(null)
 
   // Handle AI question
   const handleAskQuestion = async () => {
@@ -110,7 +116,7 @@ function HelpCenterContent() {
 
     setIsAskingAI(true)
     setAiAnswer(null)
-    setFeedback(null)
+    setAiFeedback(null)
 
     try {
       const response = await fetch('/api/helpcenter/ask', {
@@ -294,6 +300,24 @@ function HelpCenterContent() {
                 {/* Answer Content */}
                 <div className="px-6 py-5 prose prose-slate dark:prose-invert max-w-none prose-p:text-lg prose-p:leading-relaxed prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-white">
                   <ReactMarkdown>{aiAnswer.answer}</ReactMarkdown>
+                  {/* Feedback */}
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t">
+                    <span className="text-xs text-slate-500">War das hilfreich?</span>
+                    <button
+                      onClick={() => { setAiFeedback('up'); try { localStorage.setItem(`palai_hc_feedback_${simpleHash(question.trim())}`, 'up') } catch {}; toast.success('Danke für dein Feedback!') }}
+                      className={`p-1.5 rounded-md transition-colors ${aiFeedback === 'up' ? 'bg-green-100 text-green-600' : 'hover:bg-slate-100 text-slate-400'}`}
+                      disabled={aiFeedback !== null}
+                    >
+                      <ThumbsUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => { setAiFeedback('down'); try { localStorage.setItem(`palai_hc_feedback_${simpleHash(question.trim())}`, 'down') } catch {}; toast.success('Danke für dein Feedback!') }}
+                      className={`p-1.5 rounded-md transition-colors ${aiFeedback === 'down' ? 'bg-red-100 text-red-600' : 'hover:bg-slate-100 text-slate-400'}`}
+                      disabled={aiFeedback !== null}
+                    >
+                      <ThumbsDown className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Source Articles */}
@@ -321,39 +345,6 @@ function HelpCenterContent() {
                     </div>
                   </div>
                 )}
-
-                {/* Feedback */}
-                <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700">
-                  {feedback ? (
-                    <p className="text-sm text-center text-slate-500 dark:text-slate-400">
-                      Danke für Ihr Feedback!
-                    </p>
-                  ) : (
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="text-sm text-slate-500 dark:text-slate-400">War diese Antwort hilfreich?</span>
-                      <button
-                        onClick={() => {
-                          setFeedback('up')
-                          try { localStorage.setItem(`palai_hc_fb_${question.trim().substring(0, 50)}`, 'up') } catch {}
-                          toast.success('Danke für Ihr Feedback!')
-                        }}
-                        className="p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-slate-400 hover:text-green-600 transition-colors"
-                      >
-                        <ThumbsUp className="h-5 w-5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setFeedback('down')
-                          try { localStorage.setItem(`palai_hc_fb_${question.trim().substring(0, 50)}`, 'down') } catch {}
-                          toast.success('Danke für Ihr Feedback!')
-                        }}
-                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 transition-colors"
-                      >
-                        <ThumbsDown className="h-5 w-5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
           )}
@@ -444,7 +435,7 @@ function HelpCenterContent() {
                       </p>
                       <div className="flex items-center gap-2 mt-3 text-xs text-slate-400 dark:text-slate-500">
                         <Clock className="h-3.5 w-3.5" />
-                        <span>Aktualisiert {formatDate(article.updated_at)}</span>
+                        <span>Aktualisiert {formatAbsoluteDate(article.updated_at)}</span>
                       </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-[#B9965A] transition-colors flex-shrink-0 mt-1" />

@@ -176,6 +176,7 @@ function ChatPageContent() {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedMessageId(messageId)
+      toast.success('Kopiert')
       setTimeout(() => setCopiedMessageId(null), 2000)
     } catch {
       toast.error('Kopieren fehlgeschlagen')

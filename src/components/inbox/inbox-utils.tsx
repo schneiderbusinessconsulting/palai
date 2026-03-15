@@ -1,6 +1,5 @@
 import { Badge } from '@/components/ui/badge'
 import { Bell, FileText, User, TrendingUp } from 'lucide-react'
-import { formatRelativeDate } from '@/lib/utils'
 
 export function getConfidenceColor(confidence: number) {
   if (confidence >= 0.85) return 'bg-green-500'
@@ -74,6 +73,3 @@ export function getBuyingIntentBadge(score?: number) {
   return null // Low intent not shown
 }
 
-export function formatDate(dateString: string) {
-  return formatRelativeDate(dateString)
-}

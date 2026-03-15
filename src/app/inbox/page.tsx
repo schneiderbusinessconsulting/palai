@@ -91,6 +91,7 @@ interface Email {
   assigned_agent_id?: string
   support_level?: string
   snoozed_until?: string
+  tags?: string[]
 }
 
 interface Agent {
@@ -261,6 +262,10 @@ export default function InboxPage() {
   // Agent assignment state
   const [agents, setAgents] = useState<Agent[]>([])
   const [assignedAgentFilter, setAssignedAgentFilter] = useState<string>('all')
+
+  // Tags state
+  const [tagInput, setTagInput] = useState('')
+  const [tagFilter, setTagFilter] = useState<string>('')
 
   // Internal notes state
   const [notes, setNotes] = useState<EmailNote[]>([])
@@ -474,6 +479,44 @@ export default function InboxPage() {
     } catch (error) {
       console.error('Failed to snooze email:', error)
     }
+  }
+
+  // Tag management
+  const handleAddTag = async (emailId: string, tag: string) => {
+    const trimmed = tag.trim().toLowerCase()
+    if (!trimmed) return
+    try {
+      const res = await fetch(`/api/emails/${emailId}/tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag: trimmed }),
+      })
+      if (res.ok) {
+        const { tags } = await res.json()
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, tags } : e))
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev => prev ? { ...prev, tags } : prev)
+        }
+        setTagInput('')
+      }
+    } catch { /* silent */ }
+  }
+
+  const handleRemoveTag = async (emailId: string, tag: string) => {
+    try {
+      const res = await fetch(`/api/emails/${emailId}/tags`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag }),
+      })
+      if (res.ok) {
+        const { tags } = await res.json()
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, tags } : e))
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev => prev ? { ...prev, tags } : prev)
+        }
+      }
+    } catch { /* silent */ }
   }
 
   // Resolve template variables in text
@@ -943,6 +986,8 @@ export default function InboxPage() {
         if (email.assigned_agent_id !== assignedAgentFilter) return false
       }
     }
+    // Filter by tag
+    if (tagFilter && !(email.tags || []).includes(tagFilter)) return false
     if (filter !== 'all' && email.status !== filter) return false
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
@@ -1067,6 +1112,23 @@ export default function InboxPage() {
             ))}
           </SelectContent>
         </Select>
+        {/* Tag Filter */}
+        {(() => {
+          const allTags = Array.from(new Set(emails.flatMap(e => e.tags || [])))
+          return allTags.length > 0 ? (
+            <Select value={tagFilter} onValueChange={setTagFilter}>
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue placeholder="Tag-Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Alle Tags</SelectItem>
+                {allTags.sort().map(tag => (
+                  <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null
+        })()}
         {/* Saved Views */}
         <div className="flex items-center gap-1">
           {savedViews.length > 0 && (
@@ -1273,6 +1335,16 @@ export default function InboxPage() {
                         </div>
                       </div>
 
+                      {(email.tags || []).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {email.tags!.map(tag => (
+                            <span key={tag} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       <p className="text-sm text-slate-600 dark:text-slate-300 mt-2 line-clamp-2">
                         {email.body_text}
                       </p>
@@ -1366,6 +1438,33 @@ export default function InboxPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Tags */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Tags:</span>
+                {(selectedEmail.tags || []).map(tag => (
+                  <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                    {tag}
+                    <button
+                      onClick={() => handleRemoveTag(selectedEmail.id, tag)}
+                      className="hover:text-indigo-900 dark:hover:text-indigo-200"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <form
+                  onSubmit={(e) => { e.preventDefault(); handleAddTag(selectedEmail.id, tagInput) }}
+                  className="inline-flex"
+                >
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Tag hinzufügen…"
+                    className="h-6 w-28 text-xs px-2"
+                  />
+                </form>
               </div>
 
               {/* Snooze */}

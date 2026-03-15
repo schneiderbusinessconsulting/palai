@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -305,7 +305,7 @@ export default function InboxPage() {
   }
 
   // Fetch emails (with optional loading indicator)
-  const fetchEmails = async (showLoading = true) => {
+  const fetchEmails = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true)
     try {
       const response = await fetch(`/api/emails?status=${filter}`)
@@ -323,7 +323,7 @@ export default function InboxPage() {
     } finally {
       if (showLoading) setIsLoading(false)
     }
-  }
+  }, [filter])
 
   // Fetch agents on mount
   const fetchAgents = async () => {
@@ -570,7 +570,7 @@ export default function InboxPage() {
     fetchOwners()
     fetchAgents()
     loadSavedViews()
-  }, [filter])
+  }, [fetchEmails])
 
   // Deep-link: open email detail from ?emailId= query param (e.g. from Insights page)
   const [deepLinkHandled, setDeepLinkHandled] = useState(false)
@@ -914,7 +914,7 @@ export default function InboxPage() {
     fetchNotes(email.id)
   }
 
-  const filteredEmails = emails.filter((email) => {
+  const filteredEmails = useMemo(() => emails.filter((email) => {
     // Hide sent/closed emails if toggle is on
     if (hideSent && email.status === 'sent') return false
     // Hide system/transactional emails if toggle is on
@@ -941,10 +941,10 @@ export default function InboxPage() {
       )
     }
     return true
-  })
+  }), [emails, hideSent, hideSystemMails, assignedAgentFilter, tagFilter, filter, searchQuery])
 
   // Sort
-  const sortedEmails = [...filteredEmails].sort((a, b) => {
+  const sortedEmails = useMemo(() => [...filteredEmails].sort((a, b) => {
     let cmp = 0
     switch (sortBy) {
       case 'date':
@@ -961,11 +961,11 @@ export default function InboxPage() {
         break
     }
     return sortDir === 'desc' ? -cmp : cmp
-  })
+  }), [filteredEmails, sortBy, sortDir])
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(sortedEmails.length / PAGE_SIZE))
-  const paginatedEmails = sortedEmails.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedEmails.length / PAGE_SIZE)), [sortedEmails.length])
+  const paginatedEmails = useMemo(() => sortedEmails.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sortedEmails, page])
 
   // Reset page when filters change
   useEffect(() => { setPage(1) }, [filter, searchQuery, hideSent, hideSystemMails, sortBy, sortDir, assignedAgentFilter, tagFilter])

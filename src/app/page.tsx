@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -99,6 +99,11 @@ interface Level1Stats {
   slaCompliance: number | null
   resolutionRate: number | null
 }
+
+const isActionable = (e: Email) =>
+  e.email_type !== 'system_alert' &&
+  e.email_type !== 'notification' &&
+  (e.email_type !== 'form_submission' || e.needs_response)
 
 const SLA_RESOLUTION_MINUTES: Record<string, number> = {
   critical: 240,   // 4h
@@ -217,31 +222,23 @@ function computeWorkload(
   weekStart.setDate(weekStart.getDate() - (dow === 0 ? 6 : dow - 1))
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  const isActionable = (e: Email) =>
-    e.email_type !== 'system_alert' &&
-    e.email_type !== 'notification' &&
-    (e.email_type !== 'form_submission' || e.needs_response)
-
   const actionable = allEmails.filter(isActionable)
-  const backlog = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected').length
+  let backlog = 0, inboundToday = 0, inboundWeek = 0, inboundMonth = 0
+  let resolvedToday = 0, resolvedWeek = 0, resolvedMonth = 0
 
-  const inboundToday = actionable.filter(e => new Date(e.received_at) >= todayStart).length
-  const inboundWeek = actionable.filter(e => new Date(e.received_at) >= weekStart).length
-  const inboundMonth = actionable.filter(e => new Date(e.received_at) >= monthStart).length
-
-  const sentEmails = actionable.filter(e => e.status === 'sent')
-  const resolvedToday = sentEmails.filter(e => {
-    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
-    return d >= todayStart
-  }).length
-  const resolvedWeek = sentEmails.filter(e => {
-    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
-    return d >= weekStart
-  }).length
-  const resolvedMonth = sentEmails.filter(e => {
-    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
-    return d >= monthStart
-  }).length
+  for (const e of actionable) {
+    if (e.status !== 'sent' && e.status !== 'rejected') backlog++
+    const receivedDate = new Date(e.received_at)
+    if (receivedDate >= todayStart) inboundToday++
+    if (receivedDate >= weekStart) inboundWeek++
+    if (receivedDate >= monthStart) inboundMonth++
+    if (e.status === 'sent') {
+      const d = e.updated_at ? new Date(e.updated_at) : receivedDate
+      if (d >= todayStart) resolvedToday++
+      if (d >= weekStart) resolvedWeek++
+      if (d >= monthStart) resolvedMonth++
+    }
+  }
 
   const daysInData = Math.max(daily.length, 1)
   const totalIncoming = daily.reduce((s, d) => s + d.total, 0)
@@ -285,7 +282,7 @@ function computeWorkload(
   }
 }
 
-function TrendPill({ value, invertColor }: { value: number; invertColor?: boolean }) {
+const TrendPill = memo(function TrendPill({ value, invertColor }: { value: number; invertColor?: boolean }) {
   const positive = invertColor ? value < 0 : value > 0
   const negative = invertColor ? value > 0 : value < 0
   return (
@@ -300,7 +297,7 @@ function TrendPill({ value, invertColor }: { value: number; invertColor?: boolea
       {value > 0 ? '+' : ''}{value}%
     </span>
   )
-}
+})
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -313,7 +310,7 @@ export default function DashboardPage() {
   const [level1, setLevel1] = useState<Level1Stats>({ backlog: 0, avgResponseHours: null, slaCompliance: null, resolutionRate: null })
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setIsLoading(true)
     setFetchError(null)
     try {
@@ -329,11 +326,6 @@ export default function DashboardPage() {
         const data = await emailRes.json()
         const all: Email[] = data.emails || []
         allEmails = all
-
-        const isActionable = (e: Email) =>
-          e.email_type !== 'system_alert' &&
-          e.email_type !== 'notification' &&
-          (e.email_type !== 'form_submission' || e.needs_response)
 
         const actionable = all.filter(isActionable)
         const backlog = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected').length
@@ -401,22 +393,22 @@ export default function DashboardPage() {
       setIsLoading(false)
       setLastUpdated(new Date())
     }
-  }
+  }, [])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { fetchData() }, [fetchData])
 
   // Auto-refresh every 2 minutes
   useEffect(() => {
     const interval = setInterval(fetchData, 120_000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
-  const greeting = (() => {
+  const greeting = useMemo(() => {
     const h = new Date().getHours()
     if (h < 12) return 'Guten Morgen'
     if (h < 18) return 'Guten Tag'
     return 'Guten Abend'
-  })()
+  }, [])
 
   return (
     <div className="space-y-6">

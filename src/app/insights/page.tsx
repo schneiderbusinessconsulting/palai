@@ -37,6 +37,7 @@ import {
   ExternalLink,
   Download,
 } from 'lucide-react'
+import { formatRelativeDate } from '@/lib/utils'
 
 interface InsightsData {
   summary: {
@@ -153,13 +154,7 @@ function StatCard({
   )
 }
 
-function formatRelativeDate(dateString: string) {
-  const date = new Date(dateString)
-  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'heute'
-  if (diffDays === 1) return 'gestern'
-  return `vor ${diffDays}d`
-}
+// formatRelativeDate imported from @/lib/utils
 
 function DrilldownDialog({
   open,

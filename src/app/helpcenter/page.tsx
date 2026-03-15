@@ -16,7 +16,11 @@ import {
   MessageCircle,
   Send,
   Sparkles,
+  ThumbsUp,
+  ThumbsDown,
 } from 'lucide-react'
+import { formatAbsoluteDate } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface HelpArticle {
   id: string
@@ -76,11 +80,7 @@ function slugify(text: string): string {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('de-CH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  return formatAbsoluteDate(dateString)
 }
 
 function getExcerpt(content: string, maxLength: number = 120): string {
@@ -102,6 +102,7 @@ function HelpCenterContent() {
   const [question, setQuestion] = useState('')
   const [isAskingAI, setIsAskingAI] = useState(false)
   const [aiAnswer, setAiAnswer] = useState<AIAnswer | null>(null)
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
 
   // Handle AI question
   const handleAskQuestion = async () => {
@@ -109,6 +110,7 @@ function HelpCenterContent() {
 
     setIsAskingAI(true)
     setAiAnswer(null)
+    setFeedback(null)
 
     try {
       const response = await fetch('/api/helpcenter/ask', {
@@ -319,6 +321,39 @@ function HelpCenterContent() {
                     </div>
                   </div>
                 )}
+
+                {/* Feedback */}
+                <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700">
+                  {feedback ? (
+                    <p className="text-sm text-center text-slate-500 dark:text-slate-400">
+                      Danke für Ihr Feedback!
+                    </p>
+                  ) : (
+                    <div className="flex items-center justify-center gap-4">
+                      <span className="text-sm text-slate-500 dark:text-slate-400">War diese Antwort hilfreich?</span>
+                      <button
+                        onClick={() => {
+                          setFeedback('up')
+                          try { localStorage.setItem(`palai_hc_fb_${question.trim().substring(0, 50)}`, 'up') } catch {}
+                          toast.success('Danke für Ihr Feedback!')
+                        }}
+                        className="p-2 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 text-slate-400 hover:text-green-600 transition-colors"
+                      >
+                        <ThumbsUp className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFeedback('down')
+                          try { localStorage.setItem(`palai_hc_fb_${question.trim().substring(0, 50)}`, 'down') } catch {}
+                          toast.success('Danke für Ihr Feedback!')
+                        }}
+                        className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 transition-colors"
+                      >
+                        <ThumbsDown className="h-5 w-5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

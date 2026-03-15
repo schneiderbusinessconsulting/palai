@@ -29,6 +29,7 @@ import {
   MailCheck,
 } from 'lucide-react'
 import Link from 'next/link'
+import { formatRelativeDate } from '@/lib/utils'
 
 interface Email {
   id: string
@@ -97,17 +98,6 @@ interface Level1Stats {
   avgResponseHours: number | null
   slaCompliance: number | null
   resolutionRate: number | null
-}
-
-function formatTimeAgo(dateString: string) {
-  const diffMs = Date.now() - new Date(dateString).getTime()
-  const mins = Math.floor(diffMs / 60000)
-  const hours = Math.floor(diffMs / 3600000)
-  const days = Math.floor(diffMs / 86400000)
-  if (mins < 60) return `vor ${mins} Min`
-  if (hours < 24) return `vor ${hours}h`
-  if (days === 1) return 'gestern'
-  return `vor ${days}d`
 }
 
 const SLA_RESOLUTION_MINUTES: Record<string, number> = {
@@ -321,6 +311,7 @@ export default function DashboardPage() {
   const [sentimentDist, setSentimentDist] = useState<Record<string, number>>({})
   const [workload, setWorkload] = useState<WorkloadStats | null>(null)
   const [level1, setLevel1] = useState<Level1Stats>({ backlog: 0, avgResponseHours: null, slaCompliance: null, resolutionRate: null })
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -408,10 +399,17 @@ export default function DashboardPage() {
       setFetchError('Daten konnten nicht geladen werden. Bitte Seite aktualisieren.')
     } finally {
       setIsLoading(false)
+      setLastUpdated(new Date())
     }
   }
 
   useEffect(() => { fetchData() }, [])
+
+  // Auto-refresh every 2 minutes
+  useEffect(() => {
+    const interval = setInterval(fetchData, 120_000)
+    return () => clearInterval(interval)
+  }, [])
 
   const greeting = (() => {
     const h = new Date().getHours()
@@ -445,7 +443,12 @@ export default function DashboardPage() {
       )}
 
       {/* Refresh */}
-      <div className="flex justify-end -mt-4">
+      <div className="flex items-center justify-end gap-3 -mt-4">
+        {lastUpdated && (
+          <span className="text-xs text-slate-400">
+            Zuletzt: {formatRelativeDate(lastUpdated.toISOString())}
+          </span>
+        )}
         <Button variant="outline" size="sm" onClick={fetchData} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Aktualisieren
@@ -642,7 +645,7 @@ export default function DashboardPage() {
                           <p className="text-xs text-slate-500 truncate">
                             {lead.from_name || lead.from_email}
                             <span className="mx-1.5 text-slate-300">·</span>
-                            {formatTimeAgo(lead.received_at)}
+                            {formatRelativeDate(lead.received_at)}
                             {lead.status !== 'sent' && (
                               <span className="ml-1.5 text-amber-500 font-medium">offen</span>
                             )}

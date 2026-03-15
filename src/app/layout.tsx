@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Sidebar } from '@/components/layout/sidebar'
+import { Toaster } from '@/components/ui/sonner'
 
 // Help Center domains - these don't show the sidebar
 const HELP_CENTER_DOMAINS = ['help.palacios-institut.ch', 'help.palacios-institut.com']
@@ -41,6 +42,7 @@ export default async function RootLayout({
         <body className="font-sans antialiased">
           <ThemeProvider>
             {children}
+            <Toaster />
           </ThemeProvider>
         </body>
       </html>
@@ -58,6 +60,7 @@ export default async function RootLayout({
               {children}
             </main>
           </div>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

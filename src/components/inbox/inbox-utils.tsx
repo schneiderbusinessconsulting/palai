@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge'
 import { Bell, FileText, User, TrendingUp } from 'lucide-react'
+import { formatRelativeDate } from '@/lib/utils'
 
 export function getConfidenceColor(confidence: number) {
   if (confidence >= 0.85) return 'bg-green-500'
@@ -74,14 +75,5 @@ export function getBuyingIntentBadge(score?: number) {
 }
 
 export function formatDate(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffHours < 1) return 'vor wenigen Minuten'
-  if (diffHours < 24) return `vor ${diffHours}h`
-  if (diffDays === 1) return 'gestern'
-  return `vor ${diffDays} Tagen`
+  return formatRelativeDate(dateString)
 }

@@ -52,6 +52,12 @@ import {
   Bookmark,
   UserCircle,
   Wand2,
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronsLeft,
+  ChevronsRight,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
@@ -67,6 +73,17 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 
 interface EmailDraft {
   id: string
@@ -146,6 +163,21 @@ export default function InboxPage() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState('')
   const [fetchError, setFetchError] = useState('')
+
+  // Sorting
+  const [sortBy, setSortBy] = useState<'date' | 'confidence' | 'status' | 'sender'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const PAGE_SIZE = 25
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBulkActioning, setIsBulkActioning] = useState(false)
+
+  // Dismiss confirmation
+  const [dismissEmailId, setDismissEmailId] = useState<string | null>(null)
 
   // Detail modal state
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
@@ -853,19 +885,10 @@ export default function InboxPage() {
     }
   }
 
-  // Close/dismiss email without sending (marks as sent to hide it)
-  const handleDismissEmail = async (emailId: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent opening the detail modal
-    try {
-      const response = await fetch(`/api/emails/${emailId}/mark-sent`, {
-        method: 'POST',
-      })
-      if (response.ok) {
-        fetchEmails()
-      }
-    } catch (error) {
-      console.error('Dismiss email failed:', error)
-    }
+  // Close/dismiss email - uses confirmation dialog
+  const handleDismissEmail = (emailId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDismissEmailId(emailId)
   }
 
   // Open email detail
@@ -919,6 +942,90 @@ export default function InboxPage() {
     }
     return true
   })
+
+  // Sort
+  const sortedEmails = [...filteredEmails].sort((a, b) => {
+    let cmp = 0
+    switch (sortBy) {
+      case 'date':
+        cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime()
+        break
+      case 'confidence':
+        cmp = (a.email_drafts?.[0]?.confidence_score || 0) - (b.email_drafts?.[0]?.confidence_score || 0)
+        break
+      case 'status':
+        cmp = a.status.localeCompare(b.status)
+        break
+      case 'sender':
+        cmp = (a.from_name || a.from_email).localeCompare(b.from_name || b.from_email)
+        break
+    }
+    return sortDir === 'desc' ? -cmp : cmp
+  })
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sortedEmails.length / PAGE_SIZE))
+  const paginatedEmails = sortedEmails.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1) }, [filter, searchQuery, hideSent, hideSystemMails, sortBy, sortDir, assignedAgentFilter, tagFilter])
+
+  // Bulk action handlers
+  const toggleSelect = (emailId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(emailId)) next.delete(emailId)
+      else next.add(emailId)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedEmails.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(paginatedEmails.map(e => e.id)))
+    }
+  }
+
+  const handleBulkClose = async () => {
+    setIsBulkActioning(true)
+    const results = await Promise.allSettled(
+      Array.from(selectedIds).map(id =>
+        fetch(`/api/emails/${id}/mark-sent`, { method: 'POST' })
+      )
+    )
+    const succeeded = results.filter(r => r.status === 'fulfilled').length
+    const failed = results.length - succeeded
+    if (failed > 0) {
+      toast.error(`${failed} E-Mail(s) konnten nicht geschlossen werden`)
+    }
+    if (succeeded > 0) {
+      toast.success(`${succeeded} E-Mail(s) geschlossen`)
+    }
+    setSelectedIds(new Set())
+    setIsBulkActioning(false)
+    fetchEmails()
+  }
+
+  // Dismiss email with confirmation
+  const handleDismissConfirmed = async () => {
+    if (!dismissEmailId) return
+    try {
+      const response = await fetch(`/api/emails/${dismissEmailId}/mark-sent`, {
+        method: 'POST',
+      })
+      if (response.ok) {
+        toast.success('E-Mail geschlossen')
+        fetchEmails()
+      }
+    } catch (error) {
+      console.error('Dismiss email failed:', error)
+      toast.error('E-Mail konnte nicht geschlossen werden')
+    }
+    setDismissEmailId(null)
+  }
 
   const currentDraft = selectedEmail?.email_drafts?.[0]
   const confidence = currentDraft?.confidence_score || 0
@@ -1115,10 +1222,9 @@ export default function InboxPage() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-9 w-9 p-0" onClick={() => {
-                    if (confirm('Alle gespeicherten Ansichten löschen?')) {
-                      setSavedViews([])
-                      localStorage.removeItem('palai_saved_views')
-                    }
+                    setSavedViews([])
+                    localStorage.removeItem('palai_saved_views')
+                    toast.success('Alle Ansichten gelöscht')
                   }}>
                     <Trash2 className="h-4 w-4 text-slate-400" />
                   </Button>
@@ -1131,6 +1237,64 @@ export default function InboxPage() {
           )}
         </div>
       </div>
+
+      {/* Sort Controls + Email Count */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+            <SelectTrigger className="w-44 h-8 text-xs">
+              <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="date">Datum</SelectItem>
+              <SelectItem value="confidence">Confidence</SelectItem>
+              <SelectItem value="status">Status</SelectItem>
+              <SelectItem value="sender">Absender</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2"
+            onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+          >
+            {sortDir === 'desc' ? '↓ Absteigend' : '↑ Aufsteigend'}
+          </Button>
+        </div>
+        <span className="text-xs text-slate-500">
+          {sortedEmails.length} E-Mail{sortedEmails.length !== 1 ? 's' : ''}
+          {sortedEmails.length !== filteredEmails.length && ` (${filteredEmails.length} total)`}
+        </span>
+      </div>
+
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 sticky top-0 z-10">
+          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+            {selectedIds.size} ausgewählt
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5"
+            onClick={handleBulkClose}
+            disabled={isBulkActioning}
+          >
+            {isBulkActioning ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+            Schliessen
+          </Button>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Auswahl aufheben
+          </Button>
+        </div>
+      )}
 
       {/* Sync Message */}
       {syncMessage && (
@@ -1175,7 +1339,7 @@ export default function InboxPage() {
             Bitte prüfe die Serververbindung und Umgebungsvariablen
           </p>
         </div>
-      ) : filteredEmails.length === 0 ? (
+      ) : sortedEmails.length === 0 ? (
         <div className="text-center py-12">
           <Mail className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-4" />
           <p className="text-slate-500 dark:text-slate-400">
@@ -1191,7 +1355,7 @@ export default function InboxPage() {
           {threadView && (() => {
             const threadGroups = new Map<string, Email[]>()
             const noThread: Email[] = []
-            for (const email of filteredEmails) {
+            for (const email of paginatedEmails) {
               if (email.hubspot_thread_id) {
                 const existing = threadGroups.get(email.hubspot_thread_id) || []
                 existing.push(email)
@@ -1212,23 +1376,48 @@ export default function InboxPage() {
             }
             return null
           })()}
-          {filteredEmails.map((email) => {
+          {/* Select All */}
+          <div className="flex items-center gap-2 px-1">
+            <button
+              onClick={toggleSelectAll}
+              className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              {selectedIds.size === paginatedEmails.length && paginatedEmails.length > 0 ? (
+                <CheckSquare className="h-4 w-4 text-blue-600" />
+              ) : (
+                <Square className="h-4 w-4 text-slate-400" />
+              )}
+            </button>
+            <span className="text-xs text-slate-500">Alle auf dieser Seite</span>
+          </div>
+          {paginatedEmails.map((email) => {
             const draft = email.email_drafts?.[0]
             const emailConfidence = draft?.confidence_score || 0
 
             // In thread view, show thread indicator
             const threadCount = threadView && email.hubspot_thread_id
-              ? filteredEmails.filter(e => e.hubspot_thread_id === email.hubspot_thread_id).length
+              ? paginatedEmails.filter(e => e.hubspot_thread_id === email.hubspot_thread_id).length
               : 0
 
             return (
               <Card
                 key={email.id}
-                className="hover:shadow-md transition-shadow cursor-pointer"
+                className={`hover:shadow-md transition-shadow cursor-pointer ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
                 onClick={() => openEmailDetail(email)}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
+                    {/* Bulk Checkbox */}
+                    <button
+                      onClick={(e) => toggleSelect(email.id, e)}
+                      className="mt-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
+                    >
+                      {selectedIds.has(email.id) ? (
+                        <CheckSquare className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <Square className="h-4 w-4 text-slate-400" />
+                      )}
+                    </button>
                     {/* Confidence Indicator */}
                     <div
                       className={`w-2 h-full min-h-[60px] rounded-full ${
@@ -1346,8 +1535,71 @@ export default function InboxPage() {
               </Card>
             )
           })}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-slate-500">
+                Seite {page} von {totalPages} — {sortedEmails.length} E-Mails
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={page === 1}
+                  onClick={() => setPage(1)}
+                >
+                  <ChevronsLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(totalPages)}
+                >
+                  <ChevronsRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Dismiss Confirmation Dialog */}
+      <AlertDialog open={!!dismissEmailId} onOpenChange={(open) => { if (!open) setDismissEmailId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>E-Mail schliessen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Diese E-Mail wird als erledigt markiert. Du kannst sie jederzeit über den Filter &quot;Gesendet&quot; wieder anzeigen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDismissConfirmed}>Schliessen</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Email Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={(open) => { if (!open) handleClose() }}>

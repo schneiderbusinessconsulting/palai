@@ -25,7 +25,10 @@ import {
   Edit2,
   Clock,
   ArrowRight,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface LearningCase {
   id: string
@@ -85,6 +88,11 @@ export default function LearningPage() {
   const [extractingId, setExtractingId] = useState<string | null>(null)
   const [dismissingId, setDismissingId] = useState<string | null>(null)
 
+  // Batch selection
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set())
+  const [isBatchExtracting, setIsBatchExtracting] = useState(false)
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 })
+
   // Extract dialog
   const [extractDialogCase, setExtractDialogCase] = useState<LearningCase | null>(null)
   const [extractTitle, setExtractTitle] = useState('')
@@ -125,6 +133,57 @@ export default function LearningPage() {
     } finally {
       setExtractingId(null)
     }
+  }
+
+  const toggleSelectCase = (id: string) => {
+    setSelectedCaseIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAllPending = () => {
+    const pendingIds = cases.filter(c => c.status === 'pending').map(c => c.id)
+    if (pendingIds.every(id => selectedCaseIds.has(id))) {
+      setSelectedCaseIds(new Set())
+    } else {
+      setSelectedCaseIds(new Set(pendingIds))
+    }
+  }
+
+  const handleBatchExtract = async () => {
+    const selectedCases = cases.filter(c => selectedCaseIds.has(c.id) && c.status === 'pending')
+    if (selectedCases.length === 0) return
+
+    setIsBatchExtracting(true)
+    setBatchProgress({ current: 0, total: selectedCases.length })
+
+    let succeeded = 0
+    for (let i = 0; i < selectedCases.length; i++) {
+      const lc = selectedCases[i]
+      setBatchProgress({ current: i + 1, total: selectedCases.length })
+      try {
+        const res = await fetch(`/api/learning/${lc.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'extract',
+            title: `Gelernt: ${lc.incoming_emails?.subject || 'Antwortkorrektur'}`,
+            learning_context: null,
+          }),
+        })
+        if (res.ok) succeeded++
+      } catch (err) {
+        console.error('Batch extract error:', err)
+      }
+    }
+
+    setIsBatchExtracting(false)
+    setSelectedCaseIds(new Set())
+    toast.success(`${succeeded}/${selectedCases.length} Korrekturen extrahiert`)
+    fetchCases()
   }
 
   const handleDismiss = async (id: string) => {
@@ -203,14 +262,14 @@ export default function LearningPage() {
         </ol>
       </div>
 
-      {/* Filter */}
-      <div className="flex gap-2 flex-wrap">
+      {/* Filter + Batch Actions */}
+      <div className="flex items-center gap-2 flex-wrap">
         {(['pending', 'extracted', 'dismissed', 'all'] as const).map(f => (
           <Button
             key={f}
             variant={filter === f ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setFilter(f)}
+            onClick={() => { setFilter(f); setSelectedCaseIds(new Set()) }}
           >
             {f === 'pending' ? 'Ausstehend' : f === 'extracted' ? 'Extrahiert' : f === 'dismissed' ? 'Verworfen' : 'Alle'}
             {f === 'pending' && stats.pending > 0 && (
@@ -220,6 +279,44 @@ export default function LearningPage() {
             )}
           </Button>
         ))}
+        <div className="flex-1" />
+        {filter === 'pending' && cases.filter(c => c.status === 'pending').length > 0 && (
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={toggleSelectAllPending}
+            >
+              {cases.filter(c => c.status === 'pending').every(c => selectedCaseIds.has(c.id)) ? (
+                <CheckSquare className="h-3.5 w-3.5" />
+              ) : (
+                <Square className="h-3.5 w-3.5" />
+              )}
+              Alle auswählen
+            </Button>
+            {selectedCaseIds.size > 0 && (
+              <Button
+                size="sm"
+                className="gap-1.5 bg-green-600 hover:bg-green-700"
+                onClick={handleBatchExtract}
+                disabled={isBatchExtracting}
+              >
+                {isBatchExtracting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Extrahiere {batchProgress.current}/{batchProgress.total}...
+                  </>
+                ) : (
+                  <>
+                    <BookOpen className="h-3.5 w-3.5" />
+                    {selectedCaseIds.size} extrahieren
+                  </>
+                )}
+              </Button>
+            )}
+          </>
+        )}
       </div>
 
       {/* Cases List */}
@@ -242,9 +339,21 @@ export default function LearningPage() {
       ) : (
         <div className="space-y-4">
           {cases.map(lc => (
-            <Card key={lc.id}>
+            <Card key={lc.id} className={selectedCaseIds.has(lc.id) ? 'ring-2 ring-green-400' : ''}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
+                  {lc.status === 'pending' && (
+                    <button
+                      onClick={() => toggleSelectCase(lc.id)}
+                      className="mt-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
+                    >
+                      {selectedCaseIds.has(lc.id) ? (
+                        <CheckSquare className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <Square className="h-4 w-4 text-slate-400" />
+                      )}
+                    </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-base truncate">
                       {lc.incoming_emails?.subject || 'Kein Betreff'}

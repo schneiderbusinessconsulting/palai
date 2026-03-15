@@ -13,6 +13,7 @@ import {
   Clock,
   FileText,
 } from 'lucide-react'
+import { formatAbsoluteDate } from '@/lib/utils'
 
 interface Article {
   id: string
@@ -53,11 +54,7 @@ const categoryConfig: Record<string, {
 }
 
 function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('de-CH', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  return formatAbsoluteDate(dateString)
 }
 
 export default function ArticlePage() {

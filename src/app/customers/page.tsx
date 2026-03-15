@@ -15,7 +15,17 @@ import {
   MessageSquare,
   Mail,
   ExternalLink,
+  ArrowUpDown,
+  Filter,
 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { formatRelativeDate } from '@/lib/utils'
 
 interface Customer {
   email: string
@@ -26,14 +36,6 @@ interface Customer {
   lastContact: string
   resolvedCount: number
   sentiments: Record<string, number>
-}
-
-function formatRelativeDate(dateString: string) {
-  const date = new Date(dateString)
-  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24))
-  if (diffDays === 0) return 'heute'
-  if (diffDays === 1) return 'gestern'
-  return `vor ${diffDays}d`
 }
 
 function sentimentBadge(sentiment: string) {
@@ -47,10 +49,15 @@ function sentimentBadge(sentiment: string) {
   return <Badge className={info.className}>{info.label}</Badge>
 }
 
+type CustomerSortField = 'name' | 'totalEmails' | 'avgBuyingIntent' | 'dominantSentiment' | 'lastContact'
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<CustomerSortField>('lastContact')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [sentimentFilter, setSentimentFilter] = useState<string>('all')
   const router = useRouter()
 
   const fetchCustomers = async (query?: string) => {
@@ -76,12 +83,31 @@ export default function CustomersPage() {
     fetchCustomers(search)
   }
 
+  // Filter + sort customers
+  const displayCustomers = (() => {
+    const filtered = sentimentFilter === 'all'
+      ? customers
+      : customers.filter(c => c.dominantSentiment === sentimentFilter)
+
+    return [...filtered].sort((a, b) => {
+      let cmp = 0
+      switch (sortBy) {
+        case 'name': cmp = (a.name || a.email).localeCompare(b.name || b.email); break
+        case 'totalEmails': cmp = a.totalEmails - b.totalEmails; break
+        case 'avgBuyingIntent': cmp = a.avgBuyingIntent - b.avgBuyingIntent; break
+        case 'dominantSentiment': cmp = a.dominantSentiment.localeCompare(b.dominantSentiment); break
+        case 'lastContact': cmp = new Date(a.lastContact).getTime() - new Date(b.lastContact).getTime(); break
+      }
+      return sortDir === 'desc' ? -cmp : cmp
+    })
+  })()
+
   return (
     <div className="space-y-6">
       <Header title="Kunden" description="Kundenprofile aus E-Mail-Interaktionen" />
 
-      {/* Search Bar */}
-      <div className="flex gap-2">
+      {/* Search Bar + Sort + Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
@@ -93,6 +119,47 @@ export default function CustomersPage() {
           />
         </div>
         <Button onClick={handleSearch} variant="outline">Suchen</Button>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as CustomerSortField)}>
+          <SelectTrigger className="w-full sm:w-48">
+            <ArrowUpDown className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="lastContact">Letzter Kontakt</SelectItem>
+            <SelectItem value="name">Name</SelectItem>
+            <SelectItem value="totalEmails">E-Mails</SelectItem>
+            <SelectItem value="avgBuyingIntent">Buying Intent</SelectItem>
+            <SelectItem value="dominantSentiment">Stimmung</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-10"
+          onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+        >
+          {sortDir === 'desc' ? '↓' : '↑'}
+        </Button>
+      </div>
+
+      {/* Sentiment Filter Chips */}
+      <div className="flex gap-2 flex-wrap">
+        {[
+          { key: 'all', label: 'Alle' },
+          { key: 'positive', label: 'Positiv' },
+          { key: 'neutral', label: 'Neutral' },
+          { key: 'negative', label: 'Negativ' },
+          { key: 'frustrated', label: 'Frustriert' },
+        ].map(({ key, label }) => (
+          <Button
+            key={key}
+            variant={sentimentFilter === key ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setSentimentFilter(key)}
+          >
+            {label}
+          </Button>
+        ))}
       </div>
 
       {/* Summary */}
@@ -144,7 +211,7 @@ export default function CustomersPage() {
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         </div>
-      ) : customers.length === 0 ? (
+      ) : displayCustomers.length === 0 ? (
         <div className="text-center py-12">
           <Users className="h-12 w-12 mx-auto text-slate-300 mb-4" />
           <p className="text-slate-500">Keine Kunden gefunden</p>
@@ -154,12 +221,12 @@ export default function CustomersPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Kundenliste ({customers.length})
+              Kundenliste ({displayCustomers.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {customers.map((customer) => (
+              {displayCustomers.map((customer) => (
                 <button
                   key={customer.email}
                   onClick={() => router.push(`/customers/${encodeURIComponent(customer.email)}`)}

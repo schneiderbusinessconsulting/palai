@@ -21,7 +21,11 @@ import {
   Upload,
   FileText,
   X,
+  Copy,
+  Check,
+  Trash2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 
 type AssistantMode = 'chat' | 'learning' | 'rules'
 
@@ -112,16 +116,32 @@ function ChatPageContent() {
   const initialMode = (searchParams.get('mode') as AssistantMode) || 'chat'
 
   const [mode, setMode] = useState<AssistantMode>(initialMode)
-  const [messages, setMessages] = useState<Message[]>(getMessagesForMode(initialMode))
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === 'undefined') return getMessagesForMode(initialMode)
+    try {
+      const stored = localStorage.getItem(`palai_chat_${initialMode}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        return parsed.map((m: Message) => ({ ...m, timestamp: new Date(m.timestamp) }))
+      }
+    } catch { /* ignore */ }
+    return getMessagesForMode(initialMode)
+  })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState<string | null>(null)
   const [lastUserContent, setLastUserContent] = useState<string>('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Persist messages to localStorage
+  useEffect(() => {
+    localStorage.setItem(`palai_chat_${mode}`, JSON.stringify(messages))
+  }, [messages, mode])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -131,9 +151,35 @@ function ChatPageContent() {
 
   const handleModeChange = (newMode: AssistantMode) => {
     setMode(newMode)
-    setMessages(getMessagesForMode(newMode))
+    try {
+      const stored = localStorage.getItem(`palai_chat_${newMode}`)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setMessages(parsed.map((m: Message) => ({ ...m, timestamp: new Date(m.timestamp) })))
+      } else {
+        setMessages(getMessagesForMode(newMode))
+      }
+    } catch {
+      setMessages(getMessagesForMode(newMode))
+    }
     setLastUserContent('')
     setSelectedFile(null)
+  }
+
+  const handleClearChat = () => {
+    setMessages(getMessagesForMode(mode))
+    localStorage.removeItem(`palai_chat_${mode}`)
+    toast.success('Gespräch gelöscht')
+  }
+
+  const handleCopyMessage = async (messageId: string, content: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedMessageId(messageId)
+      setTimeout(() => setCopiedMessageId(null), 2000)
+    } catch {
+      toast.error('Kopieren fehlgeschlagen')
+    }
   }
 
   // Handle file upload
@@ -418,7 +464,8 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
       <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Mode Tabs */}
         <div className="border-b border-slate-200 dark:border-slate-700 p-3">
-          <div className="flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1 max-w-md mx-auto">
+          <div className="flex items-center gap-2 max-w-md mx-auto">
+          <div className="flex-1 flex bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-1">
             <button
               onClick={() => handleModeChange('chat')}
               className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-all ${
@@ -453,6 +500,14 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
               AI Regeln
             </button>
           </div>
+          <button
+            onClick={handleClearChat}
+            className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            title="Gespräch löschen"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -479,7 +534,7 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
 
                 <div className={`flex-1 max-w-[80%] ${message.role === 'user' ? 'text-right' : ''}`}>
                   <div
-                    className={`inline-block p-3 rounded-lg text-left ${
+                    className={`inline-block p-3 rounded-lg text-left relative group ${
                       message.role === 'user'
                         ? 'bg-blue-600 text-white'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
@@ -492,6 +547,19 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
                     }`}>
                       <ReactMarkdown>{message.content}</ReactMarkdown>
                     </div>
+                    {message.role === 'assistant' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleCopyMessage(message.id, message.content) }}
+                        className="absolute top-2 right-2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                        title="Kopieren"
+                      >
+                        {copiedMessageId === message.id ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5 text-slate-400" />
+                        )}
+                      </button>
+                    )}
                   </div>
 
                   {/* Sources */}

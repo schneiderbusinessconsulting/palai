@@ -31,6 +31,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { formatAbsoluteDate } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   Calendar,
   Users,
@@ -107,11 +109,7 @@ function formatPrice(price: number | null) {
 
 function formatDate(dateString: string | null) {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('de-CH', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+  return formatAbsoluteDate(dateString)
 }
 
 export default function CoursesPage() {
@@ -189,7 +187,7 @@ export default function CoursesPage() {
   // Save course
   const handleSave = async () => {
     if (!formData.name?.trim()) {
-      alert('Bitte geben Sie einen Kursnamen ein')
+      toast.error('Bitte geben Sie einen Kursnamen ein')
       return
     }
 
@@ -209,11 +207,11 @@ export default function CoursesPage() {
         fetchCourses()
       } else {
         const error = await response.json()
-        alert(error.error || 'Fehler beim Speichern')
+        toast.error(error.error || 'Fehler beim Speichern')
       }
     } catch (error) {
       console.error('Save error:', error)
-      alert('Fehler beim Speichern')
+      toast.error('Fehler beim Speichern')
     } finally {
       setIsSaving(false)
     }

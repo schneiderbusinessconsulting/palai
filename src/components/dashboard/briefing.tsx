@@ -29,7 +29,7 @@ function getGreeting(): string {
   return 'Guten Abend'
 }
 
-function formatDate(): string {
+function formatTodayDate(): string {
   return new Date().toLocaleDateString('de-CH', {
     weekday: 'long',
     day: 'numeric',
@@ -211,7 +211,7 @@ export function DashboardBriefing() {
             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mb-1">
               <span>{getGreeting()}</span>
               <span>-</span>
-              <span>{formatDate()}</span>
+              <span>{formatTodayDate()}</span>
             </div>
             <p className="text-base font-medium text-slate-900 dark:text-white">
               {getBriefingSummary()}

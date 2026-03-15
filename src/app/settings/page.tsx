@@ -49,6 +49,17 @@ import {
 import { AutomationTab } from '@/components/settings/automation-tab'
 import { AuditTrailTab } from '@/components/settings/audit-trail-tab'
 import { BusinessHoursTab } from '@/components/settings/business-hours-tab'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -126,6 +137,21 @@ function useSaveFeedback() {
 export default function SettingsPage() {
   const { saved: savedKey, showSaved } = useSaveFeedback()
 
+  // Confirmation dialog state
+  const [confirmAction, setConfirmAction] = useState<{ title: string; description: string; onConfirm: () => void } | null>(null)
+
+  // Unsaved changes warning
+  const [isDirty, setIsDirty] = useState(false)
+
+  useEffect(() => {
+    if (!isDirty) return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [isDirty])
+
   // ── Profil ──────────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', signature: '' })
   const [profileLoaded, setProfileLoaded] = useState(false)
@@ -148,6 +174,12 @@ export default function SettingsPage() {
   const handleSaveProfile = () => {
     localStorage.setItem('palai_profile', JSON.stringify(profile))
     showSaved('profile')
+    setIsDirty(false)
+  }
+
+  const handleProfileChange = (field: string, value: string) => {
+    setProfile(p => ({ ...p, [field]: value }))
+    setIsDirty(true)
   }
 
   // ── AI Instructions ─────────────────────────────────────────────────────────
@@ -193,22 +225,28 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteInstruction = async (title: string) => {
-    if (!window.confirm(`AI-Instruktion "${title}" wirklich löschen?`)) return
-    setDeletingInstr(title)
-    try {
-      const res = await fetch('/api/settings/ai-instructions', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      })
-      if (!res.ok) throw new Error('Delete failed')
-      fetchInstructions()
-    } catch {
-      alert('Instruktion konnte nicht gelöscht werden.')
-    } finally {
-      setDeletingInstr(null)
-    }
+  const handleDeleteInstruction = (title: string) => {
+    setConfirmAction({
+      title: 'AI-Instruktion löschen?',
+      description: `"${title}" wird unwiderruflich gelöscht.`,
+      onConfirm: async () => {
+        setDeletingInstr(title)
+        try {
+          const res = await fetch('/api/settings/ai-instructions', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title }),
+          })
+          if (!res.ok) throw new Error('Delete failed')
+          fetchInstructions()
+          toast.success('Instruktion gelöscht')
+        } catch {
+          toast.error('Instruktion konnte nicht gelöscht werden.')
+        } finally {
+          setDeletingInstr(null)
+        }
+      },
+    })
   }
 
   // ── AI Settings (localStorage) ───────────────────────────────────────────────
@@ -376,15 +414,21 @@ export default function SettingsPage() {
     }
   }
 
-  const handleDeleteWord = async (id: string) => {
-    if (!window.confirm('Trigger-Wort wirklich löschen?')) return
-    try {
-      const res = await fetch(`/api/settings/trigger-words/${id}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Delete failed')
-      fetchTriggerWords()
-    } catch {
-      alert('Trigger-Wort konnte nicht gelöscht werden.')
-    }
+  const handleDeleteWord = (id: string) => {
+    setConfirmAction({
+      title: 'Trigger-Wort löschen?',
+      description: 'Das Trigger-Wort wird unwiderruflich gelöscht.',
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/settings/trigger-words/${id}`, { method: 'DELETE' })
+          if (!res.ok) throw new Error('Delete failed')
+          fetchTriggerWords()
+          toast.success('Trigger-Wort gelöscht')
+        } catch {
+          toast.error('Trigger-Wort konnte nicht gelöscht werden.')
+        }
+      },
+    })
   }
 
   const handleToggleWord = async (id: string, is_active: boolean) => {
@@ -546,14 +590,14 @@ export default function SettingsPage() {
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Vorname</label>
                       <Input
                         value={profile.firstName}
-                        onChange={(e) => setProfile((p) => ({ ...p, firstName: e.target.value }))}
+                        onChange={(e) => handleProfileChange('firstName', e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Nachname</label>
                       <Input
                         value={profile.lastName}
-                        onChange={(e) => setProfile((p) => ({ ...p, lastName: e.target.value }))}
+                        onChange={(e) => handleProfileChange('lastName', e.target.value)}
                       />
                     </div>
                   </div>
@@ -562,7 +606,7 @@ export default function SettingsPage() {
                     <Input
                       type="email"
                       value={profile.email}
-                      onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+                      onChange={(e) => handleProfileChange('email', e.target.value)}
                     />
                   </div>
                 </CardContent>
@@ -576,7 +620,7 @@ export default function SettingsPage() {
                 <CardContent className="space-y-4">
                   <Textarea
                     value={profile.signature}
-                    onChange={(e) => setProfile((p) => ({ ...p, signature: e.target.value }))}
+                    onChange={(e) => handleProfileChange('signature', e.target.value)}
                     rows={5}
                     className="font-mono text-sm"
                   />
@@ -1516,6 +1560,22 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmAction?.title}</AlertDialogTitle>
+            <AlertDialogDescription>{confirmAction?.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { confirmAction?.onConfirm(); setConfirmAction(null) }}>
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

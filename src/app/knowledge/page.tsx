@@ -53,12 +53,24 @@ import {
   TooltipTrigger,
   TooltipProvider,
 } from '@/components/ui/tooltip'
+import { formatRelativeDate } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 
 interface KnowledgeItem {
   title: string
@@ -129,16 +141,7 @@ function getSourceBadge(type: string) {
 }
 
 function formatDate(dateString: string) {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return 'heute'
-  if (diffDays === 1) return 'gestern'
-  if (diffDays < 7) return `vor ${diffDays} Tagen`
-  if (diffDays < 30) return `vor ${Math.floor(diffDays / 7)} Wochen`
-  return date.toLocaleDateString('de-CH')
+  return formatRelativeDate(dateString)
 }
 
 export default function KnowledgePage() {
@@ -158,6 +161,9 @@ export default function KnowledgePage() {
   const [sourceType, setSourceType] = useState('help_article')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Confirmation dialog
+  const [deleteConfirm, setDeleteConfirm] = useState<{ title: string; action: () => void } | null>(null)
 
   // AI Categorization state
   const [isCategorizing, setIsCategorizing] = useState(false)
@@ -290,10 +296,8 @@ export default function KnowledgePage() {
     }
   }
 
-  // Handle delete
-  const handleDelete = async (itemTitle: string) => {
-    if (!confirm(`"${itemTitle}" wirklich löschen?`)) return
-
+  // Handle delete (internal, after confirmation)
+  const executeDelete = async (itemTitle: string) => {
     try {
       const response = await fetch('/api/knowledge', {
         method: 'DELETE',
@@ -302,11 +306,21 @@ export default function KnowledgePage() {
       })
 
       if (response.ok) {
+        toast.success('Eintrag gelöscht')
         fetchItems()
       }
     } catch (error) {
       console.error('Delete error:', error)
+      toast.error('Löschen fehlgeschlagen')
     }
+  }
+
+  // Handle delete with confirmation
+  const handleDelete = (itemTitle: string) => {
+    setDeleteConfirm({
+      title: itemTitle,
+      action: () => executeDelete(itemTitle),
+    })
   }
 
   // Handle edit - load item content
@@ -414,9 +428,11 @@ export default function KnowledgePage() {
     })
   }
 
-  const handleReject = async (itemTitle: string) => {
-    if (!confirm(`"${itemTitle}" ablehnen und löschen?`)) return
-    await handleDelete(itemTitle)
+  const handleReject = (itemTitle: string) => {
+    setDeleteConfirm({
+      title: itemTitle,
+      action: () => executeDelete(itemTitle),
+    })
   }
 
   const pendingItems = items.filter((item) => item.approved === false)
@@ -889,6 +905,24 @@ export default function KnowledgePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eintrag löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{deleteConfirm?.title}&quot; wird unwiderruflich gelöscht.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { deleteConfirm?.action(); setDeleteConfirm(null) }}>
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>

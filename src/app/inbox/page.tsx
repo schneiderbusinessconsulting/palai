@@ -229,6 +229,7 @@ function InboxPageContent() {
 
   // Thread history state
   const [threadEmails, setThreadEmails] = useState<Email[]>([])
+  const [customerEmailCount, setCustomerEmailCount] = useState<number | null>(null)
   const [expandedThreadIds, setExpandedThreadIds] = useState<Set<string>>(new Set())
 
   // Saved views state
@@ -922,6 +923,16 @@ function InboxPageContent() {
     setNewNoteContent('')
     setNotesError('')
     fetchNotes(email.id)
+    // Fetch total email count for this customer
+    setCustomerEmailCount(null)
+    if (email.from_email) {
+      fetch(`/api/customers?search=${encodeURIComponent(email.from_email)}&countOnly=true`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.emailCount != null) setCustomerEmailCount(data.emailCount)
+        })
+        .catch(() => {})
+    }
     // Fetch thread siblings if this email has a thread ID
     setThreadEmails([])
     setExpandedThreadIds(new Set())
@@ -1692,6 +1703,15 @@ function InboxPageContent() {
                     <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {selectedEmail.from_name || selectedEmail.from_email}
                     </span>
+                    {customerEmailCount !== null && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ml-2 ${
+                        customerEmailCount === 1
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                      }`}>
+                        {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
+                      </span>
+                    )}
                     <span className="text-xs text-slate-500 dark:text-slate-500 whitespace-nowrap flex-shrink-0">
                       {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
@@ -1717,7 +1737,7 @@ function InboxPageContent() {
                     onLoad={(e) => {
                       const iframe = e.currentTarget
                       if (iframe.contentDocument?.body) {
-                        iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 600) + 'px'
+                        iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
                       }
                     }}
                     sandbox=""

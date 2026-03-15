@@ -10,7 +10,22 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search')
+    const countOnly = searchParams.get('countOnly') === 'true'
     const limit = parseInt(searchParams.get('limit') || '50')
+
+    // Fast path: just return email count for a specific sender
+    if (countOnly && search) {
+      const sanitized = search.replace(/[%_]/g, '\\$&').substring(0, 100)
+      const { count, error: countError } = await supabase
+        .from('incoming_emails')
+        .select('*', { count: 'exact', head: true })
+        .in('email_type', ['customer_inquiry', 'form_submission'])
+        .ilike('from_email', `%${sanitized}%`)
+      if (countError) {
+        return NextResponse.json({ error: 'Failed to count emails' }, { status: 500 })
+      }
+      return NextResponse.json({ emailCount: count || 0 })
+    }
 
     // Get all customer emails (excluding system/notification and own emails)
     let query = supabase

@@ -23,25 +23,6 @@ function parseTime(time: string): { hours: number; minutes: number } {
   return { hours, minutes }
 }
 
-function getMinutesInDay(date: Date, startTime: string, endTime: string): number {
-  const start = parseTime(startTime)
-  const end = parseTime(endTime)
-
-  const dayStart = start.hours * 60 + start.minutes
-  const dayEnd = end.hours * 60 + end.minutes
-  const current = date.getHours() * 60 + date.getMinutes()
-
-  if (current <= dayStart) return dayEnd - dayStart // Full day remaining
-  if (current >= dayEnd) return 0 // Day is over
-  return dayEnd - current // Remaining minutes today
-}
-
-function getFullDayMinutes(startTime: string, endTime: string): number {
-  const start = parseTime(startTime)
-  const end = parseTime(endTime)
-  return (end.hours * 60 + end.minutes) - (start.hours * 60 + start.minutes)
-}
-
 export function isWithinBusinessHours(
   date: Date,
   hours: BusinessHoursConfig[] = DEFAULT_BUSINESS_HOURS

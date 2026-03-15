@@ -169,7 +169,6 @@ test.describe('Courses', () => {
 
   test('delete button opens confirmation dialog', async ({ page }) => {
     // The delete button (Trash2 icon) is a small button without text
-    const deleteBtn = page.locator('button').filter({ has: page.locator('svg') }).last()
     // Find a more specific delete button — it's a small button near the copy button
     const courseCard = page.locator('.grid > div').first()
     if (await courseCard.isVisible()) {

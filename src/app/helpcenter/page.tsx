@@ -299,7 +299,7 @@ function HelpCenterContent() {
 
                 {/* Answer Content */}
                 <div className="px-6 py-5 prose prose-slate dark:prose-invert max-w-none prose-p:text-lg prose-p:leading-relaxed prose-p:text-slate-700 dark:prose-p:text-slate-300 prose-strong:text-slate-900 dark:prose-strong:text-white">
-                  <ReactMarkdown>{aiAnswer.answer}</ReactMarkdown>
+                  <ReactMarkdown>{aiAnswer.answer || 'Keine Antwort verfügbar'}</ReactMarkdown>
                   {/* Feedback */}
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t">
                     <span className="text-xs text-slate-500">War das hilfreich?</span>

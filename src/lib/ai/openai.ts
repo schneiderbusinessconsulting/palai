@@ -465,10 +465,6 @@ export async function classifyEmail(
   const isFormSubmission = formPatterns.some(p => lowerFrom.includes(p) || lowerSubject.includes(p))
 
   if (isFormSubmission) {
-    // Check if there's a comment/question in the form that needs response
-    const commentPatterns = ['kommentar', 'comment', 'frage', 'question', 'anmerkung', 'nachricht', 'message']
-    const hasComment = commentPatterns.some(p => bodyText.toLowerCase().includes(p))
-
     // Look for actual content after comment field
     const commentMatch = bodyText.match(/(?:kommentar|comment|nachricht|message)[:\s]*\n([^\n]+)/i)
     const hasActualComment = commentMatch && commentMatch[1] && commentMatch[1].trim().length > 5 && commentMatch[1].trim() !== '-'

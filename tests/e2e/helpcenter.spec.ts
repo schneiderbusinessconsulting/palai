@@ -122,7 +122,6 @@ test.describe('Help Center', () => {
 
     await page.waitForTimeout(1000)
 
-    const thumbsUpBtn = page.locator('button').filter({ has: page.locator('svg') }).filter({ hasText: '' }).nth(0)
     // Find the ThumbsUp button near "War das hilfreich?"
     const feedbackSection = page.locator('text=War das hilfreich?').locator('..')
     const upBtn = feedbackSection.locator('button').first()

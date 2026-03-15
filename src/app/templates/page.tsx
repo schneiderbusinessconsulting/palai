@@ -18,7 +18,6 @@ import {
   Star,
   StarOff,
   Loader2,
-  X,
   Check,
   FileText,
 } from 'lucide-react'

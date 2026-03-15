@@ -19,8 +19,6 @@ import {
   Shield,
   BarChart3,
   SmilePlus,
-  Frown,
-  Meh,
   FileCheck,
   ArrowUpRight,
   ArrowDownRight,
@@ -197,7 +195,7 @@ function computeSlaStats(allEmails: Email[]): SlaStats {
 
   const sentToday = allEmails.filter(e => {
     if (e.status !== 'sent') return false
-    const d = new Date(e.received_at)
+    const d = e.updated_at ? new Date(e.updated_at) : new Date(e.received_at)
     return d >= todayStart
   }).length
 
@@ -293,11 +291,6 @@ function computeWorkload(
     return d >= last30Start
   }).length
 
-  const daysInData = Math.max(daily.length, 1)
-  const totalIncoming = daily.reduce((s, d) => s + d.total, 0)
-  const totalSent = daily.reduce((s, d) => s + d.sent, 0)
-  const weeksInData = Math.max(daysInData / 7, 1)
-  const monthsInData = Math.max(daysInData / 30, 1)
 
   const todayStr = now.toISOString().split('T')[0]
   const weekStartStr = weekStart.toISOString().split('T')[0]
@@ -375,7 +368,7 @@ function computeDailyKPIs(allEmails: Email[], csatRatings: Array<{ rating: numbe
   const days = Array.from(dayMap.keys()).sort()
 
   // Pre-compute actual open count per day: emails received on or before this day that are still not resolved
-  return days.map((day, idx) => {
+  return days.map((day) => {
     const { emails, csatRatings: dayRatings } = dayMap.get(day)!
     const resolved = emails.filter(e => e.status === 'sent').length
     const total = emails.length
@@ -914,7 +907,7 @@ export default function DashboardPage() {
                             )}
                           </p>
                         </div>
-                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 flex-shrink-0">{lead.buying_intent_score}%</span>
+                        <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400 flex-shrink-0">{lead.buying_intent_score ?? 0}%</span>
                       </div>
                     </Link>
                   ))}

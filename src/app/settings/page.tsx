@@ -176,8 +176,7 @@ export default function SettingsPage() {
       'integrations': fetchIntegrationStatus,
     }
     tabFetchers[activeTab]?.()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+  }, [activeTab])  
 
   // ── Profil ──────────────────────────────────────────────────────────────────
   const [profile, setProfile] = useState({ firstName: '', lastName: '', email: '', signature: '' })

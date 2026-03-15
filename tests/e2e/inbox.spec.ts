@@ -17,7 +17,7 @@ test.describe('Inbox', () => {
     await searchInput.fill('test@example.com')
     // Should filter — either shows results or empty state
     await page.waitForTimeout(500)
-    const visible = await page.locator('text=Keine E-Mails gefunden').isVisible().catch(() => false)
+    await page.locator('text=Keine E-Mails gefunden').isVisible().catch(() => false)
     // Just verify search doesn't crash
     expect(true).toBe(true)
   })

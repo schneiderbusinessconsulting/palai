@@ -286,9 +286,7 @@ describe('POST /api/emails (HubSpot import)', () => {
       json: () => Promise.resolve(hubspotResults),
     })
 
-    let callCount = 0
     mockSupabase.from.mockImplementation(() => {
-      callCount++
       const chain = {
         select: vi.fn().mockReturnThis(),
         insert: vi.fn().mockReturnThis(),

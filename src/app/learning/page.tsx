@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog'
 import {
   BookOpen,
-  CheckCircle,
   X,
   Loader2,
   Brain,

@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -192,7 +191,7 @@ export default function KnowledgePage() {
 
   useEffect(() => {
     fetchItems()
-  }, [filter])
+  }, [filter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle upload
   const handleUpload = async () => {
@@ -454,7 +453,7 @@ export default function KnowledgePage() {
     })
   }
 
-  const pendingItems: KnowledgeItem[] = []
+  const pendingItems: KnowledgeItem[] = items.filter(i => i.approved === false)
   const filteredItems = items.filter((item) => {
     if (searchQuery) {
       return item.title.toLowerCase().includes(searchQuery.toLowerCase())

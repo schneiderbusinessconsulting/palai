@@ -146,6 +146,25 @@ interface DrilldownEmail {
   received_at: string
 }
 
+interface FeedbackItem {
+  id: string
+  content: string
+  sentiment: string
+  original_quote?: string
+  category?: string
+  mentioned_person?: string
+  email_id?: string
+}
+
+interface FeedbackThread {
+  id: string
+  title: string
+  department: string
+  problem_statement?: string
+  ai_recommendation?: string
+  feedback_items?: FeedbackItem[]
+}
+
 function BuyingIntentBar({ score }: { score: number }) {
   const color =
     score >= 70 ? 'bg-emerald-500' :
@@ -251,8 +270,7 @@ export default function InsightsPage() {
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<string>('30d')
   const [drilldown, setDrilldown] = useState<{ title: string; emails: DrilldownEmail[] } | null>(null)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [feedbackThreads, setFeedbackThreads] = useState<any[]>([])
+  const [feedbackThreads, setFeedbackThreads] = useState<FeedbackThread[]>([])
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
   const router = useRouter()
 
@@ -280,12 +298,12 @@ export default function InsightsPage() {
           <CardDescription>Gesammeltes Feedback aus Kunden-E-Mails</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {threads.map((thread: any) => {
+          {threads.map((thread: FeedbackThread) => {
             const isExpanded = expandedThreads.has(thread.id)
             const items = thread.feedback_items || []
-            const posCount = items.filter((i: any) => i.sentiment === 'positive').length
-            const neuCount = items.filter((i: any) => i.sentiment === 'neutral').length
-            const negCount = items.filter((i: any) => i.sentiment === 'negative').length
+            const posCount = items.filter((i: FeedbackItem) => i.sentiment === 'positive').length
+            const neuCount = items.filter((i: FeedbackItem) => i.sentiment === 'neutral').length
+            const negCount = items.filter((i: FeedbackItem) => i.sentiment === 'negative').length
 
             return (
               <div key={thread.id} className="border rounded-lg overflow-hidden">
@@ -332,7 +350,7 @@ export default function InsightsPage() {
 
                     {items.length > 0 && (
                       <div className="space-y-2">
-                        {items.map((item: any) => (
+                        {items.map((item: FeedbackItem) => (
                           <div key={item.id} className="p-3 border rounded-lg bg-slate-50/50 dark:bg-slate-800/30">
                             <p className="text-sm">{item.content}</p>
                             {item.original_quote && (

@@ -73,16 +73,20 @@ export function DashboardBriefing() {
           const pending = emails.filter((e: { status: string }) => e.status === 'pending')
           const draftReady = emails.filter((e: { status: string }) => e.status === 'draft_ready')
 
-          const sentToday = emails.filter((e: { status: string; updated_at?: string }) => {
+          const sentToday = emails.filter((e: { status: string; updated_at?: string; received_at?: string }) => {
             if (e.status !== 'sent') return false
-            const sentDate = new Date(e.updated_at || '')
-            return sentDate >= todayStart
+            const dateStr = e.updated_at || e.received_at
+            if (!dateStr) return false
+            const sentDate = new Date(dateStr)
+            return !isNaN(sentDate.getTime()) && sentDate >= todayStart
           })
 
-          const sentYesterday = emails.filter((e: { status: string; updated_at?: string }) => {
+          const sentYesterday = emails.filter((e: { status: string; updated_at?: string; received_at?: string }) => {
             if (e.status !== 'sent') return false
-            const sentDate = new Date(e.updated_at || '')
-            return sentDate >= yesterdayStart && sentDate < todayStart
+            const dateStr = e.updated_at || e.received_at
+            if (!dateStr) return false
+            const sentDate = new Date(dateStr)
+            return !isNaN(sentDate.getTime()) && sentDate >= yesterdayStart && sentDate < todayStart
           })
 
           // High priority = low confidence drafts

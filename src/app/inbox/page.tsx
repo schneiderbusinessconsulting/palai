@@ -16,10 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
@@ -40,7 +36,6 @@ import {
   EyeOff,
   Copy,
   Check,
-  FileUp,
   RotateCcw,
   MessageSquare,
   Bot,
@@ -90,7 +85,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-import { Email, EmailDraft, EmailNote, Agent, SavedView } from '@/types/email'
+import { Email, EmailNote, Agent, SavedView } from '@/types/email'
 import { CategoryTabs } from '@/components/inbox/category-tabs'
 import { DensityToggle, type Density } from '@/components/inbox/density-toggle'
 import { StarPicker } from '@/components/inbox/star-picker'
@@ -263,13 +258,16 @@ function InboxPageContent() {
         lockHeartbeatRef.current = null
       }
     }
-  }, [isDetailOpen, selectedEmail?.id])
+  }, [isDetailOpen, selectedEmail?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close modal and release any held lock
   const handleClose = () => {
     if (selectedEmail) releaseLock(selectedEmail.id)
     setIsDetailOpen(false)
     setLockWarning(null)
+    setIsEditing(false)
+    setIsManualMode(false)
+    setEditedResponse('')
   }
 
   // Keyboard shortcuts for inbox navigation
@@ -335,7 +333,7 @@ function InboxPageContent() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isDetailOpen, selectedEmail, emails])
+  }, [isDetailOpen, selectedEmail, emails]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load auto-draft preference from localStorage
   useEffect(() => {
@@ -376,22 +374,25 @@ function InboxPageContent() {
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (!supabaseUrl || !supabaseKey) return
 
-    const { createClient } = require('@supabase/supabase-js')
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    let cleanup: (() => void) | undefined
+    import('@supabase/supabase-js').then(({ createClient }) => {
+      const supabase = createClient(supabaseUrl, supabaseKey)
 
-    const channel = supabase
-      .channel('inbox-realtime')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'incoming_emails' },
-        (payload: any) => {
-          // Add new email to the top of the list
-          setEmails(prev => [payload.new as Email, ...prev])
-          toast.info('Neue E-Mail eingegangen', { description: payload.new?.subject })
-        }
-      )
-      .subscribe()
+      const channel = supabase
+        .channel('inbox-realtime')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'incoming_emails' },
+          (payload: { new: Record<string, unknown> }) => {
+            setEmails(prev => [payload.new as unknown as Email, ...prev])
+            toast.info('Neue E-Mail eingegangen', { description: (payload.new as unknown as Email)?.subject })
+          }
+        )
+        .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+      cleanup = () => { supabase.removeChannel(channel) }
+    })
+
+    return () => { cleanup?.() }
   }, [])
 
   // Fetch emails (with optional loading indicator)
@@ -679,7 +680,7 @@ function InboxPageContent() {
     fetchOwners()
     fetchAgents()
     loadSavedViews()
-  }, [fetchEmails])
+  }, [fetchEmails]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deep-link: open email detail from ?emailId= query param (e.g. from Insights page)
   const [deepLinkHandled, setDeepLinkHandled] = useState(false)
@@ -698,7 +699,7 @@ function InboxPageContent() {
       setHideSystemMails(false)
       setDeepLinkHandled(true)
     }
-  }, [emails, searchParams, deepLinkHandled, isLoading])
+  }, [emails, searchParams, deepLinkHandled, isLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-sync every 60 seconds (background, no loading indicator)
   const isSyncingRef = useRef(false)
@@ -877,7 +878,7 @@ function InboxPageContent() {
     } else {
       setIsDetailOpen(false)
     }
-  }, [selectedEmail])
+  }, [selectedEmail]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Send via Resend + HubSpot (full send pipeline) — with 5s undo
   const handleSend = async () => {
@@ -1457,8 +1458,14 @@ function InboxPageContent() {
               </SelectTrigger>
               <SelectContent>
                 {savedViews.map((view) => (
-                  <div key={view.id} className="flex items-center justify-between">
+                  <div key={view.id} className="flex items-center justify-between group">
                     <SelectItem value={view.id}>{view.name}</SelectItem>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteView(view.id) }}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
                   </div>
                 ))}
               </SelectContent>
@@ -1729,10 +1736,10 @@ function InboxPageContent() {
                   <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Snooze 4h" onClick={(e) => { e.stopPropagation(); handleSnooze(email.id, 4) }}>
                     <EyeOff className="h-3.5 w-3.5 text-slate-500" />
                   </button>
-                  <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Schliessen" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/mark-sent`, { method: 'POST' }).then(() => { toast.success('Geschlossen'); fetchEmails() }) }}>
+                  <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Schliessen" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/mark-sent`, { method: 'POST' }).then(res => { if (res.ok) { toast.success('Geschlossen'); fetchEmails() } else { toast.error('Fehler beim Schliessen') } }).catch(() => toast.error('Netzwerkfehler')) }}>
                     <CheckCircle className="h-3.5 w-3.5 text-slate-500" />
                   </button>
-                  <button className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20" title="Spam" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/spam`, { method: 'POST' }).then(() => { toast.success('Als Spam markiert'); fetchEmails() }) }}>
+                  <button className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20" title="Spam" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/spam`, { method: 'POST' }).then(res => { if (res.ok) { toast.success('Als Spam markiert'); fetchEmails() } else { toast.error('Fehler beim Spam-Markieren') } }).catch(() => toast.error('Netzwerkfehler')) }}>
                     <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
                   </button>
                 </div>
@@ -2125,7 +2132,7 @@ function InboxPageContent() {
                           className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left"
                           onClick={() => setExpandedThreadIds(prev => {
                             const next = new Set(prev)
-                            next.has(tEmail.id) ? next.delete(tEmail.id) : next.add(tEmail.id)
+                            if (next.has(tEmail.id)) { next.delete(tEmail.id) } else { next.add(tEmail.id) }
                             return next
                           })}
                         >

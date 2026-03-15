@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,7 +15,6 @@ import {
   Mail,
   ExternalLink,
   ArrowUpDown,
-  Filter,
 } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -60,7 +58,6 @@ export default function CustomersPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [sentimentFilter, setSentimentFilter] = useState<string>('all')
   const [page, setPage] = useState(1)
-  const router = useRouter()
 
   const fetchCustomers = async (query?: string) => {
     setLoading(true)

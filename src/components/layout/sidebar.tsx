@@ -29,7 +29,6 @@ import {
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 const dashboards = [
   { name: 'Intelligence', href: '/', current: true },

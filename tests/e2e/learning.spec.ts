@@ -110,12 +110,7 @@ test.describe('Learning', () => {
 
   test('checkbox selection works for pending cases', async ({ page }) => {
     // The pending case should have a checkbox (Square/CheckSquare icon button)
-    const checkboxBtn = page.locator('button').filter({ has: page.locator('svg') }).first()
-    // Look specifically for the square icon button
-    const selectBtns = page.locator('button[class*="rounded"]').filter({ hasNot: page.locator('span') })
-    // Just verify a checkbox-like element is present in the case card
-    const caseCard = page.locator('[class*="ring"]').first()
-    // Simpler: look for the select all button
+    // Look for the select all button
     await expect(page.locator('button:has-text("Alle auswählen")')).toBeVisible({ timeout: 10000 })
   })
 

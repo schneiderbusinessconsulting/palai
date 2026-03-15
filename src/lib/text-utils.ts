@@ -132,3 +132,138 @@ export function calculateHappinessScore(subject: string, bodyText: string): numb
 
   return Math.max(1, Math.min(5, Math.round(score)))
 }
+
+/**
+ * Rule-based spam detection — no API calls.
+ * Returns a spam score and boolean flag.
+ */
+export function detectSpam(
+  fromEmail: string,
+  subject: string,
+  bodyText: string
+): { isSpam: boolean; spamScore: number } {
+  let spamScore = 0
+  const emailLower = fromEmail.toLowerCase()
+  const subjectLower = subject.toLowerCase()
+  const bodyLower = bodyText.toLowerCase()
+  const fullText = `${subjectLower} ${bodyLower}`
+
+  // 1. Known marketing/bulk email domains (40 points)
+  const bulkDomains = [
+    'mailchimp', 'sendgrid', 'hubspotmail', 'constantcontact', 'mailerlite',
+    'brevo', 'sendinblue', 'campaignmonitor', 'mailjet', 'getresponse',
+    'activecampaign', 'aweber', 'convertkit', 'drip', 'beehiiv', 'substack',
+  ]
+  if (bulkDomains.some((d) => emailLower.includes(d))) {
+    spamScore += 40
+  }
+
+  // 2. fromEmail patterns (only as a signal, not standalone)
+  const suspiciousPrefix = /^(noreply@|no-reply@|newsletter@|marketing@|info@)/
+  const hasSuspiciousPrefix = suspiciousPrefix.test(emailLower)
+
+  // 3. Unsubscribe keywords in body (30 points)
+  const unsubscribePatterns = [
+    'unsubscribe', 'abmelden', 'abbestellen', 'austragen', 'newsletter abbestellen',
+  ]
+  if (unsubscribePatterns.some((p) => bodyLower.includes(p))) {
+    spamScore += 30
+  }
+
+  // 4. Promotional keywords — German (15 each, cap 45)
+  const promoDE = [
+    'kostenlos', 'gratis', 'gewinnen', 'gewinnspiel', 'sonderangebot',
+    'rabatt', 'prozent reduziert', 'jetzt zugreifen', 'limitiertes angebot',
+    'nur heute', 'klicken sie hier',
+  ]
+  // Promotional keywords — English
+  const promoEN = [
+    'free', 'winner', 'congratulations', 'click here', 'limited offer',
+    'act now', 'urgent', 'unsubscribe',
+  ]
+  const allPromo = [...promoDE, ...promoEN]
+  let promoHits = 0
+  for (const kw of allPromo) {
+    if (fullText.includes(kw)) {
+      promoHits++
+    }
+  }
+  spamScore += Math.min(promoHits * 15, 45)
+
+  // 5. ALL-CAPS subject (>50% uppercase and length > 10) — 20 points
+  if (subject.length > 10) {
+    const upperCount = (subject.match(/[A-ZÄÖÜ]/g) || []).length
+    const letterCount = (subject.match(/[A-Za-zÄÖÜäöü]/g) || []).length
+    if (letterCount > 0 && upperCount / letterCount > 0.5) {
+      spamScore += 20
+    }
+  }
+
+  // 6. Excessive URLs in body (>5 links) — 15 points
+  const urlCount = (bodyText.match(/https?:\/\//gi) || []).length
+  if (urlCount > 5) {
+    spamScore += 15
+  }
+
+  // 7. Generic greetings combined with marketing keywords
+  const genericGreeting = /dear sir\/madam|sehr geehrte damen und herren/.test(fullText)
+  if (genericGreeting && promoHits > 0) {
+    spamScore += 10
+  }
+
+  // 8. HTML-heavy emails with lots of images (>3 <img tags) combined with promo keywords
+  const imgCount = (bodyText.match(/<img/gi) || []).length
+  if (imgCount > 3 && promoHits > 0) {
+    spamScore += 10
+  }
+
+  // Boost score if suspicious prefix is combined with other signals
+  if (hasSuspiciousPrefix && spamScore > 0) {
+    spamScore += 10
+  }
+
+  return { isSpam: spamScore >= 60, spamScore }
+}
+
+/**
+ * Detect up to 3 topic tags from German text.
+ * Returns tags sorted by relevance (number of keyword matches).
+ */
+export function detectTopicTags(subject: string, bodyText: string): string[] {
+  const text = `${subject} ${bodyText}`.toLowerCase()
+
+  const tagKeywords: Record<string, string[]> = {
+    'Anfrage': ['anfrage', 'frage', 'wissen', 'erkundigen', 'informieren', 'information'],
+    'Beschwerde': ['beschwerde', 'reklamation', 'unzufrieden', 'problem', 'fehler', 'mangel', 'enttäuscht', 'ärgerlich'],
+    'Bestellung': ['bestellung', 'bestellen', 'kaufen', 'order', 'lieferung', 'versand'],
+    'Stornierung': ['stornieren', 'stornierung', 'kündigen', 'kündigung', 'absagen', 'rücktritt'],
+    'Zertifikat': ['zertifikat', 'zertifizierung', 'diplom', 'abschluss', 'prüfung', 'nachweis'],
+    'Kurs': ['kurs', 'ausbildung', 'seminar', 'schulung', 'workshop', 'weiterbildung', 'lehrgang'],
+    'Feedback': ['feedback', 'rückmeldung', 'bewertung', 'meinung', 'erfahrung', 'empfehlung', 'weiterempf'],
+    'Rechnung': ['rechnung', 'zahlung', 'bezahlung', 'überweisung', 'faktura', 'quittung', 'mahnung'],
+    'Terminanfrage': ['termin', 'terminvereinbarung', 'besprechung', 'meeting', 'gespräch vereinbaren'],
+    'Anmeldung': ['anmeldung', 'anmelden', 'registrierung', 'registrieren', 'einschreibung'],
+    'Produkt': ['produkt', 'artikel', 'ware', 'sortiment', 'angebot', 'preis', 'preisanfrage', 'preisliste'],
+    'Kooperation': ['kooperation', 'zusammenarbeit', 'partnerschaft', 'partner', 'kooperieren'],
+  }
+
+  const tagScores: { tag: string; count: number }[] = []
+
+  for (const [tag, keywords] of Object.entries(tagKeywords)) {
+    let count = 0
+    for (const kw of keywords) {
+      const regex = new RegExp(`\\b${kw}`, 'g')
+      const matches = text.match(regex)
+      if (matches) {
+        count += matches.length
+      }
+    }
+    if (count > 0) {
+      tagScores.push({ tag, count })
+    }
+  }
+
+  tagScores.sort((a, b) => b.count - a.count)
+
+  return tagScores.slice(0, 3).map((t) => t.tag)
+}

@@ -27,9 +27,10 @@ export async function GET(request: NextRequest) {
       // Emails with buying intent, tone, priority, status — filtered by period
       supabase
         .from('incoming_emails')
-        .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status')
+        .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status, happiness_score, topic_tags')
         .gte('received_at', startDateStr)
         .not('from_email', 'in', `("${OWN_EMAILS.join('","')}")`)
+        .or('is_spam.eq.false,is_spam.is.null')
         .order('received_at', { ascending: false })
         .limit(500),
 

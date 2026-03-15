@@ -1,5 +1,5 @@
 import { Badge } from '@/components/ui/badge'
-import { Bell, FileText, User, TrendingUp } from 'lucide-react'
+import { Bell, FileText, User, TrendingUp, ShieldAlert, Tag } from 'lucide-react'
 
 export function getConfidenceColor(confidence: number) {
   if (confidence >= 0.85) return 'bg-green-500'
@@ -96,6 +96,51 @@ export function getHappinessBadge(score?: number | null, size: 'sm' | 'lg' = 'sm
     <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${h.color}`} title={h.label}>
       {h.emoji} {score}/5
     </span>
+  )
+}
+
+// Topic tag color mapping
+const topicTagColors: Record<string, string> = {
+  'Anfrage': 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-900/20 dark:text-teal-400 dark:border-teal-800',
+  'Beschwerde': 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-400 dark:border-rose-800',
+  'Bestellung': 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-900/20 dark:text-sky-400 dark:border-sky-800',
+  'Stornierung': 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800',
+  'Zertifikat': 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800',
+  'Kurs': 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800',
+  'Feedback': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
+  'Rechnung': 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
+  'Terminanfrage': 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/20 dark:text-cyan-400 dark:border-cyan-800',
+  'Anmeldung': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
+  'Produkt': 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800',
+  'Kooperation': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800',
+}
+
+export function getTopicTagBadges(tags?: string[] | null) {
+  if (!tags || tags.length === 0) return null
+  return (
+    <div className="inline-flex items-center gap-1 flex-wrap">
+      {tags.map(tag => (
+        <span
+          key={tag}
+          className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-medium ${
+            topicTagColors[tag] || 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+          }`}
+        >
+          <Tag className="h-2.5 w-2.5" />
+          {tag}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export function getSpamBadge(isSpam?: boolean, spamScore?: number) {
+  if (!isSpam) return null
+  return (
+    <Badge variant="outline" className="text-red-600 border-red-300 bg-red-50 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800 gap-1">
+      <ShieldAlert className="h-3 w-3" />
+      Spam {spamScore ? `(${spamScore}%)` : ''}
+    </Badge>
   )
 }
 

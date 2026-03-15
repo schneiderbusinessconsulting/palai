@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
-import { analyzeTone, determinePriority, calculateHappinessScore } from '@/lib/text-utils'
+import { analyzeTone, determinePriority, calculateHappinessScore, detectSpam, detectTopicTags } from '@/lib/text-utils'
 
 // Phase 3: BI scanning — fire-and-forget, runs in background after email insert
 // Returns buying intent score (0-100) for immediate storage on the email record
@@ -257,6 +257,8 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const assignedAgentId = searchParams.get('assigned_agent_id')
     const tags = searchParams.get('tags')
+    const showSpam = searchParams.get('spam')
+    const topicFilter = searchParams.get('topic')
 
     const supabase = await createClient()
 
@@ -275,6 +277,18 @@ export async function GET(request: NextRequest) {
       `, { count: 'exact' })
       .order('received_at', { ascending: false })
       .range(offset, offset + limit - 1)
+
+    // Spam filter: by default exclude spam, show only spam when ?spam=true
+    if (showSpam === 'true') {
+      query = query.eq('is_spam', true)
+    } else {
+      query = query.or('is_spam.eq.false,is_spam.is.null')
+    }
+
+    // Topic tag filter
+    if (topicFilter) {
+      query = query.contains('topic_tags', [topicFilter])
+    }
 
     if (status && status !== 'all') {
       query = query.eq('status', status)
@@ -524,6 +538,10 @@ export async function POST(request: NextRequest) {
       const tone = analyzeTone(subject, bodyText)
       const happinessScore = calculateHappinessScore(subject, bodyText)
 
+      // Phase 6: Spam detection + Topic tags (rule-based, free)
+      const spamResult = detectSpam(fromEmail, subject, bodyText)
+      const topicTags = detectTopicTags(subject, bodyText)
+
       // Phase 4: Determine priority + SLA target
       const priority = determinePriority(classification.emailType, tone.urgency, classification.needsResponse)
       const slaTargetId = slaTargets[priority] || null
@@ -553,6 +571,11 @@ export async function POST(request: NextRequest) {
           tone_urgency: tone.urgency,
           // Happiness score
           happiness_score: happinessScore,
+          // Spam detection
+          is_spam: spamResult.isSpam,
+          spam_score: spamResult.spamScore,
+          // Topic tags
+          topic_tags: topicTags,
           // Default assignment
           assigned_agent_id: defaultAgentId,
         })
@@ -563,9 +586,10 @@ export async function POST(request: NextRequest) {
         console.error('Failed to insert email:', insertError)
       } else {
         imported++
-        if (newEmail?.id) {
+        if (newEmail?.id && !spamResult.isSpam) {
           const hubspotThreadId = props.hs_email_thread_id || null
           // Phase 3: BI scanning — async so we can store buying intent score
+          // Skip for spam emails — they don't count as tickets
           if (classification.emailType === 'customer_inquiry' || classification.emailType === 'form_submission') {
             scanEmailForBiInsights(newEmail.id, subject, bodyText, { urgency: tone.urgency, sentiment: tone.sentiment })
               .then(async (intentScore) => {
@@ -579,7 +603,7 @@ export async function POST(request: NextRequest) {
               })
               .catch(err => console.error('BI scan failed:', err))
           }
-          // Auto-draft if enabled
+          // Auto-draft if enabled — skip for spam
           if (autoDraftEnabled && classification.needsResponse) {
             generateDraftForEmail(newEmail.id, subject, bodyText, fromName, hubspotThreadId)
               .catch(err => console.error('Background draft generation failed:', err))

@@ -59,6 +59,7 @@ import {
   ChevronsRight,
   CheckSquare,
   Square,
+  ShieldAlert,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
@@ -67,6 +68,8 @@ import {
   getEmailTypeBadge,
   getBuyingIntentBadge,
   getHappinessBadge,
+  getTopicTagBadges,
+  getSpamBadge,
 } from '@/components/inbox/inbox-utils'
 import { formatRelativeDate } from '@/lib/utils'
 import {
@@ -86,67 +89,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
-
-interface EmailDraft {
-  id: string
-  ai_generated_response: string
-  edited_response?: string
-  confidence_score: number
-  status: string
-  formality?: 'sie' | 'du'
-}
-
-interface Email {
-  id: string
-  hubspot_email_id: string
-  from_email: string
-  from_name?: string
-  subject: string
-  body_text: string
-  body_html?: string
-  received_at: string
-  status: string
-  email_type?: 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
-  needs_response?: boolean
-  classification_reason?: string
-  buying_intent_score?: number
-  happiness_score?: number
-  email_drafts?: EmailDraft[]
-  assigned_agent_id?: string
-  support_level?: string
-  snoozed_until?: string
-  tags?: string[]
-  hubspot_thread_id?: string
-}
-
-interface Agent {
-  id: string
-  name: string
-  email: string
-  role: string
-  specializations?: string[]
-  is_active: boolean
-}
-
-interface EmailNote {
-  id: string
-  email_id: string
-  agent_name: string
-  content: string
-  created_at: string
-}
-
-interface SavedView {
-  id: string
-  name: string
-  filters: {
-    status: string
-    hideSent: boolean
-    hideSystemMails: boolean
-    searchQuery: string
-    assignedAgentId: string
-  }
-}
+import { Email, EmailDraft, EmailNote, Agent, SavedView } from '@/types/email'
 
 interface HubSpotOwner {
   id: string
@@ -159,6 +102,8 @@ function InboxPageContent() {
   const [emails, setEmails] = useState<Email[]>([])
   const initialFilter = searchParams.get('filter') || 'all'
   const [filter, setFilter] = useState(initialFilter)
+  const [showSpam, setShowSpam] = useState(false) // Spam view toggle
+  const [topicFilter, setTopicFilter] = useState('') // Filter by topic tag
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
@@ -421,7 +366,10 @@ function InboxPageContent() {
   const fetchEmails = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true)
     try {
-      const response = await fetch(`/api/emails?status=${filter}`)
+      const params = new URLSearchParams({ status: filter })
+      if (showSpam) params.set('spam', 'true')
+      if (topicFilter) params.set('topic', topicFilter)
+      const response = await fetch(`/api/emails?${params.toString()}`)
       const data = await response.json()
       if (response.ok) {
         setEmails(data.emails || [])
@@ -436,7 +384,7 @@ function InboxPageContent() {
     } finally {
       if (showLoading) setIsLoading(false)
     }
-  }, [filter])
+  }, [filter, showSpam, topicFilter])
 
   // Fetch agents on mount
   const fetchAgents = async () => {
@@ -1279,6 +1227,39 @@ function InboxPageContent() {
             <SelectItem value="sent">Gesendet</SelectItem>
           </SelectContent>
         </Select>
+        {/* Spam toggle */}
+        <Button
+          variant={showSpam ? 'default' : 'outline'}
+          size="sm"
+          className={`gap-1.5 ${showSpam ? 'bg-red-600 hover:bg-red-700 text-white' : ''}`}
+          onClick={() => { setShowSpam(!showSpam); if (!showSpam) setTopicFilter('') }}
+        >
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Spam
+        </Button>
+        {/* Topic filter */}
+        {!showSpam && (
+          <Select value={topicFilter} onValueChange={(v) => setTopicFilter(v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-full sm:w-40">
+              <SelectValue placeholder="Thema..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Alle Themen</SelectItem>
+              <SelectItem value="Anfrage">Anfrage</SelectItem>
+              <SelectItem value="Beschwerde">Beschwerde</SelectItem>
+              <SelectItem value="Bestellung">Bestellung</SelectItem>
+              <SelectItem value="Kurs">Kurs</SelectItem>
+              <SelectItem value="Zertifikat">Zertifikat</SelectItem>
+              <SelectItem value="Feedback">Feedback</SelectItem>
+              <SelectItem value="Rechnung">Rechnung</SelectItem>
+              <SelectItem value="Stornierung">Stornierung</SelectItem>
+              <SelectItem value="Anmeldung">Anmeldung</SelectItem>
+              <SelectItem value="Produkt">Produkt</SelectItem>
+              <SelectItem value="Terminanfrage">Terminanfrage</SelectItem>
+              <SelectItem value="Kooperation">Kooperation</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
           <Switch
             id="hide-sent"
@@ -1706,6 +1687,8 @@ function InboxPageContent() {
                           {email.support_level === 'L2' && (
                             <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">Eskaliert</Badge>
                           )}
+                          {getTopicTagBadges(email.topic_tags)}
+                          {getSpamBadge(email.is_spam, email.spam_score)}
                           {getHappinessBadge(email.happiness_score)}
                           {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
@@ -1858,6 +1841,7 @@ function InboxPageContent() {
             <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
             <button className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2" onClick={() => { fetch(`/api/emails/${contextMenu.emailId}/mark-sent`, { method: 'POST' }).then(() => { toast.success('E-Mail geschlossen'); fetchEmails() }); setContextMenu(null) }}><CheckCircle className="h-3.5 w-3.5" /> Schliessen</button>
             <button className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2" onClick={() => { setDismissEmailId(contextMenu.emailId); setContextMenu(null) }}><Trash2 className="h-3.5 w-3.5" /> Verwerfen</button>
+            <button className="w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 flex items-center gap-2" onClick={() => { fetch(`/api/emails/${contextMenu.emailId}/spam`, { method: 'POST' }).then(() => { toast.success('Als Spam markiert'); fetchEmails() }); setContextMenu(null) }}><ShieldAlert className="h-3.5 w-3.5" /> Als Spam markieren</button>
           </div>
         </>
       )}
@@ -1903,9 +1887,14 @@ function InboxPageContent() {
               {/* Subject heading + metadata toolbar — Gmail-style */}
               <div className="px-6 pt-5 pb-2">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-xl font-normal text-slate-900 dark:text-slate-100 leading-snug flex-1">
-                    {selectedEmail.subject}
-                  </h2>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-xl font-normal text-slate-900 dark:text-slate-100 leading-snug">
+                      {selectedEmail.subject}
+                    </h2>
+                    {selectedEmail.topic_tags && selectedEmail.topic_tags.length > 0 && (
+                      <div className="mt-1.5">{getTopicTagBadges(selectedEmail.topic_tags)}</div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                     {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
                     {customerEmailCount !== null && (

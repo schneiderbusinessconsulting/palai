@@ -418,14 +418,37 @@ export default function KnowledgePage() {
 
   // Handle approve/reject
   const handleApprove = async (itemTitle: string) => {
+    // Optimistic update
     setItems((prev) =>
       prev.map((item) => item.title === itemTitle ? { ...item, approved: true } : item)
     )
-    await fetch('/api/knowledge', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldTitle: itemTitle, approved: true }),
-    })
+
+    try {
+      const response = await fetch('/api/knowledge', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldTitle: itemTitle, approved: true }),
+      })
+
+      if (!response.ok) {
+        // Revert on failure
+        setItems((prev) =>
+          prev.map((item) =>
+            item.title === itemTitle ? { ...item, approved: false } : item
+          )
+        )
+        toast.error('Freigabe fehlgeschlagen')
+      }
+    } catch (error) {
+      console.error('Approve error:', error)
+      // Revert on error
+      setItems((prev) =>
+        prev.map((item) =>
+          item.title === itemTitle ? { ...item, approved: false } : item
+        )
+      )
+      toast.error('Freigabe fehlgeschlagen')
+    }
   }
 
   const handleReject = (itemTitle: string) => {

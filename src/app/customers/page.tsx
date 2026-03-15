@@ -78,8 +78,6 @@ export default function CustomersPage() {
     }
   }
 
-  useEffect(() => { fetchCustomers() }, [])
-
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {

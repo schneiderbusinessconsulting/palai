@@ -159,6 +159,12 @@ export function Header({ title, description }: HeaderProps) {
           <Input
             placeholder="Suchen..."
             className="pl-9 w-64 bg-white dark:bg-slate-800"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const query = (e.target as HTMLInputElement).value.trim()
+                if (query) router.push(`/inbox?search=${encodeURIComponent(query)}`)
+              }
+            }}
           />
         </div>
 

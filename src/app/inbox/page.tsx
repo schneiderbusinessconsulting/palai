@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -150,7 +150,7 @@ interface HubSpotOwner {
   name: string
 }
 
-export default function InboxPage() {
+function InboxPageContent() {
   const searchParams = useSearchParams()
   const [emails, setEmails] = useState<Email[]>([])
   const [filter, setFilter] = useState('all')
@@ -617,7 +617,7 @@ export default function InboxPage() {
     const interval = setInterval(autoSync, 60000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchEmails])
 
   // Sync from HubSpot (including status sync for closed conversations)
   const handleSync = async () => {
@@ -2162,5 +2162,17 @@ export default function InboxPage() {
       </Dialog>
 
     </div>
+  )
+}
+
+export default function InboxPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+        <div className="animate-spin h-8 w-8 border-4 border-amber-500 border-t-transparent rounded-full" />
+      </div>
+    }>
+      <InboxPageContent />
+    </Suspense>
   )
 }

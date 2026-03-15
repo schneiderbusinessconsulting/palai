@@ -38,10 +38,72 @@ export async function generateChatResponse(
 }
 
 // Detect formality (Sie/Du) from email content
+// Priority: 1) Signature analysis (first name only → du), 2) Pronoun counting
 export function detectFormality(text: string): 'sie' | 'du' {
+  // --- Step 1: Analyze the closing/signature (strongest signal) ---
+  // Look at the last ~5 lines for a greeting pattern + name
+  const lines = text.trim().split(/\n/).map(l => l.trim()).filter(Boolean)
+  const tail = lines.slice(-5)
+
+  // Common German closings that precede the sender's name
+  const closingPatterns = [
+    /^(liebe|viele|herzliche|freundliche|beste)\s+gr(?:ü|ue?)(?:ss|ß)e?\s*,?\s*$/i,
+    /^(mit\s+(?:lieben|freundlichen|herzlichen|besten)\s+gr(?:ü|ue?)(?:ss|ß)en)\s*,?\s*$/i,
+    /^gr(?:ü|ue?)(?:ss|ß)e?\s*,?\s*$/i,
+    /^lg\s*,?\s*$/i,
+    /^mfg\s*,?\s*$/i,
+    /^cheers\s*,?\s*$/i,
+    /^danke\s*(?:dir|ihnen)?\s*(?:und)?\s*(?:liebe|herzliche|viele)?\s*gr(?:ü|ue?)(?:ss|ß)e?\s*,?\s*$/i,
+    /^(?:danke|vielen\s+dank)\s*[!.]?\s*$/i,
+  ]
+
+  for (let i = 0; i < tail.length; i++) {
+    const line = tail[i]
+    const isClosing = closingPatterns.some(p => p.test(line))
+    if (isClosing) {
+      // The name is typically the next non-empty line after the closing
+      const nameLine = tail.slice(i + 1).find(l => l.length > 0 && l.length < 60)
+      if (nameLine) {
+        // Clean up name: remove phone numbers, email addresses, titles
+        const cleanName = nameLine
+          .replace(/[-–—].*$/, '') // remove everything after dash (title/company)
+          .replace(/\d+/g, '')     // remove numbers
+          .replace(/@\S+/g, '')    // remove email
+          .replace(/[,;]/g, '')    // remove punctuation
+          .trim()
+
+        const nameParts = cleanName.split(/\s+/).filter(p => p.length > 1)
+        // Single word = first name only → informal (du)
+        if (nameParts.length === 1) {
+          return 'du'
+        }
+        // Multiple words = full name → formal (sie)
+        if (nameParts.length >= 2) {
+          return 'sie'
+        }
+      }
+      // Closing found but no clear name → check for informal closing style
+      if (/^lg\s*,?\s*$/i.test(line) || /^cheers/i.test(line)) {
+        return 'du'
+      }
+    }
+  }
+
+  // Also check if the greeting at the beginning hints at formality
+  const firstLines = lines.slice(0, 3)
+  for (const line of firstLines) {
+    if (/^(hi|hey|hallo|moin)\b/i.test(line) && !/^hallo\s+(herr|frau)\b/i.test(line)) {
+      // Informal greeting → slight signal for du (but continue to pronoun check)
+      return 'du'
+    }
+    if (/^(sehr\s+geehrte|guten\s+tag\s+(herr|frau))\b/i.test(line)) {
+      return 'sie'
+    }
+  }
+
+  // --- Step 2: Fall back to pronoun counting in body ---
   const lowerText = text.toLowerCase()
 
-  // Patterns for formal "Sie"
   const siePatterns = [
     /\bsie\b/gi,
     /\bihnen\b/gi,
@@ -49,7 +111,6 @@ export function detectFormality(text: string): 'sie' | 'du' {
     /\bihre[nms]?\b/gi,
   ]
 
-  // Patterns for informal "Du"
   const duPatterns = [
     /\bdu\b/gi,
     /\bdir\b/gi,

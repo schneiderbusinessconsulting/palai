@@ -24,6 +24,8 @@ import {
   UserCog,
   ClipboardList,
   Briefcase,
+  Calendar,
+  FileBarChart,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
@@ -40,6 +42,8 @@ const navigation = [
   { name: 'Insights', href: '/insights', icon: BarChart3, badgeKey: 'escalations' },
   { name: 'Deals', href: '/deals', icon: Briefcase },
   { name: 'Kunden', href: '/customers', icon: Users },
+  { name: 'Termine', href: '/meetings', icon: Calendar },
+  { name: 'Reports', href: '/reports', icon: FileBarChart },
   { name: 'Team', href: '/agents', icon: UserCog },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
@@ -237,7 +241,7 @@ export function Sidebar() {
           {(() => {
             const groups = [
               { label: 'Support', items: ['Dashboard', 'Inbox', 'Aufgaben'] },
-              { label: 'Insights', items: ['Insights', 'Deals', 'Kunden', 'Team'] },
+              { label: 'Insights', items: ['Insights', 'Deals', 'Kunden', 'Termine', 'Reports', 'Team'] },
               { label: 'Wissen', items: ['Knowledge Base', 'Chat', 'AI Learning', 'Templates', 'Kurse & Preise'] },
               { label: 'System', items: ['Einstellungen'] },
             ]

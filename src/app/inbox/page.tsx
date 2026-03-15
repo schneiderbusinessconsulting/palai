@@ -601,8 +601,11 @@ function InboxPageContent() {
   }, [emails, searchParams, deepLinkHandled, isLoading])
 
   // Auto-sync every 60 seconds (background, no loading indicator)
+  const isSyncingRef = useRef(false)
   useEffect(() => {
     const autoSync = async () => {
+      if (isSyncingRef.current) return // Prevent concurrent syncs
+      isSyncingRef.current = true
       try {
         // Get current autoDraft setting from localStorage
         const autoDraft = localStorage.getItem('autoDraftEnabled') === 'true'
@@ -616,6 +619,8 @@ function InboxPageContent() {
         }
       } catch (e) {
         console.error('Auto-sync failed:', e)
+      } finally {
+        isSyncingRef.current = false
       }
     }
 
@@ -1014,7 +1019,10 @@ function InboxPageContent() {
     setIsBulkActioning(true)
     const results = await Promise.allSettled(
       Array.from(selectedIds).map(id =>
-        fetch(`/api/emails/${id}/mark-sent`, { method: 'POST' })
+        fetch(`/api/emails/${id}/mark-sent`, { method: 'POST' }).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          return r
+        })
       )
     )
     const succeeded = results.filter(r => r.status === 'fulfilled').length

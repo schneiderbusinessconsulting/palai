@@ -45,6 +45,8 @@ import {
   Inbox,
   Workflow,
   ScrollText,
+  Bell,
+  Volume2,
 } from 'lucide-react'
 import { AutomationTab } from '@/components/settings/automation-tab'
 import { AuditTrailTab } from '@/components/settings/audit-trail-tab'
@@ -649,6 +651,7 @@ export default function SettingsPage() {
           <TabsTrigger value="automation" className="gap-2"><Workflow className="h-4 w-4" />Automatisierung</TabsTrigger>
           <TabsTrigger value="audit" className="gap-2"><ScrollText className="h-4 w-4" />Audit Trail</TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2"><Database className="h-4 w-4" />Integrationen</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-2"><Bell className="h-4 w-4" />Benachrichtigungen</TabsTrigger>
         </TabsList>
 
         {/* ── PROFIL ─────────────────────────────────────────────────────────── */}
@@ -1706,6 +1709,107 @@ export default function SettingsPage() {
               </div>
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400">
                 Falls neue Tabellen fehlen: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">supabase/migrations/006_support_analytics.sql</code> im Supabase SQL Editor ausführen.
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── BENACHRICHTIGUNGEN ────────────────────────────────────────────── */}
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Volume2 className="h-5 w-5" />
+                Ton & Benachrichtigungen
+              </CardTitle>
+              <CardDescription>Steuere, wie du über neue E-Mails und Ereignisse informiert wirst.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Benachrichtigungston</p>
+                  <p className="text-xs text-slate-500">Spielt einen Ton ab, wenn eine neue E-Mail eingeht</p>
+                </div>
+                <Switch
+                  defaultChecked={typeof window !== 'undefined' && localStorage.getItem('notificationSounds') !== 'false'}
+                  onCheckedChange={(checked) => localStorage.setItem('notificationSounds', String(checked))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Inbox Zero Konfetti</p>
+                  <p className="text-xs text-slate-500">Feiert mit Konfetti, wenn alle E-Mails bearbeitet sind</p>
+                </div>
+                <Switch
+                  defaultChecked={typeof window !== 'undefined' && localStorage.getItem('confettiEnabled') !== 'false'}
+                  onCheckedChange={(checked) => localStorage.setItem('confettiEnabled', String(checked))}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Browser-Benachrichtigungen</p>
+                  <p className="text-xs text-slate-500">Desktop-Push-Benachrichtigungen bei neuen E-Mails</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if ('Notification' in window) {
+                      Notification.requestPermission().then(p => {
+                        if (p === 'granted') toast.success('Benachrichtigungen aktiviert')
+                        else toast.error('Benachrichtigungen abgelehnt')
+                      })
+                    }
+                  }}
+                >
+                  Aktivieren
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
+                Tastaturkürzel
+              </CardTitle>
+              <CardDescription>Tastaturkürzel für die Inbox.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Nächste E-Mail</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">J / ↓</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Vorherige E-Mail</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">K / ↑</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">E-Mail öffnen</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">Enter</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Schliessen</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">E</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Antworten</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">R</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Zurück</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">Esc</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Hilfe</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">?</kbd>
+                </div>
+                <div className="flex justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded">
+                  <span className="text-slate-600 dark:text-slate-300">Suche</span>
+                  <kbd className="px-1.5 py-0.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded text-xs font-mono">⌘K</kbd>
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -52,14 +52,14 @@ import { formatRelativeDate } from '@/lib/utils'
 
 const COLORS = {
   green: '#10b981',
-  blue: '#3b82f6',
+  blue: '#B9965A',
   amber: '#f59e0b',
   red: '#ef4444',
   gray: '#94a3b8',
   purple: '#8b5cf6',
 }
 
-const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
+const CHART_PALETTE = ['#B9965A', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
 
 const darkTooltipStyle = {
   contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' },
@@ -291,7 +291,7 @@ export default function InsightsPage() {
       <Card className={department === 'marketing' ? 'md:col-span-2' : 'lg:col-span-2'}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-blue-500" />
+            <MessageSquare className="h-5 w-5 text-gold-500" />
             Kunden-Feedback
             <Badge variant="outline">{threads.length}</Badge>
           </CardTitle>
@@ -342,9 +342,9 @@ export default function InsightsPage() {
                     )}
 
                     {thread.ai_recommendation && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">AI Empfehlung</p>
-                        <p className="text-sm text-blue-800 dark:text-blue-300">{thread.ai_recommendation}</p>
+                      <div className="p-3 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg">
+                        <p className="text-xs font-semibold text-gold-700 dark:text-gold-400 mb-1">AI Empfehlung</p>
+                        <p className="text-sm text-gold-800 dark:text-gold-300">{thread.ai_recommendation}</p>
                       </div>
                     )}
 
@@ -372,7 +372,7 @@ export default function InsightsPage() {
                               {item.email_id && (
                                 <button
                                   onClick={(e) => { e.stopPropagation(); router.push(`/inbox?emailId=${item.email_id}`) }}
-                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                  className="text-xs text-gold-600 dark:text-gold-400 hover:underline flex items-center gap-1"
                                 >
                                   <ExternalLink className="h-3 w-3" />
                                   E-Mail
@@ -524,7 +524,7 @@ export default function InsightsPage() {
         <button onClick={() => openDrilldown('Beantwortete E-Mails', dd.sent)} className="text-left hover:ring-2 hover:ring-green-200 rounded-lg transition-all">
           <StatCard icon={CheckCircle} label="Beantwortet" value={summary.sentEmails} color="text-green-600" />
         </button>
-        <StatCard icon={BookOpen} label="KB Einträge" value={summary.kbChunkCount} color="text-blue-600" />
+        <StatCard icon={BookOpen} label="KB Einträge" value={summary.kbChunkCount} color="text-gold-600" />
         <StatCard
           icon={Star}
           label="CSAT Ø"
@@ -640,7 +640,7 @@ export default function InsightsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-blue-500" />
+                  <BarChart3 className="h-5 w-5 text-gold-500" />
                   BI Signal Typen
                 </CardTitle>
                 <CardDescription>{totalBiSignals} Signale total erkannt</CardDescription>
@@ -684,7 +684,7 @@ export default function InsightsPage() {
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-blue-500" />
+                  <MessageSquare className="h-5 w-5 text-gold-500" />
                   Top Themen
                 </CardTitle>
                 <CardDescription>Häufigste Themen in Kundenanfragen</CardDescription>
@@ -845,7 +845,7 @@ export default function InsightsPage() {
             <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ShoppingCart className="h-5 w-5 text-blue-500" />
+                  <ShoppingCart className="h-5 w-5 text-gold-500" />
                   Upsell Möglichkeiten
                 </CardTitle>
                 <CardDescription>Bereits beantwortete Anfragen mit Kaufsignal — Nachfass-Potential</CardDescription>
@@ -865,7 +865,7 @@ export default function InsightsPage() {
                       <button
                         key={opp.id}
                         onClick={() => router.push(`/inbox?emailId=${opp.id}`)}
-                        className="w-full text-left p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                        className="w-full text-left p-3 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg space-y-2 hover:bg-gold-100 dark:hover:bg-gold-900/30 transition-colors"
                       >
                         <div className="flex items-start justify-between">
                           <div>
@@ -975,7 +975,7 @@ export default function InsightsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BookOpen className="h-5 w-5 text-blue-500" />
+                  <BookOpen className="h-5 w-5 text-gold-500" />
                   Knowledge Base Status
                 </CardTitle>
               </CardHeader>
@@ -1039,7 +1039,7 @@ export default function InsightsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-blue-500" />
+                  <MessageSquare className="h-5 w-5 text-gold-500" />
                   Kundenstimmung
                 </CardTitle>
                 <CardDescription>Sentiment-Analyse aller Anfragen</CardDescription>
@@ -1186,7 +1186,7 @@ export default function InsightsPage() {
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-blue-500" />
+                  <Clock className="h-5 w-5 text-gold-500" />
                   SLA Performance
                 </CardTitle>
               </CardHeader>

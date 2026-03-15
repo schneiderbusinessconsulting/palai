@@ -40,7 +40,7 @@ interface Deal {
 
 const stages = [
   { key: 'lead', label: 'Lead', color: 'bg-slate-50 dark:bg-slate-800/50', headerColor: 'bg-slate-200 dark:bg-slate-700', textColor: 'text-slate-700 dark:text-slate-300' },
-  { key: 'qualified', label: 'Qualifiziert', color: 'bg-blue-50 dark:bg-blue-900/20', headerColor: 'bg-blue-200 dark:bg-blue-800', textColor: 'text-blue-700 dark:text-blue-300' },
+  { key: 'qualified', label: 'Qualifiziert', color: 'bg-gold-50 dark:bg-gold-900/20', headerColor: 'bg-gold-200 dark:bg-gold-800', textColor: 'text-gold-700 dark:text-gold-300' },
   { key: 'proposal', label: 'Angebot', color: 'bg-indigo-50 dark:bg-indigo-900/20', headerColor: 'bg-indigo-200 dark:bg-indigo-800', textColor: 'text-indigo-700 dark:text-indigo-300' },
   { key: 'negotiation', label: 'Verhandlung', color: 'bg-amber-50 dark:bg-amber-900/20', headerColor: 'bg-amber-200 dark:bg-amber-800', textColor: 'text-amber-700 dark:text-amber-300' },
   { key: 'won', label: 'Gewonnen', color: 'bg-green-50 dark:bg-green-900/20', headerColor: 'bg-green-200 dark:bg-green-800', textColor: 'text-green-700 dark:text-green-300' },
@@ -189,7 +189,7 @@ export default function DealsPage() {
               key={stage.key}
               className={`rounded-lg border transition-colors ${
                 dragOverStage === stage.key
-                  ? 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/10'
+                  ? 'border-gold-400 bg-gold-50/50 dark:bg-gold-900/10'
                   : 'border-slate-200 dark:border-slate-700'
               }`}
               onDragOver={(e) => handleDragOver(e, stage.key)}

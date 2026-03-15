@@ -28,7 +28,7 @@ export function DensityToggle({ density, onDensityChange }: DensityToggleProps) 
                 onClick={() => onDensityChange(value)}
                 className={`inline-flex items-center justify-center p-1.5 transition-colors ${
                   density === value
-                    ? 'bg-blue-500 text-white'
+                    ? 'bg-gold-500 text-white'
                     : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
                 } first:rounded-l-md last:rounded-r-md`}
                 aria-label={label}

@@ -12,7 +12,7 @@ export function getStatusBadge(status: string) {
     case 'pending':
       return <Badge variant="secondary">Ausstehend</Badge>
     case 'draft_ready':
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Draft bereit</Badge>
+      return <Badge className="bg-gold-500 hover:bg-gold-600">Draft bereit</Badge>
     case 'approved':
       return <Badge className="bg-green-500 hover:bg-green-600">Genehmigt</Badge>
     case 'sent':
@@ -40,7 +40,7 @@ export function getEmailTypeBadge(emailType?: string, needsResponse?: boolean) {
       )
     case 'form_submission':
       return (
-        <Badge variant="outline" className={`gap-1 ${needsResponse ? 'text-blue-600 border-blue-300' : 'text-slate-500 border-slate-300'}`}>
+        <Badge variant="outline" className={`gap-1 ${needsResponse ? 'text-gold-600 border-gold-300' : 'text-slate-500 border-slate-300'}`}>
           <FileText className="h-3 w-3" />
           Formular
         </Badge>
@@ -110,7 +110,7 @@ const topicTagColors: Record<string, string> = {
   'Feedback': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800',
   'Rechnung': 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800',
   'Terminanfrage': 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/20 dark:text-cyan-400 dark:border-cyan-800',
-  'Anmeldung': 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800',
+  'Anmeldung': 'bg-gold-50 text-gold-700 border-gold-200 dark:bg-gold-900/20 dark:text-gold-400 dark:border-gold-800',
   'Produkt': 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/20 dark:text-orange-400 dark:border-orange-800',
   'Kooperation': 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800',
 }

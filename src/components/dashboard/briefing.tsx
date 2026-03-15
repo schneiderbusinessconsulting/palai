@@ -179,9 +179,9 @@ export function DashboardBriefing() {
     }
     return {
       icon: Sparkles,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      borderColor: 'border-blue-200 dark:border-blue-800',
+      color: 'text-gold-500',
+      bgColor: 'bg-gold-50 dark:bg-gold-900/20',
+      borderColor: 'border-gold-200 dark:border-gold-800',
     }
   }
 

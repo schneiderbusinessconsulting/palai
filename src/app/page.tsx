@@ -236,7 +236,7 @@ function getPriorityBadgeColor(priority: string): string {
     case 'critical': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
     case 'high': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
     case 'low': return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-    default: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    default: return 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400'
   }
 }
 
@@ -324,7 +324,7 @@ function computeWorkload(
 }
 
 // ─── Sparkline SVG Component ─────────────────────────────────────────────────
-const Sparkline = memo(function Sparkline({ data, color = '#3b82f6', height = 24, width = 64 }: { data: number[]; color?: string; height?: number; width?: number }) {
+const Sparkline = memo(function Sparkline({ data, color = '#B9965A', height = 24, width = 64 }: { data: number[]; color?: string; height?: number; width?: number }) {
   if (data.length < 2) return null
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -661,14 +661,14 @@ export default function DashboardPage() {
         <Link href="/inbox">
           <div className={`p-5 rounded-xl border-2 transition-all cursor-pointer ${
             level1.backlog > 10 ? 'border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700' :
-            level1.backlog > 0 ? 'border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800' :
+            level1.backlog > 0 ? 'border-gold-200 bg-gold-50 dark:bg-gold-900/20 dark:border-gold-800' :
             'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800'
           } hover:shadow-md`}>
             <div className="flex items-center justify-between mb-2">
-              <Inbox className={`h-5 w-5 ${level1.backlog > 10 ? 'text-amber-600' : level1.backlog > 0 ? 'text-blue-600' : 'text-green-600'}`} />
+              <Inbox className={`h-5 w-5 ${level1.backlog > 10 ? 'text-amber-600' : level1.backlog > 0 ? 'text-gold-600' : 'text-green-600'}`} />
               {workload && <TrendPill value={workload.trend.inboundVsLastWeek} invertColor />}
             </div>
-            <p className={`text-3xl font-bold ${level1.backlog > 10 ? 'text-amber-700 dark:text-amber-400' : level1.backlog > 0 ? 'text-blue-700 dark:text-blue-400' : 'text-green-700 dark:text-green-400'}`}>
+            <p className={`text-3xl font-bold ${level1.backlog > 10 ? 'text-amber-700 dark:text-amber-400' : level1.backlog > 0 ? 'text-gold-700 dark:text-gold-400' : 'text-green-700 dark:text-green-400'}`}>
               {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> : level1.backlog}
             </p>
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Backlog</p>
@@ -685,7 +685,7 @@ export default function DashboardPage() {
             <Clock className={`h-5 w-5 ${
               level1.avgResponseHours !== null && level1.avgResponseHours > 24 ? 'text-red-600' :
               level1.avgResponseHours !== null && level1.avgResponseHours > 4 ? 'text-amber-600' :
-              'text-blue-600'
+              'text-gold-600'
             }`} />
             {periodComparison.responseTime !== undefined && <TrendPill value={periodComparison.responseTime} invertColor />}
           </div>
@@ -697,7 +697,7 @@ export default function DashboardPage() {
           </p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Ø Antwortzeit</p>
-            <Sparkline data={dailyKPIs.slice(-7).map(d => d.avgResponseHours ?? 0)} color={level1.avgResponseHours !== null && level1.avgResponseHours > 4 ? '#d97706' : '#3b82f6'} />
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.avgResponseHours ?? 0)} color={level1.avgResponseHours !== null && level1.avgResponseHours > 4 ? '#d97706' : '#B9965A'} />
           </div>
         </div>
 
@@ -810,7 +810,7 @@ export default function DashboardPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-500" />
+                  <Target className="h-5 w-5 text-gold-500" />
                   SLA Deadlines
                 </span>
                 <span className="text-sm font-normal text-slate-500">
@@ -854,7 +854,7 @@ export default function DashboardPage() {
                   ))}
                   {(slaStats.overdue.length + slaStats.dueNow.length) > 5 && (
                     <Link href="/inbox">
-                      <p className="text-xs text-slate-500 text-center pt-1 hover:text-blue-500 transition-colors">
+                      <p className="text-xs text-slate-500 text-center pt-1 hover:text-gold-500 transition-colors">
                         + {slaStats.overdue.length + slaStats.dueNow.length - 5} weitere →
                       </p>
                     </Link>
@@ -1081,7 +1081,7 @@ export default function DashboardPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {/* Team Total Row */}
-                  <tr className="bg-blue-50/50 dark:bg-blue-900/10 font-semibold">
+                  <tr className="bg-gold-50/50 dark:bg-gold-900/10 font-semibold">
                     <td className="px-4 py-2.5 text-slate-800 dark:text-slate-200">Total</td>
                     <td className="px-3 py-2.5 text-right text-slate-800 dark:text-slate-200">{agentTeam.total_emails_assigned}</td>
                     <td className="px-3 py-2.5 text-right text-green-700 dark:text-green-400">{agentTeam.total_emails_resolved}</td>
@@ -1111,7 +1111,7 @@ export default function DashboardPage() {
                       <td className="px-4 py-2.5">
                         <span className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</span>
                         <Badge className={`ml-2 text-[10px] px-1.5 py-0 ${
-                          agent.role === 'L1' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          agent.role === 'L1' ? 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400' :
                           agent.role === 'L2' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
                           'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                         }`}>{agent.role}</Badge>
@@ -1172,7 +1172,7 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-blue-500" />
+                    <Mail className="h-4 w-4 text-gold-500" />
                     <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Eingang</h3>
                   </div>
                   <TrendPill value={workload.trend.inboundVsLastWeek} invertColor />
@@ -1334,7 +1334,7 @@ export default function DashboardPage() {
                         return (
                           <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
                             <div className="w-full relative" style={{ height: `${h}%` }}>
-                              <div className="absolute bottom-0 w-full bg-blue-200 dark:bg-blue-800 rounded-t" style={{ height: '100%' }} />
+                              <div className="absolute bottom-0 w-full bg-gold-200 dark:bg-gold-800 rounded-t" style={{ height: '100%' }} />
                               {sentH > 0 && (
                                 <div className="absolute bottom-0 w-full bg-green-500 rounded-t" style={{ height: `${sentH}%` }} />
                               )}
@@ -1351,7 +1351,7 @@ export default function DashboardPage() {
                       ))}
                     </div>
                     <div className="flex gap-3 text-xs text-slate-400">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-200 dark:bg-blue-800" />Eingang</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gold-200 dark:bg-gold-800" />Eingang</span>
                       <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500" />Beantwortet</span>
                     </div>
                   </div>

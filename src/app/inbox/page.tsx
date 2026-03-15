@@ -1576,8 +1576,8 @@ function InboxPageContent() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 sticky top-0 z-10">
-          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+        <div className="flex items-center gap-3 p-3 rounded-lg bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 sticky top-0 z-10">
+          <span className="text-sm font-medium text-gold-700 dark:text-gold-300">
             {selectedIds.size} ausgewählt
           </span>
           <Button
@@ -1705,7 +1705,7 @@ function InboxPageContent() {
               className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               {selectedIds.size === paginatedEmails.length && paginatedEmails.length > 0 ? (
-                <CheckSquare className="h-4 w-4 text-blue-600" />
+                <CheckSquare className="h-4 w-4 text-gold-600" />
               ) : (
                 <Square className="h-4 w-4 text-slate-400" />
               )}
@@ -1724,7 +1724,7 @@ function InboxPageContent() {
             return (
               <Card
                 key={email.id}
-                className={`hover:shadow-md transition-shadow cursor-pointer group relative ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
+                className={`hover:shadow-md transition-shadow cursor-pointer group relative ${selectedIds.has(email.id) ? 'ring-2 ring-gold-400' : ''}`}
                 onClick={() => openEmailDetail(email)}
                 onContextMenu={(e) => {
                   e.preventDefault()
@@ -1752,7 +1752,7 @@ function InboxPageContent() {
                         className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
                       >
                         {selectedIds.has(email.id) ? (
-                          <CheckSquare className="h-4 w-4 text-blue-600" />
+                          <CheckSquare className="h-4 w-4 text-gold-600" />
                         ) : (
                           <Square className="h-4 w-4 text-slate-400" />
                         )}
@@ -1797,7 +1797,7 @@ function InboxPageContent() {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                  <div className="w-6 h-6 rounded-full bg-gold-100 dark:bg-gold-900 text-gold-700 dark:text-gold-300 flex items-center justify-center text-xs font-medium flex-shrink-0">
                                     {getAgentInitials(email.assigned_agent_id)}
                                   </div>
                                 </TooltipTrigger>
@@ -2444,7 +2444,7 @@ function InboxPageContent() {
               ) : isManualMode ? (
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <Edit className="h-4 w-4 text-blue-500" />
+                    <Edit className="h-4 w-4 text-gold-500" />
                     <h4 className="font-medium">Manuelle Antwort</h4>
                   </div>
                   <Textarea
@@ -2627,7 +2627,7 @@ function InboxPageContent() {
                 {(isEditing || isManualMode) && (
                   <Button
                     variant="outline"
-                    className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                    className="border-gold-300 text-gold-600 hover:bg-gold-50"
                     onClick={handleSaveDraft}
                     disabled={isSaving}
                   >

@@ -230,12 +230,12 @@ export default function LearningPage() {
         </Card>
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-              <Brain className="h-5 w-5 text-blue-600" />
+            <div className="p-2.5 rounded-lg bg-gold-100 dark:bg-gold-900/30">
+              <Brain className="h-5 w-5 text-gold-600" />
             </div>
             <div>
               <p className="text-sm text-slate-500">Total Korrekturen</p>
-              <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+              <p className="text-2xl font-bold text-gold-600">{stats.total}</p>
             </div>
           </CardContent>
         </Card>
@@ -255,9 +255,9 @@ export default function LearningPage() {
       </div>
 
       {/* Explanation */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+      <div className="p-4 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg text-sm text-gold-800 dark:text-gold-300">
         <p className="font-medium mb-1">So lernt die AI:</p>
-        <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400">
+        <ol className="list-decimal list-inside space-y-1 text-gold-700 dark:text-gold-400">
           <li>Du bearbeitest einen AI-Entwurf in der Inbox → wird hier automatisch erfasst</li>
           <li>Du klickst &quot;Als Wissen extrahieren&quot; → Korrektur wird in die Knowledge Base gespeichert</li>
           <li>Beim nächsten ähnlichen Thema nutzt die AI diese Information für bessere Antworten</li>

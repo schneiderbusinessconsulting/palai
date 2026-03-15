@@ -7,7 +7,7 @@ const STAR_CYCLE: (string | null)[] = [null, 'yellow', 'red', 'blue', 'green', '
 const STAR_COLORS: Record<string, string> = {
   yellow: 'text-yellow-500 fill-yellow-500',
   red: 'text-red-500 fill-red-500',
-  blue: 'text-blue-500 fill-blue-500',
+  blue: 'text-gold-500 fill-gold-500',
   green: 'text-green-500 fill-green-500',
   purple: 'text-purple-500 fill-purple-500',
 }

@@ -47,8 +47,8 @@ const categoryConfig: Record<string, {
     label: 'Allgemeine Hilfe',
     description: 'Grundlegende Informationen und Anleitungen',
     icon: <BookOpen className="h-6 w-6" />,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    color: 'text-gold-600 dark:text-gold-400',
+    bgColor: 'bg-gold-100 dark:bg-gold-900/30',
   },
   faq: {
     label: 'Häufige Fragen',

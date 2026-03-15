@@ -168,7 +168,7 @@ export function Sidebar() {
                     <span className="font-semibold text-slate-900 dark:text-white text-sm">
                       Intelligence
                     </span>
-                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
+                    <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gold-500 text-white rounded">
                       BETA
                     </span>
                   </div>
@@ -212,13 +212,13 @@ export function Sidebar() {
                         <span className="font-medium text-slate-900 dark:text-white text-sm">
                           {dashboard.name}
                         </span>
-                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-500 text-white rounded">
+                        <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gold-500 text-white rounded">
                           BETA
                         </span>
                       </div>
                     </div>
                     {dashboard.current && (
-                      <Check className="h-4 w-4 text-blue-500" />
+                      <Check className="h-4 w-4 text-gold-500" />
                     )}
                   </a>
                 ))}
@@ -270,7 +270,7 @@ export function Sidebar() {
                             className={cn(
                               'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
                               isActive
-                                ? 'bg-blue-600 text-white'
+                                ? 'bg-gold-600 text-white'
                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                             )}
                           >
@@ -329,7 +329,7 @@ export function Sidebar() {
                 className={cn(
                   'px-2 py-1 rounded text-[10px] font-medium transition-colors',
                   themeMode === 'auto'
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    ? 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400'
                     : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 )}
                 title={themeMode === 'auto' ? 'Automatisch (20-07 Uhr dunkel)' : 'Klick für Auto-Modus'}

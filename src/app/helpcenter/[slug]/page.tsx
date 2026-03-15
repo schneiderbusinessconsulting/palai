@@ -34,8 +34,8 @@ const categoryConfig: Record<string, {
     label: 'Allgemeine Hilfe',
     href: '/helpcenter?category=help_article',
     icon: <BookOpen className="h-4 w-4" />,
-    color: 'text-blue-600 dark:text-blue-400',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    color: 'text-gold-600 dark:text-gold-400',
+    bgColor: 'bg-gold-100 dark:bg-gold-900/30',
   },
   faq: {
     label: 'Häufige Fragen',

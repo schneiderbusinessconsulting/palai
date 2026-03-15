@@ -40,7 +40,7 @@ const ACTION_LABELS: Record<string, string> = {
 
 const ACTION_COLORS: Record<string, string> = {
   send_email: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  assign_email: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  assign_email: 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400',
   generate_draft: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   classify_email: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   sync_emails: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400',

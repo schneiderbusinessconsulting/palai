@@ -379,7 +379,7 @@ Diese Regel wird bei jeder E-Mail-Generierung berücksichtigt. Klicke auf "Regel
                 <div
                   className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                     message.role === 'user'
-                      ? 'bg-blue-600'
+                      ? 'bg-gold-600'
                       : 'bg-gradient-to-br from-amber-500 to-amber-600'
                   }`}
                 >
@@ -394,7 +394,7 @@ Diese Regel wird bei jeder E-Mail-Generierung berücksichtigt. Klicke auf "Regel
                   <div
                     className={`inline-block p-3 rounded-lg text-left ${
                       message.role === 'user'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-gold-600 text-white'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
                     }`}
                   >

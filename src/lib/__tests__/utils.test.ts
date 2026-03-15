@@ -14,7 +14,7 @@ describe('cn', () => {
   it('merges tailwind classes — later wins', () => {
     // twMerge resolves conflicting tailwind utilities
     expect(cn('p-4', 'p-8')).toBe('p-8')
-    expect(cn('text-red-500', 'text-blue-500')).toBe('text-blue-500')
+    expect(cn('text-red-500', 'text-gold-500')).toBe('text-gold-500')
   })
 
   it('deduplicates identical classes', () => {

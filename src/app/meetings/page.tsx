@@ -29,7 +29,7 @@ interface Meeting {
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  geplant: { label: 'Geplant', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  geplant: { label: 'Geplant', color: 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400' },
   bestätigt: { label: 'Bestätigt', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
   abgesagt: { label: 'Abgesagt', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 }
@@ -132,7 +132,7 @@ export default function MeetingsPage() {
                               ? 'bg-red-50 text-red-400 line-through dark:bg-red-900/20'
                               : m.status === 'bestätigt'
                               ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                              : 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400'
+                              : 'bg-gold-50 text-gold-700 dark:bg-gold-900/20 dark:text-gold-400'
                           }`}
                         >
                           {m.title}

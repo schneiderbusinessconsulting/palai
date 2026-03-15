@@ -718,7 +718,7 @@ export default function SettingsPage() {
 
         {/* ── AI ANWEISUNGEN ──────────────────────────────────────────────────── */}
         <TabsContent value="ai-instructions" className="space-y-6">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+          <div className="p-4 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg text-sm text-gold-800 dark:text-gold-300">
             <p className="font-medium mb-1 flex items-center gap-2"><Brain className="h-4 w-4" />Was sind AI Anweisungen?</p>
             <p>Diese Regeln werden bei <strong>jedem</strong> AI-Entwurf automatisch berücksichtigt — unabhängig vom Thema. Ideal für feste Vorgaben wie Anrede, Stil, Do&apos;s und Don&apos;ts, Preise, USPs des Instituts.</p>
           </div>
@@ -1050,7 +1050,7 @@ export default function SettingsPage() {
                     const priorityColors: Record<string, string> = {
                       critical: 'border-l-red-500',
                       high: 'border-l-amber-500',
-                      normal: 'border-l-blue-500',
+                      normal: 'border-l-gold-500',
                       low: 'border-l-slate-400',
                     }
                     return (
@@ -1095,7 +1095,7 @@ export default function SettingsPage() {
                 {[
                   { priority: 'Kritisch', color: 'text-red-600', rule: 'Urgency "critical" (dringend, Notfall, sofort, asap)' },
                   { priority: 'Hoch', color: 'text-amber-600', rule: 'Customer Inquiry + Urgency "high" (rasch, baldmöglich, zeitnah)' },
-                  { priority: 'Normal', color: 'text-blue-600', rule: 'Customer Inquiry oder Form Submission ohne spezielle Urgency' },
+                  { priority: 'Normal', color: 'text-gold-600', rule: 'Customer Inquiry oder Form Submission ohne spezielle Urgency' },
                   { priority: 'Niedrig', color: 'text-slate-500', rule: 'System-Alerts, Notifications, keine Antwort nötig' },
                 ].map(({ priority, color, rule }) => (
                   <div key={priority} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
@@ -1197,7 +1197,7 @@ export default function SettingsPage() {
                   {agents.map((agent) => (
                     <div key={agent.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium text-sm">
+                        <div className="w-9 h-9 rounded-full bg-gold-600 flex items-center justify-center text-white font-medium text-sm">
                           {agent.name.split(' ').map((n) => n[0]).join('').toUpperCase().substring(0, 2)}
                         </div>
                         <div>
@@ -1243,9 +1243,9 @@ export default function SettingsPage() {
 
         {/* ── TRAINING ───────────────────────────────────────────────────────── */}
         <TabsContent value="training" className="space-y-6">
-          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-800 dark:text-blue-300">
+          <div className="p-4 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg text-sm text-gold-800 dark:text-gold-300">
             <p className="font-medium mb-1 flex items-center gap-2"><GraduationCap className="h-4 w-4" />Was passiert beim Bulk Training?</p>
-            <ol className="list-decimal list-inside space-y-1 text-blue-700 dark:text-blue-400">
+            <ol className="list-decimal list-inside space-y-1 text-gold-700 dark:text-gold-400">
               <li>Alle E-Mails werden aus HubSpot abgerufen (max. 1000)</li>
               <li>Threads mit Eingang + Antwort werden als Q&amp;A-Paare erkannt</li>
               <li>GPT-4o-mini extrahiert das Kern-Wissen aus jedem Thread</li>
@@ -1269,12 +1269,12 @@ export default function SettingsPage() {
               </Card>
               <Card>
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                    <Brain className="h-5 w-5 text-blue-600" />
+                  <div className="p-2.5 rounded-lg bg-gold-100 dark:bg-gold-900/30">
+                    <Brain className="h-5 w-5 text-gold-600" />
                   </div>
                   <div>
                     <p className="text-sm text-slate-500">AI Anweisungen</p>
-                    <p className="text-2xl font-bold text-blue-600">{trainingStats.ai_instructions_count}</p>
+                    <p className="text-2xl font-bold text-gold-600">{trainingStats.ai_instructions_count}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1330,7 +1330,7 @@ export default function SettingsPage() {
                       <p className="text-xs text-slate-500">E-Mails geladen</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-700">{bulkResult.threads}</p>
+                      <p className="text-2xl font-bold text-gold-700">{bulkResult.threads}</p>
                       <p className="text-xs text-slate-500">Threads</p>
                     </div>
                     <div className="text-center">
@@ -1402,7 +1402,7 @@ export default function SettingsPage() {
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-700">{backfillResult.editDistanceCalculated}</p>
+                      <p className="text-2xl font-bold text-gold-700">{backfillResult.editDistanceCalculated}</p>
                       <p className="text-xs text-slate-500">Edit-Distances</p>
                     </div>
                     <div className="text-center">
@@ -1480,7 +1480,7 @@ export default function SettingsPage() {
                   </p>
                   <div className="grid grid-cols-3 gap-3 text-sm">
                     <div className="text-center">
-                      <p className="text-2xl font-bold text-blue-700">{histImportResult.imported}</p>
+                      <p className="text-2xl font-bold text-gold-700">{histImportResult.imported}</p>
                       <p className="text-xs text-slate-500">Importiert</p>
                     </div>
                     <div className="text-center">
@@ -1514,7 +1514,7 @@ export default function SettingsPage() {
               {/* Daily Workflow */}
               <div>
                 <h3 className="font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Inbox className="h-4 w-4 text-blue-500" />
+                  <Inbox className="h-4 w-4 text-gold-500" />
                   Täglicher Workflow
                 </h3>
                 <div className="space-y-2">
@@ -1526,7 +1526,7 @@ export default function SettingsPage() {
                     { step: '5', title: 'AI Learning reviewen', desc: 'Falls du einen Entwurf stark geändert hast, erscheint er in «AI Learning» → dort extrahieren oder verwerfen.' },
                   ].map(({ step, title, desc }) => (
                     <div key={step} className="flex gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                      <div className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <div className="w-6 h-6 rounded-full bg-gold-600 text-white text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
                         {step}
                       </div>
                       <div>
@@ -1706,8 +1706,8 @@ export default function SettingsPage() {
                 <p>• Row Level Security aktiviert</p>
                 <p>• Migrations: 001–006 (006 = Support Analytics)</p>
               </div>
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-xs text-blue-700 dark:text-blue-400">
-                Falls neue Tabellen fehlen: <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">supabase/migrations/006_support_analytics.sql</code> im Supabase SQL Editor ausführen.
+              <div className="p-3 bg-gold-50 dark:bg-gold-900/20 border border-gold-200 dark:border-gold-800 rounded-lg text-xs text-gold-700 dark:text-gold-400">
+                Falls neue Tabellen fehlen: <code className="bg-gold-100 dark:bg-gold-900 px-1 rounded">supabase/migrations/006_support_analytics.sql</code> im Supabase SQL Editor ausführen.
               </div>
             </CardContent>
           </Card>

@@ -108,7 +108,7 @@ function getSourceBadge(type: string) {
   const config: Record<string, { label: string; className: string }> = {
     help_article: {
       label: 'Help Center',
-      className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      className: 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400',
     },
     faq: {
       label: 'FAQ',
@@ -491,7 +491,7 @@ export default function KnowledgePage() {
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-blue-600">{stats.help_articles}</p>
+            <p className="text-2xl font-bold text-gold-600">{stats.help_articles}</p>
             <p className="text-sm text-slate-500 dark:text-slate-400">
               Help Artikel
             </p>
@@ -560,7 +560,7 @@ export default function KnowledgePage() {
               <span className="ml-2 text-xs text-slate-400">(API Credits)</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsDialogOpen(true)}>
-              <Pencil className="h-4 w-4 mr-2 text-blue-500" />
+              <Pencil className="h-4 w-4 mr-2 text-gold-500" />
               Manuell
               <span className="ml-2 text-xs text-slate-400">(Kostenlos)</span>
             </DropdownMenuItem>

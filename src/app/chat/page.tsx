@@ -522,7 +522,7 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
                 <div
                   className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                     message.role === 'user'
-                      ? 'bg-blue-600'
+                      ? 'bg-gold-600'
                       : `bg-gradient-to-br ${modeConfig.color}`
                   }`}
                 >
@@ -537,7 +537,7 @@ Klicke auf "Speichern" um dieses Wissen zur Knowledge Base hinzuzufügen.`,
                   <div
                     className={`inline-block p-3 rounded-lg text-left relative group ${
                       message.role === 'user'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-gold-600 text-white'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
                     }`}
                   >

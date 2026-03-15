@@ -22,10 +22,10 @@ export function ProgressBar({ value, label, className = '' }: ProgressBarProps) 
       )}
       <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
         {isIndeterminate ? (
-          <div className="h-full w-1/3 bg-blue-500 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" />
+          <div className="h-full w-1/3 bg-gold-500 rounded-full animate-[indeterminate_1.5s_ease-in-out_infinite]" />
         ) : (
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out"
+            className="h-full bg-gold-500 rounded-full transition-all duration-300 ease-out"
             style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
           />
         )}

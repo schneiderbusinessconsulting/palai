@@ -192,7 +192,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
-            <MessageSquare className="h-5 w-5 text-blue-500" />
+            <MessageSquare className="h-5 w-5 text-gold-500" />
             <div>
               <p className="text-sm text-slate-500">Emails total</p>
               <p className="text-xl font-bold">{customer.totalEmails}</p>

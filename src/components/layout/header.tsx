@@ -188,7 +188,7 @@ export function Header({ title, description }: HeaderProps) {
               {unreadCount > 0 && (
                 <button
                   onClick={markAllRead}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-normal"
+                  className="text-xs text-gold-600 hover:text-gold-700 font-normal"
                 >
                   Alle gelesen
                 </button>
@@ -208,7 +208,7 @@ export function Header({ title, description }: HeaderProps) {
                       notif.icon === 'alert' ? 'bg-amber-100 text-amber-600' :
                       notif.icon === 'trending' ? 'bg-green-100 text-green-600' :
                       notif.icon === 'clock' ? 'bg-red-100 text-red-600' :
-                      'bg-blue-100 text-blue-600'
+                      'bg-gold-100 text-gold-600'
                     }`}>
                       <Icon className="h-3.5 w-3.5" />
                     </div>
@@ -231,7 +231,7 @@ export function Header({ title, description }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="icon" className="rounded-full" aria-label="Benutzermenu">
               <Avatar className="h-8 w-8">
-                <AvatarFallback className="bg-blue-600 text-white text-sm">
+                <AvatarFallback className="bg-gold-600 text-white text-sm">
                   MP
                 </AvatarFallback>
               </Avatar>

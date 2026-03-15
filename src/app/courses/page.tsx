@@ -270,9 +270,9 @@ Nächster Start: ${formatDate(course.next_start)}`
       </div>
 
       {/* Quick Reference */}
-      <Card className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+      <Card className="bg-gold-50 dark:bg-gold-900/20 border-gold-200 dark:border-gold-800">
         <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+          <div className="flex items-center gap-2 text-gold-700 dark:text-gold-400">
             <DollarSign className="h-5 w-5" />
             <span className="font-medium">Alle Ausbildungen mit Ratenzahlung möglich (6 monatliche Raten, keine Zusatzkosten)</span>
           </div>

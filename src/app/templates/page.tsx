@@ -62,7 +62,7 @@ function getCategoryColor(category: string) {
   const colors: Record<string, string> = {
     Allgemein: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
     Zahlung: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    Kurse: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    Kurse: 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400',
     Zertifizierung: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
     Firmen: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   }
@@ -253,9 +253,9 @@ export default function TemplatesPage() {
       </div>
 
       {/* Template Variables Help */}
-      <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+      <Card className="bg-gold-50/50 dark:bg-gold-950/20 border-gold-200 dark:border-gold-900">
         <CardContent className="p-4">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-300 mb-2">Verfügbare Template-Variablen</p>
+          <p className="text-sm font-medium text-gold-800 dark:text-gold-300 mb-2">Verfügbare Template-Variablen</p>
           <div className="flex flex-wrap gap-2">
             {[
               { var: '{{name}}', desc: 'Kundenname' },
@@ -265,12 +265,12 @@ export default function TemplatesPage() {
               { var: '{{datum}}', desc: 'Heutiges Datum' },
               { var: '{{betreff}}', desc: 'E-Mail-Betreff' },
             ].map(v => (
-              <Badge key={v.var} variant="outline" className="text-xs text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700">
+              <Badge key={v.var} variant="outline" className="text-xs text-gold-700 dark:text-gold-400 border-gold-300 dark:border-gold-700">
                 <code className="mr-1">{v.var}</code> — {v.desc}
               </Badge>
             ))}
           </div>
-          <p className="text-xs text-blue-600/70 dark:text-blue-400/50 mt-2">Variablen werden beim Einfügen in die Inbox automatisch ersetzt.</p>
+          <p className="text-xs text-gold-600/70 dark:text-gold-400/50 mt-2">Variablen werden beim Einfügen in die Inbox automatisch ersetzt.</p>
         </CardContent>
       </Card>
 

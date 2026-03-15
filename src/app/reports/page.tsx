@@ -110,7 +110,7 @@ export default function ReportsPage() {
           const isActive = activeReport === tpl.id
 
           return (
-            <Card key={tpl.id} className={isActive ? 'ring-2 ring-blue-500' : ''}>
+            <Card key={tpl.id} className={isActive ? 'ring-2 ring-gold-500' : ''}>
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">

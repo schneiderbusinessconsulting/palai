@@ -87,7 +87,7 @@ function getCsatColor(score: number | null): string {
 
 function getRoleBadgeStyle(role: string): string {
   switch (role) {
-    case 'L1': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    case 'L1': return 'bg-gold-100 text-gold-700 dark:bg-gold-900/30 dark:text-gold-400'
     case 'L2': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
     case 'L3': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
     default: return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
@@ -165,8 +165,8 @@ export default function AgentsPage() {
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortKey !== column) return <ArrowUpDown className="h-3 w-3 text-slate-400" />
     return sortAsc
-      ? <ArrowUp className="h-3 w-3 text-blue-500" />
-      : <ArrowDown className="h-3 w-3 text-blue-500" />
+      ? <ArrowUp className="h-3 w-3 text-gold-500" />
+      : <ArrowDown className="h-3 w-3 text-gold-500" />
   }
 
   return (
@@ -214,7 +214,7 @@ export default function AgentsPage() {
       {/* Loading */}
       {isLoading && (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <Loader2 className="h-8 w-8 animate-spin text-gold-500" />
         </div>
       )}
 
@@ -223,11 +223,11 @@ export default function AgentsPage() {
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Total Emails */}
-            <div className="p-5 rounded-xl border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+            <div className="p-5 rounded-xl border-2 border-gold-200 bg-gold-50 dark:bg-gold-900/20 dark:border-gold-800">
               <div className="flex items-center justify-between mb-2">
-                <Mail className="h-5 w-5 text-blue-600" />
+                <Mail className="h-5 w-5 text-gold-600" />
               </div>
-              <p className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+              <p className="text-3xl font-bold text-gold-700 dark:text-gold-400">
                 {data.team.total_emails_assigned}
               </p>
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">E-Mails gesamt</p>
@@ -376,7 +376,7 @@ export default function AgentsPage() {
                                 )}
                                 {agent.escalations_from > 0 && agent.escalations_to > 0 && ' / '}
                                 {agent.escalations_to > 0 && (
-                                  <span className="text-blue-600" title="Erhalten von anderen">
+                                  <span className="text-gold-600" title="Erhalten von anderen">
                                     {agent.escalations_to} an
                                   </span>
                                 )}
@@ -431,7 +431,7 @@ export default function AgentsPage() {
                             <p className="text-xs text-slate-600 dark:text-slate-400">
                               {agent.escalations_from > 0 && <span className="text-amber-600">{agent.escalations_from} ab</span>}
                               {agent.escalations_from > 0 && agent.escalations_to > 0 && ' / '}
-                              {agent.escalations_to > 0 && <span className="text-blue-600">{agent.escalations_to} an</span>}
+                              {agent.escalations_to > 0 && <span className="text-gold-600">{agent.escalations_to} an</span>}
                               {agent.escalations_from === 0 && agent.escalations_to === 0 && '--'}
                             </p>
                           </div>

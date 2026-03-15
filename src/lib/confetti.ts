@@ -3,7 +3,7 @@
  * No external dependencies. Creates temporary DOM elements.
  */
 export function fireConfetti() {
-  const colors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+  const colors = ['#10b981', '#B9965A', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
   const container = document.createElement('div')
   container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden'
   document.body.appendChild(container)

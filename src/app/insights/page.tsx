@@ -61,8 +61,9 @@ const darkTooltipStyle = {
   labelStyle: { color: '#e2e8f0' },
 }
 
-function renderPieLabel({ name, percent }: { name: string; percent: number }) {
-  return `${name} ${(percent * 100).toFixed(0)}%`
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function renderPieLabel({ name, percent }: any) {
+  return `${name || ''} ${((percent || 0) * 100).toFixed(0)}%`
 }
 
 interface InsightsData {
@@ -895,7 +896,8 @@ export default function InsightsPage() {
                         <YAxis domain={[0, 5]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                         <Tooltip
                           {...darkTooltipStyle}
-                          formatter={(value: number, name: string) => [
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          formatter={(value: any, name: any) => [
                             name === 'avg' ? `${value}/5` : value,
                             name === 'avg' ? 'CSAT' : 'Bewertungen',
                           ]}

@@ -65,6 +65,7 @@ import {
   getStatusBadge,
   getEmailTypeBadge,
   getBuyingIntentBadge,
+  getHappinessBadge,
 } from '@/components/inbox/inbox-utils'
 import { formatRelativeDate } from '@/lib/utils'
 import {
@@ -108,6 +109,7 @@ interface Email {
   needs_response?: boolean
   classification_reason?: string
   buying_intent_score?: number
+  happiness_score?: number
   email_drafts?: EmailDraft[]
   assigned_agent_id?: string
   support_level?: string
@@ -295,6 +297,71 @@ function InboxPageContent() {
     setIsDetailOpen(false)
     setLockWarning(null)
   }
+
+  // Keyboard shortcuts for inbox navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
+      const emailList = emails || []
+      const currentIndex = selectedEmail ? emailList.findIndex(em => em.id === selectedEmail.id) : -1
+
+      switch (e.key) {
+        case 'j': // Next email
+        case 'ArrowDown':
+          if (!isDetailOpen && emailList.length > 0) {
+            e.preventDefault()
+            const nextIdx = currentIndex < emailList.length - 1 ? currentIndex + 1 : 0
+            openEmailDetail(emailList[nextIdx])
+          }
+          break
+        case 'k': // Previous email
+        case 'ArrowUp':
+          if (!isDetailOpen && emailList.length > 0) {
+            e.preventDefault()
+            const prevIdx = currentIndex > 0 ? currentIndex - 1 : emailList.length - 1
+            openEmailDetail(emailList[prevIdx])
+          }
+          break
+        case 'Escape':
+          if (isDetailOpen) {
+            e.preventDefault()
+            handleClose()
+          }
+          break
+        case 'e': // Close/archive email
+          if (isDetailOpen && selectedEmail) {
+            e.preventDefault()
+            fetch(`/api/emails/${selectedEmail.id}/mark-sent`, { method: 'POST' })
+              .then(() => { toast.success('E-Mail geschlossen'); handleClose(); fetchEmails() })
+              .catch(() => toast.error('Fehler beim Schliessen'))
+          }
+          break
+        case 'r': // Focus reply / edit mode
+          if (isDetailOpen && !isEditing) {
+            e.preventDefault()
+            setIsEditing(true)
+          }
+          break
+        case '?': // Show shortcuts help
+          if (!isDetailOpen) {
+            e.preventDefault()
+            toast.info('Tastaturkürzel: J/K navigieren, Enter öffnet, E schliesst, R antwortet, Esc zurück')
+          }
+          break
+        case 'Enter':
+          if (!isDetailOpen && currentIndex >= 0) {
+            e.preventDefault()
+            openEmailDetail(emailList[currentIndex])
+          }
+          break
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isDetailOpen, selectedEmail, emails])
 
   // Load auto-draft preference from localStorage
   useEffect(() => {
@@ -1049,6 +1116,46 @@ function InboxPageContent() {
     fetchEmails()
   }
 
+  const handleBulkAssign = async (agentId: string) => {
+    setIsBulkActioning(true)
+    const results = await Promise.allSettled(
+      Array.from(selectedIds).map(id =>
+        fetch(`/api/emails/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assigned_agent_id: agentId || null }),
+        }).then(r => { if (!r.ok) throw new Error(); return r })
+      )
+    )
+    const succeeded = results.filter(r => r.status === 'fulfilled').length
+    if (succeeded > 0) toast.success(`${succeeded} E-Mail(s) zugewiesen`)
+    setSelectedIds(new Set())
+    setIsBulkActioning(false)
+    fetchEmails()
+  }
+
+  const handleBulkTag = async (tag: string) => {
+    if (!tag.trim()) return
+    setIsBulkActioning(true)
+    const results = await Promise.allSettled(
+      Array.from(selectedIds).map(async (id) => {
+        const email = emails.find(e => e.id === id)
+        const currentTags = email?.tags || []
+        if (currentTags.includes(tag)) return
+        return fetch(`/api/emails/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tags: [...currentTags, tag] }),
+        }).then(r => { if (!r.ok) throw new Error(); return r })
+      })
+    )
+    const succeeded = results.filter(r => r.status === 'fulfilled').length
+    if (succeeded > 0) toast.success(`Tag "${tag}" zu ${succeeded} E-Mail(s) hinzugefügt`)
+    setSelectedIds(new Set())
+    setIsBulkActioning(false)
+    fetchEmails()
+  }
+
   // Dismiss email with confirmation
   const handleDismissConfirmed = async () => {
     if (!dismissEmailId) return
@@ -1326,6 +1433,20 @@ function InboxPageContent() {
             {isBulkActioning ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
             Schliessen
           </Button>
+          <Select onValueChange={(v) => handleBulkAssign(v)}>
+            <SelectTrigger className="w-32 h-7 text-xs">
+              <SelectValue placeholder="Zuweisen..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Nicht zugewiesen</SelectItem>
+              {agents.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id}>{agent.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <form onSubmit={(e) => { e.preventDefault(); const input = e.currentTarget.querySelector('input'); if (input?.value) { handleBulkTag(input.value); input.value = '' } }} className="inline-flex">
+            <Input placeholder="+ Tag" className="h-7 w-24 text-xs" />
+          </form>
           <div className="flex-1" />
           <Button
             size="sm"
@@ -1491,6 +1612,7 @@ function InboxPageContent() {
                           {email.support_level === 'L2' && (
                             <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">Eskaliert</Badge>
                           )}
+                          {getHappinessBadge(email.happiness_score)}
                           {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
@@ -1632,13 +1754,14 @@ function InboxPageContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Email Detail Modal */}
-      <Dialog open={isDetailOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-0">
-          {/* Hidden DialogHeader for accessibility — visually replaced below */}
-          <DialogHeader className="sr-only">
-            <DialogTitle>{selectedEmail?.subject}</DialogTitle>
-          </DialogHeader>
+      {/* Email Detail Side Panel */}
+      {isDetailOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleClose} />}
+      <div className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: 'min(56rem, 100vw - 4rem)' }}>
+        <div className="sr-only" role="heading" aria-level={2}>{selectedEmail?.subject}</div>
+          {/* Close button */}
+          <button onClick={handleClose} className="absolute top-4 right-4 z-10 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Schliessen">
+            <X className="h-5 w-5 text-slate-500" />
+          </button>
 
           {selectedEmail && (
             <div className="flex flex-col">
@@ -1712,6 +1835,7 @@ function InboxPageContent() {
                         {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
                       </span>
                     )}
+                    {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
                     <span className="text-xs text-slate-500 dark:text-slate-500 whitespace-nowrap flex-shrink-0">
                       {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
@@ -2322,8 +2446,7 @@ function InboxPageContent() {
               </div>
             </DialogFooter>
           )}
-        </DialogContent>
-      </Dialog>
+      </div>
 
     </div>
   )

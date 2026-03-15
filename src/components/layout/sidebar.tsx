@@ -106,6 +106,7 @@ export function Sidebar() {
       {/* Mobile Menu Button */}
       <button
         onClick={() => setMobileOpen(true)}
+        aria-label="Navigation öffnen"
         className="fixed top-4 left-4 z-50 lg:hidden p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
       >
         <Menu className="h-5 w-5 text-slate-600 dark:text-slate-300" />
@@ -223,46 +224,70 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <ul className="space-y-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href ||
-                (item.href !== '/' && pathname.startsWith(item.href))
+          {(() => {
+            const groups = [
+              { label: 'Support', items: ['Dashboard', 'Inbox'] },
+              { label: 'Insights', items: ['Insights', 'Kunden', 'Team'] },
+              { label: 'Wissen', items: ['Knowledge Base', 'Chat', 'AI Learning', 'Templates', 'Kurse & Preise'] },
+              { label: 'System', items: ['Einstellungen'] },
+            ]
+
+            return groups.map((group) => {
+              const groupNavItems = navigation.filter(item => group.items.includes(item.name))
+              if (groupNavItems.length === 0) return null
 
               return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
-                    {!collapsed && (
-                      <>
-                        <span className="flex-1">{item.name}</span>
-                        {item.badgeKey && badges[item.badgeKey] > 0 && (
-                          <span
+                <div key={group.label}>
+                  {!collapsed && (
+                    <span className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-600 px-3 mb-1 mt-4 block font-medium">
+                      {group.label}
+                    </span>
+                  )}
+                  <ul className="space-y-1">
+                    {groupNavItems.map((item) => {
+                      const isActive = pathname === item.href ||
+                        (item.href !== '/' && pathname.startsWith(item.href))
+
+                      return (
+                        <li key={item.name}>
+                          <Link
+                            href={item.href}
+                            onClick={() => setMobileOpen(false)}
+                            {...(isActive ? { 'aria-current': 'page' as const } : {})}
                             className={cn(
-                              'px-2 py-0.5 text-xs font-medium rounded-full',
+                              'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors',
                               isActive
-                                ? 'bg-white/20 text-white'
-                                : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                ? 'bg-blue-600 text-white'
+                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                             )}
                           >
-                            {badges[item.badgeKey]}
-                          </span>
-                        )}
-                      </>
-                    )}
-                  </Link>
-                </li>
+                            <item.icon className="h-5 w-5 flex-shrink-0" />
+                            {!collapsed && (
+                              <>
+                                <span className="flex-1">{item.name}</span>
+                                {item.badgeKey && badges[item.badgeKey] > 0 && (
+                                  <span
+                                    className={cn(
+                                      'px-2 py-0.5 text-xs font-medium rounded-full',
+                                      isActive
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                                    )}
+                                  >
+                                    {badges[item.badgeKey]}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </Link>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
               )
-            })}
-          </ul>
+            })
+          })()}
         </nav>
 
         {/* Footer */}
@@ -288,6 +313,7 @@ export function Sidebar() {
           {/* Collapse Toggle (Desktop only) */}
           <button
             onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
             className="hidden lg:flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             {collapsed ? (

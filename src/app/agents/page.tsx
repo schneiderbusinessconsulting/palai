@@ -305,7 +305,7 @@ export default function AgentsPage() {
                   <div className="hidden lg:block rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="bg-slate-50 dark:bg-slate-800/50">
+                        <tr className="sticky top-0 bg-white dark:bg-slate-900 z-10">
                           <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">
                             <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-300">
                               Agent <SortIcon column="name" />

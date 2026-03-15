@@ -101,3 +101,34 @@ export function determinePriority(
   if (emailType === 'form_submission') return 'normal'
   return 'low'
 }
+
+/**
+ * Customer Happiness Score (1-5) based on words and tonality
+ * 5 = very happy, 1 = very unhappy
+ */
+export function calculateHappinessScore(subject: string, bodyText: string): number {
+  const text = `${subject} ${bodyText}`.toLowerCase()
+
+  // Strong positive indicators → 5
+  const strongPositive = /\bbegeistert\b|\bfantastisch\b|\bhervorragend\b|\bperfekt\b|\bausgezeichnet\b|\bbrillant\b|\bgroßartig\b|\bgrossartig\b|\bwundervoll\b|\büberwältigt\b/.test(text)
+  // Positive indicators
+  const positiveWords = (text.match(/\btoll\b|\bsuper\b|\bwunderbar\b|\bgut\b|\bfreue\b|\bdanke\b|\bvielen dank\b|\bprofessionell\b|\bklar\b|\bhilfreich\b|\bzufrieden\b|\bempfehlen\b|\bweiter\s*so\b/g) || []).length
+  // Negative indicators
+  const negativeWords = (text.match(/\bleider\b|\bnicht\b|\bproblem\b|\bfehler\b|\bschade\b|\bunzufrieden\b|\bnicht\s+gut\b|\bnicht\s+hilfreich\b|\bnicht\s+überzeugt\b|\bnicht\s+überzeugend\b|\bverbesser\b|\bbedauer\b|\bnicht\s+wirklich\b|\bkritik\b|\bmangel\b|\bschwach\b/g) || []).length
+  // Strong negative indicators → 1
+  const strongNegative = /\bfrustriert\b|\bunzumutbar\b|\binakzeptabel\b|\bskandal\b|\bkatastrophe\b|\bentsetzlich\b|\bfrechheit\b|\bunverschämt\b|\babzocke\b/.test(text)
+  // Churn signals
+  const churnSignals = /\bkündigen\b|\babsagen\b|\bstornieren\b|\bnicht\s+fortsetzen\b|\bnicht\s+zu\s+beginnen\b|\baufhören\b|\bbeenden\b|\bnicht\s+weiter\b|\bentschieden.*nicht\b/.test(text)
+
+  if (strongNegative) return 1
+  if (strongPositive && negativeWords === 0) return 5
+
+  // Score calculation
+  let score = 3 // neutral base
+  score += Math.min(positiveWords * 0.4, 1.5)
+  score -= Math.min(negativeWords * 0.35, 2)
+  if (churnSignals) score -= 1
+  if (positiveWords > 0 && negativeWords === 0) score += 0.5
+
+  return Math.max(1, Math.min(5, Math.round(score)))
+}

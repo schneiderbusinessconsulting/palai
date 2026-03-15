@@ -159,6 +159,7 @@ export function Header({ title, description }: HeaderProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
             placeholder="Suchen..."
+            aria-label="Suche"
             className="pl-9 w-64 bg-white dark:bg-slate-800"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
@@ -172,7 +173,7 @@ export function Header({ title, description }: HeaderProps) {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="relative">
+            <Button variant="outline" size="icon" className="relative" aria-label="Benachrichtigungen">
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] font-medium text-white flex items-center justify-center">
@@ -228,7 +229,7 @@ export function Header({ title, description }: HeaderProps) {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full">
+            <Button variant="outline" size="icon" className="rounded-full" aria-label="Benutzermenu">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-blue-600 text-white text-sm">
                   MP

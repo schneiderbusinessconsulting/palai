@@ -73,3 +73,29 @@ export function getBuyingIntentBadge(score?: number) {
   return null // Low intent not shown
 }
 
+const happinessEmojis: Record<number, { emoji: string; label: string; color: string }> = {
+  1: { emoji: '😡', label: 'Sehr unzufrieden', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  2: { emoji: '😟', label: 'Unzufrieden', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+  3: { emoji: '😐', label: 'Neutral', color: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' },
+  4: { emoji: '😊', label: 'Zufrieden', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  5: { emoji: '😍', label: 'Sehr zufrieden', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
+}
+
+export function getHappinessBadge(score?: number | null, size: 'sm' | 'lg' = 'sm') {
+  if (!score || score < 1 || score > 5) return null
+  const h = happinessEmojis[score]
+  if (size === 'lg') {
+    return (
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${h.color}`}>
+        <span className="text-base">{h.emoji}</span>
+        {h.label} ({score}/5)
+      </span>
+    )
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${h.color}`} title={h.label}>
+      {h.emoji} {score}/5
+    </span>
+  )
+}
+

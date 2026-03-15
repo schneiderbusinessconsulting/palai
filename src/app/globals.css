@@ -124,3 +124,17 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  .no-print, nav, header, [role="dialog"], .toast-container {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  main {
+    margin: 0 !important;
+    padding: 1rem !important;
+  }
+}

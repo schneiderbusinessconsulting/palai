@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
-import { analyzeTone, determinePriority } from '@/lib/text-utils'
+import { analyzeTone, determinePriority, calculateHappinessScore } from '@/lib/text-utils'
 
 // Phase 3: BI scanning — fire-and-forget, runs in background after email insert
 // Returns buying intent score (0-100) for immediate storage on the email record
@@ -522,6 +522,7 @@ export async function POST(request: NextRequest) {
 
       // Phase 5: Tone analysis (rule-based, free)
       const tone = analyzeTone(subject, bodyText)
+      const happinessScore = calculateHappinessScore(subject, bodyText)
 
       // Phase 4: Determine priority + SLA target
       const priority = determinePriority(classification.emailType, tone.urgency, classification.needsResponse)
@@ -550,6 +551,8 @@ export async function POST(request: NextRequest) {
           tone_formality: tone.formality,
           tone_sentiment: tone.sentiment,
           tone_urgency: tone.urgency,
+          // Happiness score
+          happiness_score: happinessScore,
           // Default assignment
           assigned_agent_id: defaultAgentId,
         })

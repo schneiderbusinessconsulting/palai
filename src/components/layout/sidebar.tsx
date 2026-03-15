@@ -47,7 +47,7 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { theme, toggleTheme } = useTheme()
+  const { theme, themeMode, toggleTheme, setThemeMode } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [switcherOpen, setSwitcherOpen] = useState(false)
@@ -293,22 +293,38 @@ export function Sidebar() {
         {/* Footer */}
         <div className="border-t border-slate-200 dark:border-slate-800 p-3 space-y-2">
           {/* Theme Toggle */}
-          <button
-            onClick={toggleTheme}
-            className={cn(
-              'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors',
-              collapsed && 'justify-center'
-            )}
-          >
-            {theme === 'light' ? (
-              <Moon className="h-5 w-5" />
-            ) : (
-              <Sun className="h-5 w-5" />
-            )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleTheme}
+              className={cn(
+                'flex items-center gap-3 flex-1 px-3 py-2.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors',
+                collapsed && 'justify-center'
+              )}
+            >
+              {theme === 'light' ? (
+                <Moon className="h-5 w-5" />
+              ) : (
+                <Sun className="h-5 w-5" />
+              )}
+              {!collapsed && (
+                <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+              )}
+            </button>
             {!collapsed && (
-              <span>{theme === 'light' ? 'Dark Mode' : 'Light Mode'}</span>
+              <button
+                onClick={() => setThemeMode(themeMode === 'auto' ? 'manual' : 'auto')}
+                className={cn(
+                  'px-2 py-1 rounded text-[10px] font-medium transition-colors',
+                  themeMode === 'auto'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                )}
+                title={themeMode === 'auto' ? 'Automatisch (20-07 Uhr dunkel)' : 'Klick für Auto-Modus'}
+              >
+                Auto
+              </button>
             )}
-          </button>
+          </div>
 
           {/* Collapse Toggle (Desktop only) */}
           <button

@@ -4,6 +4,7 @@ import './globals.css'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Toaster } from '@/components/ui/sonner'
+import { GlobalFeatures } from '@/components/layout/global-features'
 
 // Help Center domains - these don't show the sidebar
 const HELP_CENTER_DOMAINS = ['help.palacios-institut.ch', 'help.palacios-institut.com']
@@ -60,6 +61,7 @@ export default async function RootLayout({
               {children}
             </main>
           </div>
+          <GlobalFeatures />
           <Toaster />
         </ThemeProvider>
       </body>

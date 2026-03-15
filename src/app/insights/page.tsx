@@ -36,6 +36,9 @@ import {
   Clock,
   ExternalLink,
   Download,
+  ChevronDown,
+  ChevronRight,
+  User,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell,
@@ -230,13 +233,143 @@ function DrilldownDialog({
   )
 }
 
+function SentimentDot({ sentiment }: { sentiment: string }) {
+  const color =
+    sentiment === 'positive' ? 'bg-emerald-500' :
+    sentiment === 'negative' ? 'bg-red-500' :
+    'bg-slate-400'
+  return <span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+}
+
 export default function InsightsPage() {
   const [data, setData] = useState<InsightsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<string>('30d')
   const [drilldown, setDrilldown] = useState<{ title: string; emails: DrilldownEmail[] } | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [feedbackThreads, setFeedbackThreads] = useState<any[]>([])
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
   const router = useRouter()
+
+  const toggleThread = (id: string) => {
+    setExpandedThreads(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const renderFeedbackSection = (department: string) => {
+    const threads = feedbackThreads.filter(t => t.department === department)
+    if (threads.length === 0) return null
+
+    return (
+      <Card className={department === 'marketing' ? 'md:col-span-2' : 'lg:col-span-2'}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-purple-500" />
+            Kunden-Feedback
+            <Badge variant="outline">{threads.length}</Badge>
+          </CardTitle>
+          <CardDescription>Gesammeltes Feedback aus Kunden-E-Mails</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {threads.map((thread: any) => {
+            const isExpanded = expandedThreads.has(thread.id)
+            const items = thread.feedback_items || []
+            const posCount = items.filter((i: any) => i.sentiment === 'positive').length
+            const neuCount = items.filter((i: any) => i.sentiment === 'neutral').length
+            const negCount = items.filter((i: any) => i.sentiment === 'negative').length
+
+            return (
+              <div key={thread.id} className="border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleThread(thread.id)}
+                  className="w-full text-left p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2 min-w-0">
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 mt-0.5 text-slate-400 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 mt-0.5 text-slate-400 flex-shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{thread.title}</p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="outline" className="text-xs">{thread.department}</Badge>
+                          <span className="text-xs text-slate-500">{items.length} Einträge</span>
+                          {posCount > 0 && <span className="text-xs text-emerald-600">{posCount} positiv</span>}
+                          {neuCount > 0 && <span className="text-xs text-slate-500">{neuCount} neutral</span>}
+                          {negCount > 0 && <span className="text-xs text-red-600">{negCount} negativ</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                {isExpanded && (
+                  <div className="px-4 pb-4 space-y-3">
+                    {thread.problem_statement && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Problem</p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300">{thread.problem_statement}</p>
+                      </div>
+                    )}
+
+                    {thread.ai_recommendation && (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">AI Empfehlung</p>
+                        <p className="text-sm text-blue-800 dark:text-blue-300">{thread.ai_recommendation}</p>
+                      </div>
+                    )}
+
+                    {items.length > 0 && (
+                      <div className="space-y-2">
+                        {items.map((item: any) => (
+                          <div key={item.id} className="p-3 border rounded-lg bg-slate-50/50 dark:bg-slate-800/30">
+                            <p className="text-sm">{item.content}</p>
+                            {item.original_quote && (
+                              <blockquote className="mt-2 pl-3 border-l-2 border-slate-300 dark:border-slate-600 text-xs text-slate-500 dark:text-slate-400 italic">
+                                &ldquo;{item.original_quote}&rdquo;
+                              </blockquote>
+                            )}
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                              <SentimentDot sentiment={item.sentiment} />
+                              {item.category && (
+                                <Badge variant="outline" className="text-xs">{item.category}</Badge>
+                              )}
+                              {item.mentioned_person && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <User className="h-3 w-3" />
+                                  {item.mentioned_person}
+                                </Badge>
+                              )}
+                              {item.email_id && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); router.push(`/inbox?emailId=${item.email_id}`) }}
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  E-Mail
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+    )
+  }
 
   const fetchInsights = useCallback(async (selectedPeriod: string) => {
     setLoading(true)
@@ -252,7 +385,10 @@ export default function InsightsPage() {
     }
   }, [])
 
-  useEffect(() => { fetchInsights(period) }, [fetchInsights, period])
+  useEffect(() => {
+    fetchInsights(period)
+    fetch('/api/feedback?status=all').then(r => r.json()).then(data => setFeedbackThreads(data.threads || [])).catch(() => {})
+  }, [fetchInsights, period])
 
   const handlePeriodChange = (newPeriod: string) => {
     setPeriod(newPeriod)
@@ -515,6 +651,8 @@ export default function InsightsPage() {
                 )}
               </CardContent>
             </Card>
+
+            {renderFeedbackSection('marketing')}
           </div>
         </TabsContent>
 
@@ -658,6 +796,8 @@ export default function InsightsPage() {
                 )}
               </CardContent>
             </Card>
+
+            {renderFeedbackSection('sales')}
           </div>
         </TabsContent>
 
@@ -779,6 +919,8 @@ export default function InsightsPage() {
                 })()}
               </CardContent>
             </Card>
+
+            {renderFeedbackSection('product')}
           </div>
         </TabsContent>
 

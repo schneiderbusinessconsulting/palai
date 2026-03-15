@@ -23,6 +23,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Label } from '@/components/ui/label'
 import {
   Search,
@@ -156,7 +157,8 @@ interface HubSpotOwner {
 function InboxPageContent() {
   const searchParams = useSearchParams()
   const [emails, setEmails] = useState<Email[]>([])
-  const [filter, setFilter] = useState('all')
+  const initialFilter = searchParams.get('filter') || 'all'
+  const [filter, setFilter] = useState(initialFilter)
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
@@ -181,6 +183,7 @@ function InboxPageContent() {
 
   // Dismiss confirmation
   const [dismissEmailId, setDismissEmailId] = useState<string | null>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; emailId: string } | null>(null)
 
   // Detail modal state
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null)
@@ -238,6 +241,19 @@ function InboxPageContent() {
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [showSaveViewInput, setShowSaveViewInput] = useState(false)
   const [newViewName, setNewViewName] = useState('')
+
+  // Sync filter state to URL search params
+  const updateFilter = useCallback((newFilter: string) => {
+    setFilter(newFilter)
+    const params = new URLSearchParams(window.location.search)
+    if (newFilter === 'all') {
+      params.delete('filter')
+    } else {
+      params.set('filter', newFilter)
+    }
+    const newUrl = params.toString() ? `/inbox?${params.toString()}` : '/inbox'
+    window.history.replaceState({}, '', newUrl)
+  }, [])
 
   // Agent name helper (from profile localStorage)
   const getAgentName = () => {
@@ -377,6 +393,30 @@ function InboxPageContent() {
     localStorage.setItem('autoDraftEnabled', String(enabled))
   }
 
+  // Realtime subscription for new emails
+  useEffect(() => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseKey) return
+
+    const { createClient } = require('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const channel = supabase
+      .channel('inbox-realtime')
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'incoming_emails' },
+        (payload: any) => {
+          // Add new email to the top of the list
+          setEmails(prev => [payload.new as Email, ...prev])
+          toast.info('Neue E-Mail eingegangen', { description: payload.new?.subject })
+        }
+      )
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   // Fetch emails (with optional loading indicator)
   const fetchEmails = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true)
@@ -469,6 +509,13 @@ function InboxPageContent() {
 
   // Assign agent to email
   const handleAssignAgent = async (emailId: string, agentId: string) => {
+    // Optimistic: update assigned_agent_id immediately
+    const oldEmail = emails.find(e => e.id === emailId)
+    const oldAgentId = oldEmail?.assigned_agent_id
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, assigned_agent_id: agentId || undefined } : e))
+    if (selectedEmail?.id === emailId) {
+      setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: agentId || undefined } : prev)
+    }
     try {
       const response = await fetch(`/api/emails/${emailId}/assign`, {
         method: 'PATCH',
@@ -476,17 +523,22 @@ function InboxPageContent() {
         body: JSON.stringify({ agent_id: agentId || null }),
       })
       if (response.ok) {
-        // Update local state
-        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, assigned_agent_id: agentId || undefined } : e))
-        if (selectedEmail?.id === emailId) {
-          setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: agentId || undefined } : prev)
-        }
         toast.success(agentId ? 'Agent zugewiesen' : 'Zuweisung entfernt')
       } else {
+        // Revert optimistic update
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, assigned_agent_id: oldAgentId } : e))
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: oldAgentId } : prev)
+        }
         toast.error('Zuweisung fehlgeschlagen')
       }
     } catch (error) {
       console.error('Failed to assign agent:', error)
+      // Revert optimistic update
+      setEmails(prev => prev.map(e => e.id === emailId ? { ...e, assigned_agent_id: oldAgentId } : e))
+      if (selectedEmail?.id === emailId) {
+        setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: oldAgentId } : prev)
+      }
       toast.error('Zuweisung fehlgeschlagen')
     }
   }
@@ -592,7 +644,7 @@ function InboxPageContent() {
 
   // Load a saved view
   const handleLoadView = (view: SavedView) => {
-    setFilter(view.filters.status)
+    updateFilter(view.filters.status)
     setHideSent(view.filters.hideSent)
     setHideSystemMails(view.filters.hideSystemMails)
     setSearchQuery(view.filters.searchQuery)
@@ -661,7 +713,7 @@ function InboxPageContent() {
       setDeepLinkHandled(true)
     } else if (!isLoading) {
       // Email might be filtered out — try fetching all emails
-      setFilter('all')
+      updateFilter('all')
       setHideSent(false)
       setHideSystemMails(false)
       setDeepLinkHandled(true)
@@ -1095,8 +1147,12 @@ function InboxPageContent() {
 
   const handleBulkClose = async () => {
     setIsBulkActioning(true)
+    const idsToClose = Array.from(selectedIds)
+    // Optimistic: mark all selected as sent immediately
+    const oldEmails = emails.filter(e => idsToClose.includes(e.id)).map(e => ({ id: e.id, status: e.status }))
+    setEmails(prev => prev.map(e => idsToClose.includes(e.id) ? { ...e, status: 'sent' } : e))
     const results = await Promise.allSettled(
-      Array.from(selectedIds).map(id =>
+      idsToClose.map(id =>
         fetch(`/api/emails/${id}/mark-sent`, { method: 'POST' }).then(r => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`)
           return r
@@ -1106,6 +1162,13 @@ function InboxPageContent() {
     const succeeded = results.filter(r => r.status === 'fulfilled').length
     const failed = results.length - succeeded
     if (failed > 0) {
+      // Revert failed ones
+      const failedIds = idsToClose.filter((_, i) => results[i].status === 'rejected')
+      setEmails(prev => prev.map(e => {
+        const old = oldEmails.find(o => o.id === e.id)
+        if (old && failedIds.includes(e.id)) return { ...e, status: old.status }
+        return e
+      }))
       toast.error(`${failed} E-Mail(s) konnten nicht geschlossen werden`)
     }
     if (succeeded > 0) {
@@ -1113,7 +1176,6 @@ function InboxPageContent() {
     }
     setSelectedIds(new Set())
     setIsBulkActioning(false)
-    fetchEmails()
   }
 
   const handleBulkAssign = async (agentId: string) => {
@@ -1159,19 +1221,29 @@ function InboxPageContent() {
   // Dismiss email with confirmation
   const handleDismissConfirmed = async () => {
     if (!dismissEmailId) return
+    const emailId = dismissEmailId
+    // Optimistic: update status immediately
+    const oldEmail = emails.find(e => e.id === emailId)
+    const oldStatus = oldEmail?.status
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, status: 'sent' } : e))
+    setDismissEmailId(null)
     try {
-      const response = await fetch(`/api/emails/${dismissEmailId}/mark-sent`, {
+      const response = await fetch(`/api/emails/${emailId}/mark-sent`, {
         method: 'POST',
       })
       if (response.ok) {
         toast.success('E-Mail geschlossen')
-        fetchEmails()
+      } else {
+        // Revert optimistic update
+        setEmails(prev => prev.map(e => e.id === emailId ? { ...e, status: oldStatus || e.status } : e))
+        toast.error('E-Mail konnte nicht geschlossen werden')
       }
     } catch (error) {
       console.error('Dismiss email failed:', error)
+      // Revert optimistic update
+      setEmails(prev => prev.map(e => e.id === emailId ? { ...e, status: oldStatus || e.status } : e))
       toast.error('E-Mail konnte nicht geschlossen werden')
     }
-    setDismissEmailId(null)
   }
 
   const currentDraft = selectedEmail?.email_drafts?.[0]
@@ -1195,7 +1267,7 @@ function InboxPageContent() {
             className="pl-9"
           />
         </div>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={updateFilter}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Filter" />
@@ -1478,8 +1550,21 @@ function InboxPageContent() {
 
       {/* Email List */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-4">
+                  <Skeleton className="h-4 w-4 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-5 w-20" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       ) : fetchError ? (
         <div className="text-center py-12">
@@ -1554,8 +1639,12 @@ function InboxPageContent() {
             return (
               <Card
                 key={email.id}
-                className={`hover:shadow-md transition-shadow cursor-pointer ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
+                className={`hover:shadow-md transition-shadow cursor-pointer group ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
                 onClick={() => openEmailDetail(email)}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  setContextMenu({ x: e.clientX, y: e.clientY, emailId: email.id })
+                }}
               >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
@@ -1593,6 +1682,11 @@ function InboxPageContent() {
                               </span>
                             )}
                           </p>
+                          {email.body_text && (
+                            <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5 max-w-[500px]">
+                              {email.body_text.substring(0, 120).replace(/\s+/g, ' ')}{email.body_text.length > 120 ? '…' : ''}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                           {email.assigned_agent_id && (
@@ -1753,6 +1847,20 @@ function InboxPageContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Right-Click Context Menu */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-50" onClick={() => setContextMenu(null)} />
+          <div className="fixed z-50 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl py-1 min-w-[180px]" style={{ top: contextMenu.y, left: contextMenu.x }}>
+            <button className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2" onClick={() => { const em = emails.find(e => e.id === contextMenu.emailId); if (em) openEmailDetail(em); setContextMenu(null) }}><Mail className="h-3.5 w-3.5" /> Öffnen</button>
+            <button className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2" onClick={() => { toggleSelect(contextMenu.emailId, { stopPropagation: () => {} } as React.MouseEvent); setContextMenu(null) }}><CheckSquare className="h-3.5 w-3.5" /> Auswählen</button>
+            <div className="border-t border-slate-200 dark:border-slate-700 my-1" />
+            <button className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2" onClick={() => { fetch(`/api/emails/${contextMenu.emailId}/mark-sent`, { method: 'POST' }).then(() => { toast.success('E-Mail geschlossen'); fetchEmails() }); setContextMenu(null) }}><CheckCircle className="h-3.5 w-3.5" /> Schliessen</button>
+            <button className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2" onClick={() => { setDismissEmailId(contextMenu.emailId); setContextMenu(null) }}><Trash2 className="h-3.5 w-3.5" /> Verwerfen</button>
+          </div>
+        </>
+      )}
 
       {/* Email Detail Side Panel */}
       {isDetailOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleClose} />}

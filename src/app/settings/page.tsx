@@ -193,14 +193,18 @@ export default function SettingsPage() {
   }
 
   const handleDeleteInstruction = async (title: string) => {
+    if (!window.confirm(`AI-Instruktion "${title}" wirklich löschen?`)) return
     setDeletingInstr(title)
     try {
-      await fetch('/api/settings/ai-instructions', {
+      const res = await fetch('/api/settings/ai-instructions', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
       })
+      if (!res.ok) throw new Error('Delete failed')
       fetchInstructions()
+    } catch {
+      alert('Instruktion konnte nicht gelöscht werden.')
     } finally {
       setDeletingInstr(null)
     }
@@ -372,8 +376,14 @@ export default function SettingsPage() {
   }
 
   const handleDeleteWord = async (id: string) => {
-    await fetch(`/api/settings/trigger-words/${id}`, { method: 'DELETE' })
-    fetchTriggerWords()
+    if (!window.confirm('Trigger-Wort wirklich löschen?')) return
+    try {
+      const res = await fetch(`/api/settings/trigger-words/${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      fetchTriggerWords()
+    } catch {
+      alert('Trigger-Wort konnte nicht gelöscht werden.')
+    }
   }
 
   const handleToggleWord = async (id: string, is_active: boolean) => {

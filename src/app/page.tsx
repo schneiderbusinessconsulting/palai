@@ -27,6 +27,8 @@ import {
   Minus,
   Mail,
   MailCheck,
+  Star,
+  Zap,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatRelativeDate } from '@/lib/utils'
@@ -46,6 +48,7 @@ interface Email {
   sla_status?: string
   tone_sentiment?: string
   tone_urgency?: string
+  first_response_at?: string
   email_drafts?: Array<{ confidence_score: number }>
 }
 
@@ -98,6 +101,8 @@ interface Level1Stats {
   avgResponseHours: number | null
   slaCompliance: number | null
   resolutionRate: number | null
+  frtMinutes: number | null
+  csatAvg: number | null
 }
 
 const isActionable = (e: Email) =>
@@ -307,17 +312,18 @@ export default function DashboardPage() {
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
   const [sentimentDist, setSentimentDist] = useState<Record<string, number>>({})
   const [workload, setWorkload] = useState<WorkloadStats | null>(null)
-  const [level1, setLevel1] = useState<Level1Stats>({ backlog: 0, avgResponseHours: null, slaCompliance: null, resolutionRate: null })
+  const [level1, setLevel1] = useState<Level1Stats>({ backlog: 0, avgResponseHours: null, slaCompliance: null, resolutionRate: null, frtMinutes: null, csatAvg: null })
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setFetchError(null)
     try {
-      const [emailRes, insightsRes, analyticsRes] = await Promise.all([
+      const [emailRes, insightsRes, analyticsRes, csatRes] = await Promise.all([
         fetch('/api/emails?limit=200'),
         fetch('/api/insights'),
         fetch('/api/analytics?period=30d'),
+        fetch('/api/csat'),
       ])
 
       let allEmails: Email[] = []
@@ -330,9 +336,10 @@ export default function DashboardPage() {
         const actionable = all.filter(isActionable)
         const backlog = actionable.filter(e => e.status !== 'sent' && e.status !== 'rejected').length
 
-        // Sentiment
+        // Sentiment + FRT
         const sDist: Record<string, number> = { positive: 0, neutral: 0, negative: 0, frustrated: 0 }
         const responseTimes: number[] = []
+        const frtTimes: number[] = []
 
         for (const e of all) {
           if (!isActionable(e)) continue
@@ -341,6 +348,12 @@ export default function DashboardPage() {
             const received = new Date(e.received_at).getTime()
             const resolved = new Date(e.updated_at).getTime()
             if (resolved > received) responseTimes.push(resolved - received)
+          }
+          // FRT: use first_response_at if available
+          if (e.first_response_at) {
+            const received = new Date(e.received_at).getTime()
+            const firstResp = new Date(e.first_response_at).getTime()
+            if (firstResp > received) frtTimes.push((firstResp - received) / 60000)
           }
         }
 
@@ -363,7 +376,19 @@ export default function DashboardPage() {
           ? Math.round((responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length / 3600000) * 10) / 10
           : null
 
-        setLevel1({ backlog, avgResponseHours, slaCompliance, resolutionRate })
+        // FRT (First Response Time) in minutes
+        const frtMinutes = frtTimes.length > 0
+          ? Math.round(frtTimes.reduce((a, b) => a + b, 0) / frtTimes.length)
+          : null
+
+        // CSAT
+        let csatAvg: number | null = null
+        if (csatRes.ok) {
+          const csatData = await csatRes.json()
+          csatAvg = csatData.avg > 0 ? csatData.avg : null
+        }
+
+        setLevel1({ backlog, avgResponseHours, slaCompliance, resolutionRate, frtMinutes, csatAvg })
       }
 
       let dailyData: Array<{ day: string; total: number; sent: number; pending: number }> = []
@@ -450,7 +475,7 @@ export default function DashboardPage() {
       {/* ═══════════════════════════════════════════════════
           LEVEL 1 — Blick (3 Sekunden): Wie stehen wir?
           ═══════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
         {/* Backlog */}
         <Link href="/inbox">
           <div className={`p-5 rounded-xl border-2 transition-all cursor-pointer ${
@@ -525,6 +550,51 @@ export default function DashboardPage() {
               level1.resolutionRate !== null ? `${level1.resolutionRate}%` : '—'}
           </p>
           <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Heute gelöst</p>
+        </div>
+
+        {/* FRT (First Response Time) */}
+        <div className={`p-5 rounded-xl border-2 transition-all ${
+          level1.frtMinutes !== null && level1.frtMinutes > 480 ? 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800' :
+          level1.frtMinutes !== null && level1.frtMinutes > 120 ? 'border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800' :
+          'border-slate-200 bg-slate-50 dark:bg-slate-800/30 dark:border-slate-700'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <Zap className={`h-5 w-5 ${
+              level1.frtMinutes !== null && level1.frtMinutes <= 120 ? 'text-green-600' :
+              level1.frtMinutes !== null && level1.frtMinutes <= 480 ? 'text-amber-600' :
+              'text-slate-500'
+            }`} />
+          </div>
+          <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
+              level1.frtMinutes !== null ? (
+                level1.frtMinutes < 60 ? `${level1.frtMinutes}m` :
+                `${Math.round(level1.frtMinutes / 60 * 10) / 10}h`
+              ) : '—'}
+          </p>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">Ø Erste Antwort</p>
+        </div>
+
+        {/* CSAT */}
+        <div className={`p-5 rounded-xl border-2 transition-all ${
+          level1.csatAvg !== null && level1.csatAvg >= 4.0 ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' :
+          level1.csatAvg !== null && level1.csatAvg >= 3.0 ? 'border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800' :
+          level1.csatAvg !== null ? 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800' :
+          'border-slate-200 bg-slate-50 dark:bg-slate-800/30 dark:border-slate-700'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <Star className={`h-5 w-5 ${
+              level1.csatAvg !== null && level1.csatAvg >= 4.0 ? 'text-green-600' :
+              level1.csatAvg !== null && level1.csatAvg >= 3.0 ? 'text-amber-600' :
+              level1.csatAvg !== null ? 'text-red-600' :
+              'text-slate-500'
+            }`} />
+          </div>
+          <p className="text-3xl font-bold text-slate-800 dark:text-slate-200">
+            {isLoading ? <Loader2 className="h-6 w-6 animate-spin" /> :
+              level1.csatAvg !== null ? `${level1.csatAvg}` : '—'}
+          </p>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400 mt-1">CSAT (Ø 5)</p>
         </div>
       </div>
 

@@ -21,6 +21,7 @@ import {
   ChevronsUpDown,
   Check,
   Users,
+  UserCog,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
   { name: 'Insights', href: '/insights', icon: BarChart3, badgeKey: 'escalations' },
   { name: 'Kunden', href: '/customers', icon: Users },
+  { name: 'Team', href: '/agents', icon: UserCog },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
   { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },

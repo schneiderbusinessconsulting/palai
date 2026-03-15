@@ -406,6 +406,80 @@ class HubSpotClient {
       }
     )
   }
+
+  // Ensure custom properties exist in HubSpot (idempotent - creates if missing)
+  async ensureCustomProperties(): Promise<void> {
+    const properties = [
+      { name: 'palai_priority', label: 'Palai Priority', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'Email priority from palai' },
+      { name: 'palai_support_level', label: 'Palai Support Level', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'Support level from palai' },
+      { name: 'palai_topic', label: 'Palai Topic', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'Topic cluster from palai' },
+      { name: 'palai_sentiment', label: 'Palai Sentiment', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'Tone sentiment from palai' },
+      { name: 'palai_sla_status', label: 'Palai SLA Status', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'SLA status from palai' },
+      { name: 'palai_last_email_date', label: 'Palai Last Email Date', type: 'string', fieldType: 'text', groupName: 'contactinformation', description: 'Last email date from palai' },
+      { name: 'palai_total_emails', label: 'Palai Total Emails', type: 'number', fieldType: 'number', groupName: 'contactinformation', description: 'Total email count from palai' },
+      { name: 'palai_buying_intent', label: 'Palai Buying Intent', type: 'number', fieldType: 'number', groupName: 'contactinformation', description: 'Buying intent score from palai' },
+    ]
+
+    for (const prop of properties) {
+      try {
+        await this.request('/crm/v3/properties/contacts', {
+          method: 'POST',
+          body: JSON.stringify(prop),
+        })
+      } catch (e) {
+        // 409 means property already exists — that's fine
+        const msg = e instanceof Error ? e.message : String(e)
+        if (!msg.includes('409')) {
+          console.error(`Failed to create property ${prop.name}:`, msg)
+        }
+      }
+    }
+  }
+
+  // Sync email data to HubSpot contact properties
+  async syncContactProperties(params: {
+    contactEmail: string
+    properties: {
+      palai_priority?: string
+      palai_support_level?: string
+      palai_topic?: string
+      palai_sentiment?: string
+      palai_sla_status?: string
+      palai_last_email_date?: string
+      palai_total_emails?: number
+      palai_buying_intent?: number
+    }
+  }): Promise<boolean> {
+    try {
+      const contact = await this.getContactByEmail(params.contactEmail)
+      if (!contact) {
+        console.log(`HubSpot contact not found for ${params.contactEmail}`)
+        return false
+      }
+
+      // Filter out undefined values
+      const cleanProperties: Record<string, string | number> = {}
+      for (const [key, value] of Object.entries(params.properties)) {
+        if (value !== undefined && value !== null) {
+          cleanProperties[key] = value
+        }
+      }
+
+      if (Object.keys(cleanProperties).length === 0) {
+        return true
+      }
+
+      await this.request(`/crm/v3/objects/contacts/${contact.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ properties: cleanProperties }),
+      })
+
+      return true
+    } catch (e) {
+      console.error(`Failed to sync properties for ${params.contactEmail}:`, e)
+      return false
+    }
+  }
 }
 
 export function createHubSpotClient(): HubSpotClient {

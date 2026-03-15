@@ -3,6 +3,37 @@ import { createClient } from '@/lib/supabase/server'
 import { createHubSpotClient } from '@/lib/hubspot/client'
 import { wordEditDistance } from '@/lib/text-utils'
 
+// Fire-and-forget: sync email data to HubSpot contact properties
+async function syncToHubSpot(emailId: string): Promise<void> {
+  try {
+    const supabase = await createClient()
+    const hubspot = createHubSpotClient()
+
+    const { data: email } = await supabase
+      .from('incoming_emails')
+      .select('*')
+      .eq('id', emailId)
+      .single()
+
+    if (!email) return
+
+    await hubspot.syncContactProperties({
+      contactEmail: email.from_email,
+      properties: {
+        palai_priority: email.priority || undefined,
+        palai_support_level: email.support_level || undefined,
+        palai_topic: email.topic_cluster || undefined,
+        palai_sentiment: email.tone_sentiment || undefined,
+        palai_sla_status: email.sla_status || undefined,
+        palai_last_email_date: email.received_at || undefined,
+        palai_buying_intent: email.buying_intent_score ?? undefined,
+      },
+    })
+  } catch {
+    // Silently fail — HubSpot might not be configured
+  }
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ emailId: string }> }
@@ -171,7 +202,10 @@ export async function POST(
       }
     }
 
-    // 9. Log to audit
+    // 9. Fire-and-forget HubSpot property sync
+    syncToHubSpot(emailId).catch(err => console.error('HubSpot sync failed:', err))
+
+    // 10. Log to audit
     await supabase.from('audit_log').insert({
       email_id: emailId,
       draft_id: draftId,

@@ -138,6 +138,7 @@ export default function CustomersPage() {
           variant="ghost"
           size="sm"
           className="h-10"
+          title={sortDir === 'desc' ? 'Absteigend' : 'Aufsteigend'}
           onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
         >
           {sortDir === 'desc' ? '↓' : '↑'}

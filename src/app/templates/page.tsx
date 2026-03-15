@@ -43,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 
 interface Template {
   id: string
@@ -189,7 +190,7 @@ export default function TemplatesPage() {
       }
       setDialogOpen(false)
     } catch {
-      console.error('Failed to save template')
+      toast.error('Template konnte nicht gespeichert werden')
     } finally {
       setSaving(false)
     }
@@ -209,7 +210,7 @@ export default function TemplatesPage() {
         setTemplates(prev => prev.filter(t => t.id !== deleteTemplate.id))
       }
     } catch {
-      console.error('Failed to delete template')
+      toast.error('Template konnte nicht gelöscht werden')
     } finally {
       setDeleting(false)
       setDeleteTemplate(null)

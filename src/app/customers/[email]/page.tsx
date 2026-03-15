@@ -77,6 +77,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
   const [emails, setEmails] = useState<CustomerEmail[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -90,6 +91,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
         }
       } catch (e) {
         console.error('Failed to fetch customer:', e)
+        setError('Kundendaten konnten nicht geladen werden')
       } finally {
         setLoading(false)
       }
@@ -103,6 +105,20 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
         <Header title="Kundenprofil" description="Laden..." />
         <div className="flex items-center justify-center py-24">
           <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Header title="Kundenprofil" description="Fehler" />
+        <div className="text-center py-12">
+          <p className="text-slate-500">{error}</p>
+          <Button variant="outline" className="mt-4" onClick={() => { setError(null); setLoading(true); window.location.reload(); }}>
+            Erneut versuchen
+          </Button>
         </div>
       </div>
     )
@@ -229,6 +245,9 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
+            {emails.length === 0 && (
+              <p className="text-sm text-slate-500 text-center py-4">Keine E-Mails gefunden</p>
+            )}
             {emails.map(email => (
               <button
                 key={email.id}

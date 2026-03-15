@@ -555,6 +555,7 @@ export default function SettingsPage() {
 
   // ── Historical HubSpot Import ────────────────────────────────────────────────
   const [histImportRunning, setHistImportRunning] = useState(false)
+  const [showHistImportDialog, setShowHistImportDialog] = useState(false)
   const [histImportResult, setHistImportResult] = useState<{ imported: number; skipped: number; errors: number; message: string } | null>(null)
   const [histImportError, setHistImportError] = useState<string | null>(null)
 
@@ -1257,6 +1258,7 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
+              <p className="text-xs text-slate-500 mt-1">Extrahiert Wissen aus allen HubSpot E-Mail-Threads und speichert es in der Knowledge Base.</p>
 
               {bulkError && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-start gap-2">
@@ -1387,7 +1389,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <Button
-                onClick={handleHistoricalImport}
+                onClick={() => setShowHistImportDialog(true)}
                 disabled={histImportRunning}
                 className="gap-2"
               >
@@ -1397,6 +1399,23 @@ export default function SettingsPage() {
                   <><RefreshCw className="h-4 w-4" />Historischen Import starten</>
                 )}
               </Button>
+
+              <AlertDialog open={showHistImportDialog} onOpenChange={setShowHistImportDialog}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Historische E-Mails importieren?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Es werden bis zu 500 E-Mails aus HubSpot importiert und mit AI analysiert. Dies kann einige Minuten dauern und API-Credits verbrauchen.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => { setShowHistImportDialog(false); handleHistoricalImport(); }}>
+                      Import starten
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
               {histImportError && (
                 <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-start gap-2">

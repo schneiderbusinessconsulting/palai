@@ -130,6 +130,7 @@ export default function LearningPage() {
       }
     } catch (err) {
       console.error(err)
+      toast.error('Extraktion fehlgeschlagen')
     } finally {
       setExtractingId(null)
     }
@@ -201,6 +202,7 @@ export default function LearningPage() {
       }
     } catch (err) {
       console.error(err)
+      toast.error('Aktion fehlgeschlagen')
     } finally {
       setDismissingId(null)
     }

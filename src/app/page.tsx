@@ -32,6 +32,7 @@ import {
   Users,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { formatRelativeDate } from '@/lib/utils'
 
 interface AgentPerf {
@@ -447,6 +448,7 @@ const TrendPill = memo(function TrendPill({ value, invertColor }: { value: numbe
 })
 
 export default function DashboardPage() {
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [hotLeads, setHotLeads] = useState<HotLead[]>([])
@@ -811,7 +813,7 @@ export default function DashboardPage() {
               {(slaStats.overdue.length > 0 || slaStats.dueNow.length > 0) ? (
                 <div className="space-y-1.5">
                   {[...slaStats.overdue, ...slaStats.dueNow].slice(0, 5).map(email => (
-                    <Link key={email.id} href="/inbox">
+                    <Link key={email.id} href="/inbox?status=pending">
                       <div className={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
                         email.remainingMs <= 0
                           ? 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/10 hover:bg-red-50 dark:hover:bg-red-900/20'
@@ -881,7 +883,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-1.5">
                   {hotLeads.map(lead => (
-                    <Link key={lead.id} href="/inbox">
+                    <Link key={lead.id} href={`/inbox?search=${encodeURIComponent(lead.from_email)}`}>
                       <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition-colors cursor-pointer">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{lead.subject}</p>
@@ -1087,7 +1089,7 @@ export default function DashboardPage() {
                   </tr>
                   {/* Per-Agent Rows */}
                   {agentPerfs.map(agent => (
-                    <tr key={agent.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={agent.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer" onClick={() => router.push('/agents')}>
                       <td className="px-4 py-2.5">
                         <span className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</span>
                         <Badge className={`ml-2 text-[10px] px-1.5 py-0 ${

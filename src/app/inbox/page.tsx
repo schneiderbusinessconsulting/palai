@@ -1082,7 +1082,7 @@ function InboxPageContent() {
             System-Mails ausblenden
           </Label>
         </div>
-        <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
+        <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background" title="E-Mails nach Konversations-Threads gruppieren">
           <Switch
             id="thread-view"
             checked={threadView}
@@ -1127,11 +1127,12 @@ function InboxPageContent() {
           className="gap-2"
           onClick={handleReclassify}
           disabled={isClassifying}
+          title="E-Mails ohne Klassifikation werden automatisch analysiert"
         >
           {isClassifying ? (
             <><Loader2 className="h-4 w-4 animate-spin" />Klassifiziere…</>
           ) : (
-            <><Bot className="h-4 w-4" />Klassifizieren</>
+            <><Bot className="h-4 w-4" />Neu klassifizieren</>
           )}
         </Button>
         <Select value={assignedAgentFilter} onValueChange={setAssignedAgentFilter}>
@@ -1258,6 +1259,7 @@ function InboxPageContent() {
             size="sm"
             className="h-8 px-2"
             onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            title={sortDir === 'desc' ? 'Absteigend sortiert' : 'Aufsteigend sortiert'}
           >
             {sortDir === 'desc' ? '↓ Absteigend' : '↑ Aufsteigend'}
           </Button>
@@ -2081,7 +2083,7 @@ function InboxPageContent() {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Antwort zur Knowledge Base hinzufügen</p>
+                      <p>Antwort in die Knowledge Base speichern</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

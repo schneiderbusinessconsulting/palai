@@ -413,9 +413,13 @@ function InboxPageContent() {
         if (selectedEmail?.id === emailId) {
           setSelectedEmail(prev => prev ? { ...prev, assigned_agent_id: agentId || undefined } : prev)
         }
+        toast.success(agentId ? 'Agent zugewiesen' : 'Zuweisung entfernt')
+      } else {
+        toast.error('Zuweisung fehlgeschlagen')
       }
     } catch (error) {
       console.error('Failed to assign agent:', error)
+      toast.error('Zuweisung fehlgeschlagen')
     }
   }
 
@@ -765,31 +769,39 @@ function InboxPageContent() {
 
   // Send via Resend + HubSpot (full send pipeline)
   const handleSend = async () => {
-    if (!selectedEmail || !currentDraft) return
+    if (!selectedEmail) return
+
+    const finalText = isEditing ? editedResponse : (currentDraft?.edited_response || currentDraft?.ai_generated_response || editedResponse)
+
+    if (!finalText?.trim()) {
+      toast.error('Antwort darf nicht leer sein')
+      return
+    }
 
     setIsSending(true)
     try {
-      const finalText = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
       const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          draftId: currentDraft.id,
+          draftId: currentDraft?.id || undefined,
           finalText,
           ownerId: selectedOwnerId || undefined,
         }),
       })
 
       if (response.ok) {
+        toast.success('Antwort gesendet')
         releaseLock(selectedEmail.id)
         setIsDetailOpen(false)
         fetchEmails()
       } else {
         const data = await response.json()
-        console.error('Send failed:', data.error)
+        toast.error(data.error || 'Senden fehlgeschlagen')
       }
     } catch (error) {
       console.error('Send failed:', error)
+      toast.error('Senden fehlgeschlagen — Netzwerkfehler')
     } finally {
       setIsSending(false)
     }
@@ -935,6 +947,8 @@ function InboxPageContent() {
   }
 
   const filteredEmails = useMemo(() => emails.filter((email) => {
+    // Hide snoozed emails
+    if (email.snoozed_until && new Date(email.snoozed_until) > new Date()) return false
     // Hide sent/closed emails if toggle is on
     if (hideSent && email.status === 'sent') return false
     // Hide system/transactional emails if toggle is on

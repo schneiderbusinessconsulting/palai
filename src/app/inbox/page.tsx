@@ -722,6 +722,7 @@ function InboxPageContent() {
           formality,
           feedback: regenerate ? regenerateFeedback : undefined,
           regenerate,
+          senderName: getAgentName() || undefined,
         }),
       })
       if (response.ok) {

@@ -186,7 +186,7 @@ ${formalityInstruction}
 Formatierung:
 - Beginne mit einer persönlichen Anrede
 - Strukturiere längere Antworten mit Absätzen
-- Schliesse mit "Herzliche Grüsse" und Platzhalter [Name]
+- Schliesse mit "Herzliche Grüsse" und dem Namen: ${senderName || '[Name]'}
 
 Wichtig:
 - Erfinde KEINE Preise, Daten oder Fakten

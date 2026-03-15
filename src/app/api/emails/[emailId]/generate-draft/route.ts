@@ -9,10 +9,11 @@ export async function POST(
   try {
     const { emailId } = await params
     const body = await request.json().catch(() => ({}))
-    const { formality, feedback, regenerate } = body as {
+    const { formality, feedback, regenerate, senderName } = body as {
       formality?: Formality
       feedback?: string
       regenerate?: boolean
+      senderName?: string
     }
 
     const supabase = await createClient()
@@ -138,7 +139,7 @@ export async function POST(
     const { response, confidence, detectedFormality } = await generateEmailDraft(
       emailContent,
       relevantChunks,
-      email.from_name,
+      senderName || undefined,
       formality,
       feedback,
       aiInstructions,

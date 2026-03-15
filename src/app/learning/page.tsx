@@ -23,6 +23,8 @@ import {
   TrendingUp,
   AlertCircle,
   Edit2,
+  Clock,
+  ArrowRight,
 } from 'lucide-react'
 
 interface LearningCase {
@@ -308,9 +310,12 @@ export default function LearningPage() {
                 )}
 
                 {lc.status === 'extracted' && (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    In der Knowledge Base gespeichert
+                  <div className="flex items-center gap-2 text-sm text-amber-600">
+                    <Clock className="h-4 w-4" />
+                    In KB gespeichert – wartet auf Freigabe
+                    <a href="/knowledge" className="flex items-center gap-0.5 underline underline-offset-2 hover:text-amber-700">
+                      KB öffnen <ArrowRight className="h-3 w-3" />
+                    </a>
                   </div>
                 )}
               </CardContent>

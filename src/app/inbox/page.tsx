@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -294,6 +294,37 @@ export default function InboxPage() {
       body: JSON.stringify({ agent_name: getAgentName() }),
     }).catch(() => {})
   }
+
+  // Acquire lock helper (fire-and-forget, no conflict warning on open)
+  const acquireLock = (emailId: string) => {
+    fetch(`/api/emails/${emailId}/lock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent_name: getAgentName() }),
+    }).catch(() => {})
+  }
+
+  // Lock heartbeat: refresh lock every 3 minutes while modal is open
+  const lockHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (isDetailOpen && selectedEmail) {
+      acquireLock(selectedEmail.id)
+      lockHeartbeatRef.current = setInterval(() => {
+        if (selectedEmail) acquireLock(selectedEmail.id)
+      }, 3 * 60 * 1000)
+    } else {
+      if (lockHeartbeatRef.current) {
+        clearInterval(lockHeartbeatRef.current)
+        lockHeartbeatRef.current = null
+      }
+    }
+    return () => {
+      if (lockHeartbeatRef.current) {
+        clearInterval(lockHeartbeatRef.current)
+        lockHeartbeatRef.current = null
+      }
+    }
+  }, [isDetailOpen, selectedEmail?.id])
 
   // Close modal and release any held lock
   const handleClose = () => {
@@ -844,13 +875,16 @@ export default function InboxPage() {
           }))
           return { ...prev, email_drafts: updatedDrafts }
         })
-        setSaveMessage('Gespeichert!')
+        setSaveMessage('ok:Gespeichert!')
         setTimeout(() => setSaveMessage(''), 2000)
+      } else {
+        setSaveMessage('err:Speichern fehlgeschlagen – bitte erneut versuchen')
+        setTimeout(() => setSaveMessage(''), 4000)
       }
     } catch (error) {
       console.error('Save draft failed:', error)
-      setSaveMessage('Fehler beim Speichern')
-      setTimeout(() => setSaveMessage(''), 3000)
+      setSaveMessage('err:Netzwerkfehler – bitte erneut versuchen')
+      setTimeout(() => setSaveMessage(''), 4000)
     } finally {
       setIsSaving(false)
     }
@@ -1699,7 +1733,9 @@ export default function InboxPage() {
                   </span>
                 )}
                 {saveMessage && (
-                  <span className="text-sm text-green-600">{saveMessage}</span>
+                  <span className={`text-sm ${saveMessage.startsWith('err:') ? 'text-red-600' : 'text-green-600'}`}>
+                    {saveMessage.replace(/^(ok:|err:)/, '')}
+                  </span>
                 )}
                 <Button variant="outline" onClick={handleClose}>
                   Schliessen

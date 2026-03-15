@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-const LOCK_TTL_MINUTES = 30
+const LOCK_TTL_MINUTES = 10
 
 async function purgeStaleLocks(supabase: Awaited<ReturnType<typeof createClient>>) {
   const cutoff = new Date(Date.now() - LOCK_TTL_MINUTES * 60 * 1000).toISOString()

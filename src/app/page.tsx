@@ -314,6 +314,7 @@ function TrendPill({ value, invertColor }: { value: number; invertColor?: boolea
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [hotLeads, setHotLeads] = useState<HotLead[]>([])
   const [slaStats, setSlaStats] = useState<SlaStats>({ doneToday: 0, dueNow: [], overdue: [], later: 0, totalTarget: 0 })
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null)
@@ -323,6 +324,7 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     setIsLoading(true)
+    setFetchError(null)
     try {
       const [emailRes, insightsRes, analyticsRes] = await Promise.all([
         fetch('/api/emails?limit=200'),
@@ -403,6 +405,7 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Dashboard fetch error:', error)
+      setFetchError('Daten konnten nicht geladen werden. Bitte Seite aktualisieren.')
     } finally {
       setIsLoading(false)
     }
@@ -426,6 +429,20 @@ export default function DashboardPage() {
 
       {/* Daily Briefing */}
       <DashboardBriefing />
+
+      {/* Error Banner */}
+      {fetchError && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            {fetchError}
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchData} className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-400">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Erneut laden
+          </Button>
+        </div>
+      )}
 
       {/* Refresh */}
       <div className="flex justify-end -mt-4">

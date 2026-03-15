@@ -248,8 +248,21 @@ export default function InsightsPage() {
         <Header title="Insights" description="Marketing, Sales, Product & Kundenstimmung" />
         <div className="text-center py-12">
           <BarChart3 className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-          <p className="text-slate-500 font-medium">Noch keine Insights verfügbar</p>
-          <p className="text-sm text-slate-400 mt-1">Insights werden generiert sobald E-Mails in der Inbox verarbeitet werden.</p>
+          {error ? (
+            <>
+              <p className="text-slate-700 dark:text-slate-300 font-medium">Insights konnten nicht geladen werden</p>
+              <p className="text-sm text-slate-400 mt-1">{error}</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={fetchInsights}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Erneut laden
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-slate-500 font-medium">Noch keine Insights verfügbar</p>
+              <p className="text-sm text-slate-400 mt-1">Insights werden generiert sobald E-Mails in der Inbox verarbeitet werden.</p>
+            </>
+          )}
         </div>
       </div>
     )

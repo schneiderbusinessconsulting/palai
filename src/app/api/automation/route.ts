@@ -64,11 +64,20 @@ export async function PATCH(request: NextRequest) {
   try {
     const supabase = await createClient()
     const body = await request.json()
-    const { id, ...updates } = body
+    const { id, name, description, trigger, conditions, actions, is_active, priority } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Rule ID required' }, { status: 400 })
     }
+
+    const updates: Record<string, unknown> = {}
+    if (name !== undefined) updates.name = name
+    if (description !== undefined) updates.description = description
+    if (trigger !== undefined) updates.trigger = trigger
+    if (conditions !== undefined) updates.conditions = conditions
+    if (actions !== undefined) updates.actions = actions
+    if (is_active !== undefined) updates.is_active = is_active
+    if (priority !== undefined) updates.priority = priority
 
     const { data, error } = await supabase
       .from('automation_rules')

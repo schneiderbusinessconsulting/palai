@@ -95,7 +95,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const { daysBack = 365, maxEmails = 500 } = body as { daysBack?: number; maxEmails?: number }
+    const daysBack = Math.min(Math.max(Number(body.daysBack) || 365, 1), 365)
+    const maxEmails = Math.min(Math.max(Number(body.maxEmails) || 500, 1), 1000)
 
     const supabase = await createClient()
     const slaTargets = await getSlaTargets()

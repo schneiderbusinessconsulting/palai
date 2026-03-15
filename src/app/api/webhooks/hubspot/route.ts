@@ -29,7 +29,7 @@ function verifySignature(
   signature: string | null,
   secret: string
 ): boolean {
-  if (!secret) return true // Skip verification if secret not configured
+  if (!secret) return false // Reject requests when secret is not configured
   if (!signature) return false // Reject unsigned requests when secret is configured
 
   const hash = crypto
@@ -49,7 +49,11 @@ export async function POST(request: NextRequest) {
 
     const signature = request.headers.get('x-hubspot-signature-v3')
     const webhookSecret = process.env.HUBSPOT_WEBHOOK_SECRET
-    if (webhookSecret && !verifySignature(body, signature, webhookSecret)) {
+    if (!webhookSecret) {
+      console.error('HUBSPOT_WEBHOOK_SECRET is not configured')
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 401 })
+    }
+    if (!verifySignature(body, signature, webhookSecret)) {
       console.error('Invalid HubSpot webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }

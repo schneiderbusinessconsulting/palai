@@ -22,13 +22,14 @@ export async function GET(request: NextRequest) {
       .limit(500)
 
     if (search) {
-      query = query.or(`from_email.ilike.%${search}%,from_name.ilike.%${search}%`)
+      const sanitized = search.replace(/[%_]/g, '\\$&').substring(0, 100)
+      query = query.or(`from_email.ilike.%${sanitized}%,from_name.ilike.%${sanitized}%`)
     }
 
     const { data: emails, error } = await query
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to load customers' }, { status: 500 })
     }
 
     if (!emails?.length) {

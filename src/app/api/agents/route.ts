@@ -64,7 +64,14 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { id, ...updates } = await request.json()
+    const { id, name, email, role, specializations, max_open_tickets, is_active } = await request.json()
+    const updates: Record<string, unknown> = {}
+    if (name !== undefined) updates.name = name
+    if (email !== undefined) updates.email = email
+    if (role !== undefined) updates.role = role
+    if (specializations !== undefined) updates.specializations = specializations
+    if (max_open_tickets !== undefined) updates.max_open_tickets = max_open_tickets
+    if (is_active !== undefined) updates.is_active = is_active
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('support_agents')

@@ -1720,7 +1720,7 @@ function InboxPageContent() {
                         iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 600) + 'px'
                       }
                     }}
-                    sandbox="allow-same-origin"
+                    sandbox=""
                     title="Email content"
                   />
                 ) : selectedEmail.body_text ? (
@@ -1861,7 +1861,7 @@ function InboxPageContent() {
                                     iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 400) + 'px'
                                   }
                                 }}
-                                sandbox="allow-same-origin"
+                                sandbox=""
                                 title="Thread email content"
                               />
                             ) : (

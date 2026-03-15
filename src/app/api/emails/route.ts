@@ -300,7 +300,7 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Failed to fetch emails:', error.message, error.code, error.details)
       return NextResponse.json(
-        { error: 'Failed to fetch emails', details: error.message },
+        { error: 'Failed to fetch emails' },
         { status: 500 }
       )
     }
@@ -361,7 +361,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Emails API error:', error instanceof Error ? error.message : error)
     return NextResponse.json(
-      { error: 'Failed to fetch emails', details: error instanceof Error ? error.message : 'Unknown error' },
+      { error: 'Failed to fetch emails' },
       { status: 500 }
     )
   }

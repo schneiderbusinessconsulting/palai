@@ -185,7 +185,7 @@ describe('GET /api/customers', () => {
     const res = await GET(req)
     expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.error).toBe('Database connection failed')
+    expect(body.error).toBe('Failed to load customers')
   })
 
   it('excludes own company emails (filtering is applied via .not in query)', async () => {

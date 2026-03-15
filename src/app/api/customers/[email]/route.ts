@@ -11,6 +11,13 @@ export async function GET(
   try {
     const { email } = await params
     const decodedEmail = decodeURIComponent(email)
+
+    // Block access to own company emails
+    const ownEmails = ['info@palacios-relations.ch', 'rafael@palacios-relations.ch', 'philipp@palacios-relations.ch', 'noreply@palacios-relations.ch']
+    if (ownEmails.includes(decodedEmail.toLowerCase())) {
+      return NextResponse.json({ customer: null, emails: [], timeline: [] })
+    }
+
     const supabase = await createClient()
 
     const { data: emails, error } = await supabase

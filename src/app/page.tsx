@@ -488,7 +488,7 @@ export default function DashboardPage() {
         fetch('/api/emails?limit=200'),
         fetch('/api/insights'),
         fetch('/api/analytics?period=30d'),
-        fetch('/api/csat'),
+        fetch('/api/csat?period=30d'),
         fetch('/api/agents/performance?period=30d'),
       ])
 
@@ -720,7 +720,7 @@ export default function DashboardPage() {
           </p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-sm font-medium text-slate-600 dark:text-slate-400">SLA Quote</p>
-            <Sparkline data={dailyKPIs.slice(-7).map(d => d.slaCompliance ?? 100)} color={level1.slaCompliance !== null && level1.slaCompliance >= 95 ? '#16a34a' : '#d97706'} />
+            <Sparkline data={dailyKPIs.slice(-7).map(d => d.slaCompliance ?? 0)} color={level1.slaCompliance !== null && level1.slaCompliance >= 95 ? '#16a34a' : '#d97706'} />
           </div>
         </div>
 
@@ -945,7 +945,7 @@ export default function DashboardPage() {
                 </p>
                 <div className="h-16 flex items-end gap-[2px]">
                   {dailyKPIs.slice(-30).map((d, i) => {
-                    const val = d.slaCompliance ?? 100
+                    const val = d.slaCompliance ?? 0
                     return (
                       <div key={i} className="flex-1 flex flex-col justify-end" title={`${d.day}: ${val}%`}>
                         <div

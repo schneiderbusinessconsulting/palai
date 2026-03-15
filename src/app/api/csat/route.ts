@@ -35,7 +35,9 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const startDate = searchParams.get('start') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const period = searchParams.get('period')
+    const periodDays = period === '7d' ? 7 : period === '90d' ? 90 : 30
+    const startDate = searchParams.get('start') || new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const supabase = await createClient()
 

@@ -122,7 +122,7 @@ export default function CustomersPage() {
             className="pl-10"
           />
         </div>
-        <Select value={sortBy} onValueChange={(v) => setSortBy(v as CustomerSortField)}>
+        <Select value={sortBy} onValueChange={(v) => { setSortBy(v as CustomerSortField); setPage(1) }}>
           <SelectTrigger className="w-full sm:w-48">
             <ArrowUpDown className="h-4 w-4 mr-2" />
             <SelectValue />

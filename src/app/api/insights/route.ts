@@ -1,9 +1,20 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-export async function GET() {
+// Own company emails to exclude from insights
+const OWN_EMAILS = ['info@palacios-relations.ch', 'rafael@palacios-relations.ch', 'philipp@palacios-relations.ch', 'noreply@palacios-relations.ch']
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
+
+    // Parse period parameter
+    const { searchParams } = new URL(request.url)
+    const period = searchParams.get('period') || '30d'
+    const daysNum = period === '7d' ? 7 : period === '90d' ? 90 : 30
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - daysNum)
+    const startDateStr = startDate.toISOString()
 
     // Fetch all needed data in parallel
     const [
@@ -13,31 +24,36 @@ export async function GET() {
       learningRes,
       chunksRes,
     ] = await Promise.all([
-      // Emails with buying intent, tone, priority, status
+      // Emails with buying intent, tone, priority, status — filtered by period
       supabase
         .from('incoming_emails')
         .select('id, from_email, from_name, subject, received_at, status, email_type, needs_response, buying_intent_score, tone_sentiment, tone_urgency, priority, sla_status')
+        .gte('received_at', startDateStr)
+        .not('from_email', 'in', `("${OWN_EMAILS.join('","')}")`)
         .order('received_at', { ascending: false })
         .limit(500),
 
-      // BI insights
+      // BI insights — filtered by period
       supabase
         .from('bi_insights')
         .select('email_id, insight_type, content, confidence, metadata')
+        .gte('created_at', startDateStr)
         .order('created_at', { ascending: false })
         .limit(1000),
 
-      // CSAT ratings
+      // CSAT ratings — filtered by period
       supabase
         .from('csat_ratings')
         .select('email_id, rating, created_at')
+        .gte('created_at', startDateStr)
         .order('created_at', { ascending: false })
         .limit(200),
 
-      // Learning cases (knowledge gaps = low confidence + significant edit)
+      // Learning cases — filtered by period
       supabase
         .from('learning_cases')
         .select('email_id, edit_distance, status, created_at')
+        .gte('created_at', startDateStr)
         .order('created_at', { ascending: false })
         .limit(100),
 

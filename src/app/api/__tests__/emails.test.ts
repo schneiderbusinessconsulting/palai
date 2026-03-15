@@ -50,6 +50,7 @@ vi.mock('@/lib/ai/openai', () => ({
 vi.mock('@/lib/text-utils', () => ({
   analyzeTone: vi.fn(() => ({ formality: 'formal', sentiment: 'positive', urgency: 'medium' })),
   determinePriority: vi.fn(() => 'medium'),
+  calculateHappinessScore: vi.fn(() => 3),
 }))
 
 // Mock global fetch for HubSpot calls

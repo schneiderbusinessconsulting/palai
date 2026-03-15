@@ -60,6 +60,7 @@ import {
   CheckSquare,
   Square,
   ShieldAlert,
+  Clock,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
@@ -186,6 +187,9 @@ function InboxPageContent() {
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
   const [showSaveViewInput, setShowSaveViewInput] = useState(false)
   const [newViewName, setNewViewName] = useState('')
+
+  // Undo-send timer ref
+  const sendTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Sync filter state to URL search params
   const updateFilter = useCallback((newFilter: string) => {
@@ -833,7 +837,21 @@ function InboxPageContent() {
     setTimeout(() => setIsCopied(false), 2000)
   }
 
-  // Send via Resend + HubSpot (full send pipeline)
+  // Auto-advance: select next email after send/close
+  const autoAdvanceToNext = useCallback(() => {
+    if (!selectedEmail) return
+    const currentIndex = sortedEmails.findIndex(e => e.id === selectedEmail.id)
+    if (currentIndex === -1) return
+    // Pick next, or previous if at end
+    const nextIndex = currentIndex < sortedEmails.length - 1 ? currentIndex + 1 : currentIndex - 1
+    if (nextIndex >= 0 && nextIndex < sortedEmails.length) {
+      openEmailDetail(sortedEmails[nextIndex])
+    } else {
+      setIsDetailOpen(false)
+    }
+  }, [selectedEmail, sortedEmails])
+
+  // Send via Resend + HubSpot (full send pipeline) — with 5s undo
   const handleSend = async () => {
     if (!selectedEmail) return
 
@@ -844,36 +862,64 @@ function InboxPageContent() {
       return
     }
 
-    setIsSending(true)
-    try {
-      const response = await fetch(`/api/emails/${selectedEmail.id}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          draftId: currentDraft?.id || undefined,
-          finalText,
-          ownerId: selectedOwnerId || undefined,
-        }),
-      })
+    // Capture values before state changes
+    const emailToSend = selectedEmail
+    const draftId = currentDraft?.id || undefined
+    const ownerId = selectedOwnerId || undefined
 
-      if (response.ok) {
-        toast.success('Antwort gesendet')
-        releaseLock(selectedEmail.id)
-        setIsDetailOpen(false)
-        fetchEmails()
-      } else {
-        const data = await response.json()
-        toast.error(data.error || 'Senden fehlgeschlagen')
+    // Auto-advance immediately
+    autoAdvanceToNext()
+
+    // Undo-send: show toast with cancel option, send after 5s
+    const toastId = toast('E-Mail wird in 5 Sekunden gesendet...', {
+      duration: 5500,
+      action: {
+        label: 'Rückgängig',
+        onClick: () => {
+          if (sendTimerRef.current) clearTimeout(sendTimerRef.current)
+          sendTimerRef.current = null
+          toast.dismiss(toastId)
+          toast.info('Senden abgebrochen')
+          // Re-open the email
+          openEmailDetail(emailToSend)
+        },
+      },
+    })
+
+    sendTimerRef.current = setTimeout(async () => {
+      sendTimerRef.current = null
+      setIsSending(true)
+      try {
+        const response = await fetch(`/api/emails/${emailToSend.id}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            draftId,
+            finalText,
+            ownerId,
+          }),
+        })
+
+        if (response.ok) {
+          toast.success('Antwort gesendet')
+          releaseLock(emailToSend.id)
+          fetchEmails()
+        } else {
+          const data = await response.json()
+          toast.error(data.error || 'Senden fehlgeschlagen')
+          openEmailDetail(emailToSend)
+        }
+      } catch (error) {
+        console.error('Send failed:', error)
+        toast.error('Senden fehlgeschlagen — Netzwerkfehler')
+        openEmailDetail(emailToSend)
+      } finally {
+        setIsSending(false)
       }
-    } catch (error) {
-      console.error('Send failed:', error)
-      toast.error('Senden fehlgeschlagen — Netzwerkfehler')
-    } finally {
-      setIsSending(false)
-    }
+    }, 5000)
   }
 
-  // Mark as sent (just update status, no actual sending)
+  // Mark as sent (just update status, no actual sending) — with auto-advance
   const handleMarkAsSent = async () => {
     if (!selectedEmail) return
 
@@ -889,7 +935,7 @@ function InboxPageContent() {
 
       if (response.ok) {
         if (selectedEmail) releaseLock(selectedEmail.id)
-        setIsDetailOpen(false)
+        autoAdvanceToNext()
         fetchEmails()
       }
     } catch (error) {
@@ -1620,13 +1666,25 @@ function InboxPageContent() {
             return (
               <Card
                 key={email.id}
-                className={`hover:shadow-md transition-shadow cursor-pointer group ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
+                className={`hover:shadow-md transition-shadow cursor-pointer group relative ${selectedIds.has(email.id) ? 'ring-2 ring-blue-400' : ''}`}
                 onClick={() => openEmailDetail(email)}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   setContextMenu({ x: e.clientX, y: e.clientY, emailId: email.id })
                 }}
               >
+                {/* Quick Actions on Hover */}
+                <div className="absolute right-12 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-900 shadow-md rounded-lg px-1.5 py-1 z-10 border border-slate-200 dark:border-slate-700">
+                  <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Snooze 4h" onClick={(e) => { e.stopPropagation(); handleSnooze(email.id, 4) }}>
+                    <EyeOff className="h-3.5 w-3.5 text-slate-500" />
+                  </button>
+                  <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Schliessen" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/mark-sent`, { method: 'POST' }).then(() => { toast.success('Geschlossen'); fetchEmails() }) }}>
+                    <CheckCircle className="h-3.5 w-3.5 text-slate-500" />
+                  </button>
+                  <button className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/20" title="Spam" onClick={(e) => { e.stopPropagation(); fetch(`/api/emails/${email.id}/spam`, { method: 'POST' }).then(() => { toast.success('Als Spam markiert'); fetchEmails() }) }}>
+                    <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
+                  </button>
+                </div>
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Bulk Checkbox */}
@@ -1858,7 +1916,7 @@ function InboxPageContent() {
           {selectedEmail && (
             <div className="flex flex-col">
               {/* Alerts — sticky at top */}
-              {(lockWarning || selectedEmail.support_level === 'L2') && (
+              {(lockWarning || selectedEmail.support_level === 'L2' || ((selectedEmail.status === 'pending' || selectedEmail.status === 'draft_ready') && new Date(selectedEmail.received_at) < new Date(Date.now() - 48 * 60 * 60 * 1000))) && (
                 <div className="px-6 pt-5 space-y-2">
                   {/* Conflict warning */}
                   {lockWarning && (
@@ -1879,6 +1937,15 @@ function InboxPageContent() {
                     <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
                       <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                       <span>Diese E-Mail wurde zu <strong>Level 2</strong> eskaliert und erfordert manuelle Bearbeitung.</span>
+                    </div>
+                  )}
+
+                  {/* Nudge: Unbeantwortet */}
+                  {(selectedEmail.status === 'pending' || selectedEmail.status === 'draft_ready') &&
+                   new Date(selectedEmail.received_at) < new Date(Date.now() - 48 * 60 * 60 * 1000) && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+                      <Clock className="h-4 w-4 flex-shrink-0" />
+                      <span>Unbeantwortet seit {Math.floor((Date.now() - new Date(selectedEmail.received_at).getTime()) / (1000 * 60 * 60 * 24))} Tagen</span>
                     </div>
                   )}
                 </div>

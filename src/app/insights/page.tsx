@@ -39,6 +39,9 @@ import {
   ChevronDown,
   ChevronRight,
   User,
+  Sparkles,
+  Search,
+  Package,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell,
@@ -58,6 +61,16 @@ const COLORS = {
   purple: '#8b5cf6',
 }
 
+const CHART_COLORS = {
+  primary: '#3b82f6',    // blue-500
+  secondary: '#10b981',  // emerald-500
+  tertiary: '#f59e0b',   // amber-500
+  quaternary: '#ef4444',  // red-500
+  quinary: '#8b5cf6',    // violet-500
+  senary: '#06b6d4',     // cyan-500
+}
+const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
+
 const darkTooltipStyle = {
   contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#e2e8f0' },
   itemStyle: { color: '#e2e8f0' },
@@ -76,6 +89,7 @@ interface InsightsData {
     sentEmails: number
     kbChunkCount: number
     csatAvg: number | null
+    happinessCsat: number | null
     slaOk: number
     slaBreached: number
   }
@@ -269,7 +283,7 @@ export default function InsightsPage() {
       <Card className={department === 'marketing' ? 'md:col-span-2' : 'lg:col-span-2'}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-purple-500" />
+            <MessageSquare className="h-5 w-5 text-blue-500" />
             Kunden-Feedback
             <Badge variant="outline">{threads.length}</Badge>
           </CardTitle>
@@ -506,18 +520,41 @@ export default function InsightsPage() {
         <StatCard
           icon={Star}
           label="CSAT Ø"
-          value={summary.csatAvg ? `${summary.csatAvg}/5` : '—'}
+          value={summary.csatAvg ? `${summary.csatAvg}/5` : summary.happinessCsat ? `${summary.happinessCsat}%` : '—'}
           color="text-amber-500"
+          sub={!summary.csatAvg && summary.happinessCsat ? 'aus Happiness Scores' : undefined}
         />
-        <StatCard
-          icon={CheckCircle}
-          label="SLA ok"
-          value={summary.slaOk + summary.slaBreached > 0
-            ? `${Math.round(summary.slaOk / (summary.slaOk + summary.slaBreached) * 100)}%`
-            : '—'}
-          color={summary.slaBreached > 0 ? 'text-red-500' : 'text-green-600'}
-          sub={summary.slaBreached > 0 ? `${summary.slaBreached} verletzt` : undefined}
-        />
+        {(() => {
+          const slaTotal = summary.slaOk + summary.slaBreached
+          const slaPercent = slaTotal > 0 ? Math.round(summary.slaOk / slaTotal * 100) : null
+          const slaColor = slaPercent === null ? 'text-slate-500' : slaPercent === 100 ? 'text-green-600' : slaPercent >= 90 ? 'text-amber-500' : 'text-red-500'
+          return (
+            <StatCard
+              icon={CheckCircle}
+              label="SLA ok"
+              value={slaPercent !== null ? `${slaPercent}%` : '—'}
+              color={slaColor}
+              sub={summary.slaBreached > 0 ? `${summary.slaBreached} verletzt` : undefined}
+            />
+          )
+        })()}
+      </div>
+
+      {/* Executive Summary */}
+      <div className="bg-gradient-to-r from-slate-50 to-white dark:from-slate-800/50 dark:to-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="h-5 w-5 text-amber-500" />
+          <h3 className="font-semibold text-slate-900 dark:text-slate-100">Zusammenfassung</h3>
+        </div>
+        <ul className="space-y-1.5 text-sm text-slate-600 dark:text-slate-400">
+          <li>{summary.totalEmails} E-Mails im Zeitraum, davon {summary.pendingEmails} ausstehend</li>
+          {summary.sentEmails > 0 && <li>{summary.sentEmails} E-Mails beantwortet ({summary.totalEmails > 0 ? Math.round(summary.sentEmails / summary.totalEmails * 100) : 0}% Antwortrate)</li>}
+          {sales.hotLeads.length > 0 && <li>{sales.hotLeads.length} Hot Leads mit Kaufintent erkannt</li>}
+          {sales.churnRisks.length > 0 && <li className="text-red-600 dark:text-red-400">&#9888; {sales.churnRisks.length} Churn-Risiken identifiziert</li>}
+          {summary.slaBreached > 0 && <li className="text-red-600 dark:text-red-400">&#9888; {summary.slaBreached} SLA-Verletzungen</li>}
+          {summary.happinessCsat !== null && <li>Kundenzufriedenheit (CSAT) bei {summary.happinessCsat}%</li>}
+          {product.knowledgeGaps.length > 0 && <li>{product.knowledgeGaps.length} Knowledge Gaps erkannt</li>}
+        </ul>
       </div>
 
       <Tabs defaultValue="marketing" className="space-y-6">
@@ -627,7 +664,7 @@ export default function InsightsPage() {
             <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-purple-500" />
+                  <MessageSquare className="h-5 w-5 text-blue-500" />
                   Top Themen
                 </CardTitle>
                 <CardDescription>Häufigste Themen in Kundenanfragen</CardDescription>
@@ -645,7 +682,11 @@ export default function InsightsPage() {
                       <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                       <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} width={120} />
                       <Tooltip {...darkTooltipStyle} />
-                      <Bar dataKey="count" name="Anfragen" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" name="Anfragen" radius={[0, 4, 4, 0]}>
+                        {topTopics.map((_, idx) => (
+                          <Cell key={idx} fill={CHART_PALETTE[idx % CHART_PALETTE.length]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -696,7 +737,13 @@ export default function InsightsPage() {
                   </div>
                 )}
                 {sales.hotLeads.length === 0 ? (
-                  <p className="text-sm text-slate-500">Keine Hot Leads aktuell.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <TrendingUp className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Keine Hot Leads aktuell</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn E-Mails mit Kaufintent eintreffen</p>
+                  </div>
                 ) : (
                   <div className="space-y-3">
                     {sales.hotLeads.slice(0, 8).map(lead => (
@@ -736,7 +783,13 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 {sales.churnRisks.length === 0 ? (
-                  <p className="text-sm text-slate-500">Keine Churn-Risiken erkannt.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <AlertTriangle className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Keine Churn-Risiken erkannt</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn Abwanderungs-Signale erkannt werden</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {sales.churnRisks.map(risk => (
@@ -773,7 +826,13 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 {sales.upsellOpportunities.length === 0 ? (
-                  <p className="text-sm text-slate-500">Keine Upsell-Möglichkeiten erkannt.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <ShoppingCart className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Keine Upsell-Möglichkeiten erkannt</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn Kaufsignale in beantworteten E-Mails erkannt werden</p>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {sales.upsellOpportunities.map(opp => (
@@ -845,7 +904,7 @@ export default function InsightsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-purple-500" />
+                  <BarChart3 className="h-5 w-5 text-cyan-500" />
                   Themenverteilung
                 </CardTitle>
                 <CardDescription>Was fragen Kunden am häufigsten?</CardDescription>
@@ -863,7 +922,11 @@ export default function InsightsPage() {
                       <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                       <YAxis type="category" dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} width={100} />
                       <Tooltip {...darkTooltipStyle} />
-                      <Bar dataKey="count" name="Anfragen" fill={COLORS.purple} radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="count" name="Anfragen" radius={[0, 4, 4, 0]}>
+                        {topTopics.map((_, idx) => (
+                          <Cell key={idx} fill={CHART_PALETTE[idx % CHART_PALETTE.length]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}

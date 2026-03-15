@@ -224,6 +224,13 @@ export async function GET(request: NextRequest) {
         count: data.count,
       }))
 
+    // Happiness-based CSAT (from happiness_score field on emails)
+    const emailsWithHappiness = emails.filter(e => e.happiness_score && (e.happiness_score as number) > 0)
+    const avgHappiness = emailsWithHappiness.length > 0
+      ? emailsWithHappiness.reduce((sum, e) => sum + ((e.happiness_score as number) || 0), 0) / emailsWithHappiness.length
+      : 0
+    const happinessCsat = avgHappiness > 0 ? Math.round(((avgHappiness - 1) / 4) * 100) : null
+
     // SLA compliance
     const slaEmails = emails.filter(e => e.sla_status)
     const slaOk = slaEmails.filter(e => e.sla_status === 'ok').length
@@ -250,6 +257,7 @@ export async function GET(request: NextRequest) {
         sentEmails,
         kbChunkCount,
         csatAvg: csatAvg ? Math.round(csatAvg * 10) / 10 : null,
+        happinessCsat,
         slaOk,
         slaBreached,
       },

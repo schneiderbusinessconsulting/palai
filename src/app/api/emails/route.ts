@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
 import { analyzeTone, determinePriority, calculateHappinessScore, detectSpam, detectTopicTags } from '@/lib/text-utils'
+import { runAutomationRules } from '@/lib/automation/engine'
 
 // Phase 3: BI scanning — fire-and-forget, runs in background after email insert
 // Returns buying intent score (0-100) for immediate storage on the email record
@@ -608,6 +609,19 @@ export async function POST(request: NextRequest) {
             generateDraftForEmail(newEmail.id, subject, bodyText, fromName, hubspotThreadId)
               .catch(err => console.error('Background draft generation failed:', err))
           }
+          // Phase 6: Run automation rules (async, fire-and-forget)
+          runAutomationRules(supabase, {
+            id: newEmail.id,
+            from_email: fromEmail,
+            from_name: fromName || undefined,
+            subject,
+            priority,
+            tone_sentiment: tone.sentiment,
+            buying_intent_score: 0,
+            email_type: classification.emailType,
+            happiness_score: happinessScore,
+            topic_tags: topicTags,
+          }, 'email_received').catch(err => console.error('Automation rules failed:', err))
         }
       }
     }

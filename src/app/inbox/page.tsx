@@ -162,7 +162,7 @@ function InboxPageContent() {
   const [autoDraftEnabled, setAutoDraftEnabled] = useState(false) // Auto-draft disabled by default to save credits
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
-  // syncMessage replaced by toast notifications
+  // Inline messages replaced by toast notifications
   const [fetchError, setFetchError] = useState('')
 
   // Sorting

@@ -373,13 +373,14 @@ function computeDailyKPIs(allEmails: Email[], csatRatings: Array<{ rating: numbe
   }
 
   const days = Array.from(dayMap.keys()).sort()
-  let runningBacklog = 0
 
-  return days.map(day => {
+  // Pre-compute actual open count per day: emails received on or before this day that are still not resolved
+  return days.map((day, idx) => {
     const { emails, csatRatings: dayRatings } = dayMap.get(day)!
     const resolved = emails.filter(e => e.status === 'sent').length
     const total = emails.length
-    runningBacklog += total - resolved
+    // Backlog = emails received this day that are still open (not sent)
+    const backlog = total - resolved
 
     // SLA compliance
     const withSla = emails.filter(e => e.sla_status)
@@ -417,7 +418,7 @@ function computeDailyKPIs(allEmails: Email[], csatRatings: Array<{ rating: numbe
       ? Math.round((dayRatings.reduce((a, b) => a + b, 0) / dayRatings.length) * 10) / 10
       : null
 
-    return { day, backlog: Math.max(runningBacklog, 0), frtMinutes, slaCompliance, resolutionRate, avgResponseHours, csatAvg }
+    return { day, backlog: Math.max(backlog, 0), frtMinutes, slaCompliance, resolutionRate, avgResponseHours, csatAvg }
   })
 }
 

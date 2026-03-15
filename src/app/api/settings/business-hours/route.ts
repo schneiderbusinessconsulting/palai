@@ -27,7 +27,7 @@ export async function GET() {
           tableExists: false,
         })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process business hours' }, { status: 500 })
     }
 
     return NextResponse.json({ hours: data || [] })
@@ -64,7 +64,7 @@ export async function PUT(request: NextRequest) {
         if (error.code === '42P01') {
           return NextResponse.json({ error: 'Business hours table not found' }, { status: 400 })
         }
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: 'Failed to process business hours' }, { status: 500 })
       }
     }
 

@@ -16,7 +16,7 @@ export async function PATCH(
       .eq('id', emailId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to assign email' }, { status: 500 })
     }
 
     // Write audit log (fire-and-forget)

@@ -9,8 +9,9 @@ export async function GET() {
       .from('sequences')
       .select('*')
       .order('created_at', { ascending: false })
+      .limit(100)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to fetch sequences' }, { status: 500 })
     return NextResponse.json({ sequences: data || [] })
   } catch {
     return NextResponse.json({ error: 'Failed to fetch sequences' }, { status: 500 })
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to create sequence' }, { status: 500 })
     return NextResponse.json({ sequence: data })
   } catch {
     return NextResponse.json({ error: 'Failed to create sequence' }, { status: 500 })
@@ -53,7 +54,7 @@ export async function PATCH(request: NextRequest) {
       })
       .eq('id', body.id)
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to update sequence' }, { status: 500 })
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Failed to update sequence' }, { status: 500 })

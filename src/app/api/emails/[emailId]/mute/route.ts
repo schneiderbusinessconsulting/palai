@@ -24,7 +24,7 @@ export async function POST(
       .eq('id', emailId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to toggle mute' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, is_muted: newMuted })

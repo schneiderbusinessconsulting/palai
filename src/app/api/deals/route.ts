@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     if (stage && stage !== 'all') query = query.eq('stage', stage)
 
     const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process deals request' }, { status: 500 })
     return NextResponse.json({ deals: data || [] })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase.from('deals').insert(allowed).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process deals request' }, { status: 500 })
     return NextResponse.json({ deal: data })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
@@ -69,7 +69,7 @@ export async function PATCH(request: NextRequest) {
     if (body.notes !== undefined) updates.notes = body.notes
 
     const { data, error } = await supabase.from('deals').update(updates).eq('id', id).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process deals request' }, { status: 500 })
     return NextResponse.json({ deal: data })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

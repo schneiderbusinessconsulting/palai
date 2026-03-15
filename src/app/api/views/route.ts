@@ -14,7 +14,7 @@ export async function GET() {
 
     if (error) {
       if (error.code === '42P01') return NextResponse.json({ views: [] })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process views request' }, { status: 500 })
     }
 
     return NextResponse.json({ views: data || [] })
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       if (error.code === '42P01') {
         return NextResponse.json({ error: 'Views table not available. Run migration 009.' }, { status: 501 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process views request' }, { status: 500 })
     }
 
     return NextResponse.json({ view: data })
@@ -60,7 +60,7 @@ export async function DELETE(request: NextRequest) {
 
     if (error) {
       if (error.code === '42P01') return NextResponse.json({ success: true })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process views request' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

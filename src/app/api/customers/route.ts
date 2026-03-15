@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { OWN_EMAILS_FILTER } from '@/lib/constants'
 
 /**
  * Customer profiles aggregated from incoming_emails.
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
       .from('incoming_emails')
       .select('id, from_email, from_name, subject, received_at, status, tone_sentiment, buying_intent_score, priority')
       .in('email_type', ['customer_inquiry', 'form_submission'])
-      .not('from_email', 'in', '("info@palacios-relations.ch","rafael@palacios-relations.ch","philipp@palacios-relations.ch","noreply@palacios-relations.ch")')
+      .not('from_email', 'in', OWN_EMAILS_FILTER)
       .order('received_at', { ascending: false })
       .limit(500)
 

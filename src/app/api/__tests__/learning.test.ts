@@ -11,6 +11,7 @@ const mockChain = {
   eq: vi.fn().mockReturnThis(),
   order: vi.fn().mockReturnThis(),
   single: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockReturnThis(),
 }
 
 const mockSupabase = {

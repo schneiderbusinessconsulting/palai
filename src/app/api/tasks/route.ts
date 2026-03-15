@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     if (assignedAgentId) query = query.eq('assigned_agent_id', assignedAgentId)
 
     const { data, error } = await query
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process tasks request' }, { status: 500 })
     return NextResponse.json({ tasks: data || [] })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase.from('tasks').insert(allowed).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process tasks request' }, { status: 500 })
     return NextResponse.json({ task: data })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
@@ -72,7 +72,7 @@ export async function PATCH(request: NextRequest) {
     if (body.due_date !== undefined) updates.due_date = body.due_date
 
     const { data, error } = await supabase.from('tasks').update(updates).eq('id', id).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (error) return NextResponse.json({ error: 'Failed to process tasks request' }, { status: 500 })
     return NextResponse.json({ task: data })
   } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

@@ -38,6 +38,7 @@ export async function GET() {
       .from('courses')
       .select('*')
       .order('name', { ascending: true })
+      .limit(100)
 
     if (error) {
       console.error('Error fetching courses:', error)
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('Error creating course:', error)
-      return NextResponse.json({ error: 'Failed to create course', details: error.message, code: error.code }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create course' }, { status: 500 })
     }
 
     // Sync to knowledge base (don't fail if this fails)
@@ -111,8 +112,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ course: data })
   } catch (error) {
     console.error('Courses POST error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: 'Failed to create course', details: errorMessage }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create course' }, { status: 500 })
   }
 }
 
@@ -153,7 +153,7 @@ export async function PATCH(request: NextRequest) {
 
     if (error) {
       console.error('Error updating course:', error)
-      return NextResponse.json({ error: 'Failed to update course', details: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
     }
 
     // Sync to knowledge base (don't fail if this fails)

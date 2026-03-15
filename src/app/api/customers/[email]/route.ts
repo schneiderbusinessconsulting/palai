@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { OWN_EMAILS } from '@/lib/constants'
 
 /**
  * Customer detail — all emails, sentiment timeline, buying intent trend.
@@ -13,8 +14,7 @@ export async function GET(
     const decodedEmail = decodeURIComponent(email)
 
     // Block access to own company emails
-    const ownEmails = ['info@palacios-relations.ch', 'rafael@palacios-relations.ch', 'philipp@palacios-relations.ch', 'noreply@palacios-relations.ch']
-    if (ownEmails.includes(decodedEmail.toLowerCase())) {
+    if (OWN_EMAILS.includes(decodedEmail.toLowerCase())) {
       return NextResponse.json({ customer: null, emails: [], timeline: [] })
     }
 
@@ -28,7 +28,7 @@ export async function GET(
       .limit(100)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch customer' }, { status: 500 })
     }
 
     if (!emails?.length) {

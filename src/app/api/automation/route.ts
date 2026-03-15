@@ -12,12 +12,13 @@ export async function GET() {
       .from('automation_rules')
       .select('*')
       .order('priority', { ascending: true })
+      .limit(100)
 
     if (error) {
       if (error.code === '42P01') {
         return NextResponse.json({ rules: [], tableExists: false })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch rules' }, { status: 500 })
     }
 
     return NextResponse.json({ rules: rules || [] })
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
       if (error.code === '42P01') {
         return NextResponse.json({ error: 'Automation rules table not found. Run migration 009 first.' }, { status: 400 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to create rule' }, { status: 500 })
     }
 
     return NextResponse.json({ rule: data })
@@ -87,7 +88,7 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update rule' }, { status: 500 })
     }
 
     return NextResponse.json({ rule: data })
@@ -113,7 +114,7 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to delete rule' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

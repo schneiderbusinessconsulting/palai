@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       if (error.code === '42P01') {
         return NextResponse.json({ entries: [], total: 0, tableExists: false })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch audit log' }, { status: 500 })
     }
 
     return NextResponse.json({

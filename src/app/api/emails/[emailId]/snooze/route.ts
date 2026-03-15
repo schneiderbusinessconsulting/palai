@@ -29,7 +29,7 @@ export async function POST(
       if (error.message?.includes('snoozed_until')) {
         return NextResponse.json({ error: 'Snooze column not available. Run migration first.' }, { status: 400 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process snooze request' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true, snoozed_until: until })
@@ -53,7 +53,7 @@ export async function DELETE(
       .eq('id', emailId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process snooze request' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-
-// Own company emails to exclude from insights
-const OWN_EMAILS = ['info@palacios-relations.ch', 'rafael@palacios-relations.ch', 'philipp@palacios-relations.ch', 'noreply@palacios-relations.ch']
+import { OWN_EMAILS } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {

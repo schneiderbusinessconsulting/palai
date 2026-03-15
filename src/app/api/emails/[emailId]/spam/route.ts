@@ -16,7 +16,7 @@ export async function POST(
       .eq('id', emailId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update spam status' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
@@ -40,7 +40,7 @@ export async function DELETE(
       .eq('id', emailId)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update spam status' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

@@ -40,7 +40,7 @@ export async function GET(
       .order('received_at', { ascending: true })
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch thread' }, { status: 500 })
     }
 
     return NextResponse.json({ emails: emails || [] })

@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .order('created_at', { ascending: false })
+      .limit(200)
 
     if (status !== 'all') {
       query = query.eq('status', status)

@@ -11,6 +11,7 @@ export async function GET() {
       .select('id, name, subject, body, category, variables, is_favorite, usage_count, created_at, updated_at')
       .order('is_favorite', { ascending: false })
       .order('usage_count', { ascending: false })
+      .limit(100)
 
     if (error) {
       // Table may not exist yet

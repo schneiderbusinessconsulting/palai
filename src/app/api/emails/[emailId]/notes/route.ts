@@ -22,7 +22,7 @@ export async function GET(
       if (error.code === '42P01') {
         return NextResponse.json({ notes: [] })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process notes request' }, { status: 500 })
     }
 
     return NextResponse.json({ notes: data || [] })
@@ -60,7 +60,7 @@ export async function POST(
       if (error.code === '42P01') {
         return NextResponse.json({ error: 'Notes table not available. Run migration 009.' }, { status: 501 })
       }
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process notes request' }, { status: 500 })
     }
 
     return NextResponse.json({ note: data })
@@ -84,7 +84,7 @@ export async function DELETE(
 
     if (error) {
       if (error.code === '42P01') return NextResponse.json({ success: true })
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to process notes request' }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

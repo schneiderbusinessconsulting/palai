@@ -34,7 +34,7 @@ export async function POST() {
       .in('sla_status', ['ok', 'at_risk'])
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to check SLA' }, { status: 500 })
     }
 
     if (!emails || emails.length === 0) {

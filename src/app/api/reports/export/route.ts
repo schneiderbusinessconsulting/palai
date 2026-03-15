@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       if (endDate) query = query.lte('received_at', endDate)
 
       const { data: emails, error } = await query
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      if (error) return NextResponse.json({ error: 'Failed to export data' }, { status: 500 })
       data = emails || []
       filename = `emails-export-${new Date().toISOString().substring(0, 10)}`
 

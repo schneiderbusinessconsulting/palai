@@ -1625,154 +1625,197 @@ function InboxPageContent() {
 
       {/* Email Detail Modal */}
       <Dialog open={isDetailOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
-        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden p-0">
+          {/* Hidden DialogHeader for accessibility — visually replaced below */}
+          <DialogHeader className="sr-only">
             <DialogTitle>{selectedEmail?.subject}</DialogTitle>
           </DialogHeader>
 
           {selectedEmail && (
-            <div className="space-y-4 py-4">
-              {/* Conflict warning */}
-              {lockWarning && (
-                <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <span>
-                    <strong>{lockWarning.locked_by}</strong> bearbeitet diese E-Mail gerade seit{' '}
-                    {new Date(lockWarning.locked_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  <button onClick={() => setLockWarning(null)} className="ml-auto flex-shrink-0">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-
-              {/* Escalation Banner */}
-              {selectedEmail.support_level === 'L2' && (
-                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                  <span>Diese E-Mail wurde zu <strong>Level 2</strong> eskaliert und erfordert manuelle Bearbeitung.</span>
-                </div>
-              )}
-
-              {/* Email Info */}
-              <div className="text-sm text-slate-500 dark:text-slate-400">
-                <p>
-                  <strong>Von:</strong> {selectedEmail.from_name || selectedEmail.from_email}
-                  {selectedEmail.from_name && ` <${selectedEmail.from_email}>`}
-                </p>
-                <p>
-                  <strong>Empfangen:</strong>{' '}
-                  {new Date(selectedEmail.received_at).toLocaleString('de-CH')}
-                </p>
-              </div>
-
-              {/* Agent Assignment */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Zugewiesen an:</span>
-                <Select
-                  value={selectedEmail.assigned_agent_id || 'none'}
-                  onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
-                >
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Nicht zugewiesen" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nicht zugewiesen</SelectItem>
-                    {agents.map((agent) => (
-                      <SelectItem key={agent.id} value={agent.id}>
-                        {agent.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Tags */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Tags:</span>
-                {(selectedEmail.tags || []).map(tag => (
-                  <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                    {tag}
-                    <button
-                      onClick={() => handleRemoveTag(selectedEmail.id, tag)}
-                      className="hover:text-indigo-900 dark:hover:text-indigo-200"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-                <form
-                  onSubmit={(e) => { e.preventDefault(); handleAddTag(selectedEmail.id, tagInput) }}
-                  className="inline-flex"
-                >
-                  <Input
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    placeholder="Tag hinzufügen…"
-                    className="h-6 w-28 text-xs px-2"
-                  />
-                </form>
-              </div>
-
-              {/* Snooze */}
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Zurückstellen:</span>
-                {[
-                  { label: '1h', hours: 1 },
-                  { label: '4h', hours: 4 },
-                  { label: 'Morgen', hours: 20 },
-                  { label: '1 Woche', hours: 168 },
-                ].map(opt => (
-                  <Button
-                    key={opt.label}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-
-              {/* Email Body — Outlook-style */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                {/* Header bar */}
-                <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Nachricht</span>
-                  <span className="text-xs text-slate-400">
-                    {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
-                  </span>
-                </div>
-                {/* Body */}
-                <div className="p-4 bg-white dark:bg-slate-900">
-                  {selectedEmail.body_html ? (
-                    <iframe
-                      srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#374151;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#2563eb;}blockquote{border-left:3px solid #e5e7eb;margin-left:0;padding-left:12px;color:#6b7280;}img{max-width:100%;height:auto;}</style></head><body>${selectedEmail.body_html}</body></html>`}
-                      className="w-full border-0 min-h-[120px]"
-                      style={{ minHeight: '120px' }}
-                      onLoad={(e) => {
-                        const iframe = e.currentTarget
-                        if (iframe.contentDocument?.body) {
-                          iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 600) + 'px'
-                        }
-                      }}
-                      sandbox="allow-same-origin"
-                      title="Email content"
-                    />
-                  ) : selectedEmail.body_text ? (
-                    <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                      {selectedEmail.body_text}
+            <div className="flex flex-col">
+              {/* Alerts — sticky at top */}
+              {(lockWarning || selectedEmail.support_level === 'L2') && (
+                <div className="px-6 pt-5 space-y-2">
+                  {/* Conflict warning */}
+                  {lockWarning && (
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span>
+                        <strong>{lockWarning.locked_by}</strong> bearbeitet diese E-Mail gerade seit{' '}
+                        {new Date(lockWarning.locked_at).toLocaleTimeString('de-CH', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button onClick={() => setLockWarning(null)} className="ml-auto flex-shrink-0">
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">Kein Inhalt verfügbar</p>
                   )}
+
+                  {/* Escalation Banner */}
+                  {selectedEmail.support_level === 'L2' && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
+                      <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                      <span>Diese E-Mail wurde zu <strong>Level 2</strong> eskaliert und erfordert manuelle Bearbeitung.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Subject heading — prominent, Gmail-style */}
+              <div className="px-6 pt-5 pb-3">
+                <h2 className="text-2xl font-normal text-slate-900 dark:text-slate-100 leading-snug">
+                  {selectedEmail.subject}
+                </h2>
+              </div>
+
+              {/* Sender row — Gmail style with avatar */}
+              <div className="flex items-start gap-3 px-6 pb-5">
+                {/* Avatar circle with initials — color derived from sender name */}
+                <div
+                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                  style={{
+                    backgroundColor: (() => {
+                      const name = selectedEmail.from_name || selectedEmail.from_email || '?'
+                      const colors = ['#1b73e8', '#d93025', '#188038', '#e37400', '#a142f4', '#007b83', '#c5221f', '#1967d2']
+                      let hash = 0
+                      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+                      return colors[Math.abs(hash) % colors.length]
+                    })()
+                  }}
+                >
+                  {(selectedEmail.from_name || selectedEmail.from_email || '?')
+                    .split(/[\s@]+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(w => w[0]?.toUpperCase())
+                    .join('')}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {selectedEmail.from_name || selectedEmail.from_email}
+                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-500 whitespace-nowrap flex-shrink-0">
+                      {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
+                    </span>
+                  </div>
+                  {selectedEmail.from_name && (
+                    <p className="text-xs text-slate-500 dark:text-slate-500 truncate mt-0.5">
+                      {selectedEmail.from_email}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Thin separator */}
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+
+              {/* Email Body — clean, spacious, no label */}
+              <div className="px-6 py-6 pl-[4.25rem]">
+                {selectedEmail.body_html ? (
+                  <iframe
+                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
+                    className="w-full border-0 min-h-[120px]"
+                    style={{ minHeight: '120px' }}
+                    onLoad={(e) => {
+                      const iframe = e.currentTarget
+                      if (iframe.contentDocument?.body) {
+                        iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 600) + 'px'
+                      }
+                    }}
+                    sandbox="allow-same-origin"
+                    title="Email content"
+                  />
+                ) : selectedEmail.body_text ? (
+                  <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                    {selectedEmail.body_text}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">Kein Inhalt verfügbar</p>
+                )}
+              </div>
+
+              {/* Thin separator */}
+              <div className="border-t border-slate-100 dark:border-slate-800" />
+
+              {/* Metadata toolbar — compact horizontal bar */}
+              <div className="px-6 py-3 flex items-center gap-4 flex-wrap text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30">
+                {/* Agent Assignment */}
+                <div className="flex items-center gap-1.5">
+                  <UserCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <Select
+                    value={selectedEmail.assigned_agent_id || 'none'}
+                    onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
+                  >
+                    <SelectTrigger className="w-36 h-7 text-xs border-none shadow-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700 px-1.5">
+                      <SelectValue placeholder="Nicht zugewiesen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nicht zugewiesen</SelectItem>
+                      {agents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+
+                {/* Tags */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Bookmark className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  {(selectedEmail.tags || []).map(tag => (
+                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(selectedEmail.id, tag)}
+                        className="hover:text-indigo-900 dark:hover:text-indigo-200"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); handleAddTag(selectedEmail.id, tagInput) }}
+                    className="inline-flex"
+                  >
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="+ Tag"
+                      className="h-6 w-20 text-xs px-1.5 border-none shadow-none bg-transparent placeholder:text-slate-400"
+                    />
+                  </form>
+                </div>
+
+                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+
+                {/* Snooze */}
+                <div className="flex items-center gap-1.5">
+                  <EyeOff className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  {[
+                    { label: '1h', hours: 1 },
+                    { label: '4h', hours: 4 },
+                    { label: 'Morgen', hours: 20 },
+                    { label: '1 Woche', hours: 168 },
+                  ].map(opt => (
+                    <Button
+                      key={opt.label}
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-6 px-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
                 </div>
               </div>
 
               {/* Thread History — Outlook-style conversation view */}
               {threadEmails.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-2 px-6 py-4">
                   <p className="text-xs font-medium text-slate-400 uppercase tracking-wide px-1">
                     Gesprächsverlauf ({threadEmails.length} weitere Nachrichten)
                   </p>
@@ -1838,7 +1881,7 @@ function InboxPageContent() {
 
               {/* AI Draft */}
               {currentDraft ? (
-                <div className="space-y-3">
+                <div className="space-y-3 px-6 py-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-amber-500" />
@@ -2041,7 +2084,7 @@ function InboxPageContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6">
+                <div className="text-center py-6 px-6">
                   <p className="text-slate-500 dark:text-slate-400 mb-4">
                     Noch keine Antwort verfasst
                   </p>
@@ -2077,7 +2120,7 @@ function InboxPageContent() {
               )}
 
               {/* Interne Notizen */}
-              <div className="border rounded-lg">
+              <div className="border rounded-lg mx-6 mb-4">
                 <button
                   className="flex items-center gap-2 w-full p-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors"
                   onClick={() => setNotesExpanded(!notesExpanded)}
@@ -2143,7 +2186,7 @@ function InboxPageContent() {
           )}
 
           {(currentDraft || isManualMode) && (
-            <DialogFooter className="flex-col sm:flex-row gap-3">
+            <DialogFooter className="flex-col sm:flex-row gap-3 px-6 pb-5 pt-2">
               {/* Owner Selection */}
               {owners.length > 0 && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">

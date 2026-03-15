@@ -458,9 +458,8 @@ export default function KnowledgePage() {
     })
   }
 
-  const pendingItems = items.filter((item) => item.approved === false)
+  const pendingItems: KnowledgeItem[] = []
   const filteredItems = items.filter((item) => {
-    if (item.approved === false) return false // shown separately in pending section
     if (searchQuery) {
       return item.title.toLowerCase().includes(searchQuery.toLowerCase())
     }

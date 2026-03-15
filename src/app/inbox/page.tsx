@@ -101,6 +101,7 @@ interface Email {
   from_name?: string
   subject: string
   body_text: string
+  body_html?: string
   received_at: string
   status: string
   email_type?: 'customer_inquiry' | 'form_submission' | 'system_alert' | 'notification'
@@ -225,6 +226,10 @@ function InboxPageContent() {
   const [newNoteContent, setNewNoteContent] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [notesError, setNotesError] = useState('')
+
+  // Thread history state
+  const [threadEmails, setThreadEmails] = useState<Email[]>([])
+  const [expandedThreadIds, setExpandedThreadIds] = useState<Set<string>>(new Set())
 
   // Saved views state
   const [savedViews, setSavedViews] = useState<SavedView[]>([])
@@ -912,6 +917,20 @@ function InboxPageContent() {
     setNewNoteContent('')
     setNotesError('')
     fetchNotes(email.id)
+    // Fetch thread siblings if this email has a thread ID
+    setThreadEmails([])
+    setExpandedThreadIds(new Set())
+    if (email.hubspot_thread_id) {
+      fetch(`/api/emails/thread/${encodeURIComponent(email.hubspot_thread_id)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data) return
+          const siblings = (data.emails || []).filter((e: Email) => e.id !== email.id)
+          siblings.sort((a: Email, b: Email) => new Date(a.received_at).getTime() - new Date(b.received_at).getTime())
+          setThreadEmails(siblings)
+        })
+        .catch(() => {})
+    }
   }
 
   const filteredEmails = useMemo(() => emails.filter((email) => {
@@ -1715,15 +1734,106 @@ function InboxPageContent() {
                 ))}
               </div>
 
-              {/* Original Message */}
-              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg overflow-hidden">
-                <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Original Nachricht
-                </h4>
-                <div className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap break-all overflow-x-auto max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                  {selectedEmail.body_text}
+              {/* Email Body — Outlook-style */}
+              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                {/* Header bar */}
+                <div className="px-4 py-2.5 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Nachricht</span>
+                  <span className="text-xs text-slate-400">
+                    {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </span>
+                </div>
+                {/* Body */}
+                <div className="p-4 bg-white dark:bg-slate-900">
+                  {selectedEmail.body_html ? (
+                    <iframe
+                      srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,-apple-system,sans-serif;font-size:14px;color:#374151;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#2563eb;}blockquote{border-left:3px solid #e5e7eb;margin-left:0;padding-left:12px;color:#6b7280;}img{max-width:100%;height:auto;}</style></head><body>${selectedEmail.body_html}</body></html>`}
+                      className="w-full border-0 min-h-[120px]"
+                      style={{ minHeight: '120px' }}
+                      onLoad={(e) => {
+                        const iframe = e.currentTarget
+                        if (iframe.contentDocument?.body) {
+                          iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 600) + 'px'
+                        }
+                      }}
+                      sandbox="allow-same-origin"
+                      title="Email content"
+                    />
+                  ) : selectedEmail.body_text ? (
+                    <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {selectedEmail.body_text}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">Kein Inhalt verfügbar</p>
+                  )}
                 </div>
               </div>
+
+              {/* Thread History — Outlook-style conversation view */}
+              {threadEmails.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide px-1">
+                    Gesprächsverlauf ({threadEmails.length} weitere Nachrichten)
+                  </p>
+                  {threadEmails.map((tEmail) => {
+                    const isExpanded = expandedThreadIds.has(tEmail.id)
+                    return (
+                      <div key={tEmail.id} className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                        {/* Collapsed header — click to expand */}
+                        <button
+                          className="w-full px-4 py-2.5 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
+                          onClick={() => setExpandedThreadIds(prev => {
+                            const next = new Set(prev)
+                            next.has(tEmail.id) ? next.delete(tEmail.id) : next.add(tEmail.id)
+                            return next
+                          })}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`text-xs font-medium ${tEmail.status === 'sent' ? 'text-green-600' : 'text-blue-600'}`}>
+                              {tEmail.status === 'sent' ? '↩ Antwort' : '→ Eingang'}
+                            </span>
+                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                              {tEmail.from_name || tEmail.from_email}
+                            </span>
+                            {!isExpanded && (
+                              <span className="text-xs text-slate-400 truncate hidden sm:block">
+                                {tEmail.body_text?.slice(0, 80) || '…'}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
+                            {new Date(tEmail.received_at).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </button>
+                        {/* Expanded body */}
+                        {isExpanded && (
+                          <div className="p-4 bg-white dark:bg-slate-900">
+                            {tEmail.body_html ? (
+                              <iframe
+                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#374151;line-height:1.6;margin:0;padding:0;word-wrap:break-word;}a{color:#2563eb;}blockquote{border-left:3px solid #e5e7eb;margin-left:0;padding-left:12px;color:#6b7280;}</style></head><body>${tEmail.body_html}</body></html>`}
+                                className="w-full border-0"
+                                style={{ minHeight: '80px' }}
+                                onLoad={(e) => {
+                                  const iframe = e.currentTarget
+                                  if (iframe.contentDocument?.body) {
+                                    iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 400) + 'px'
+                                  }
+                                }}
+                                sandbox="allow-same-origin"
+                                title="Thread email content"
+                              />
+                            ) : (
+                              <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {tEmail.body_text || <span className="italic text-slate-400">Kein Inhalt</span>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
               {/* AI Draft */}
               {currentDraft ? (

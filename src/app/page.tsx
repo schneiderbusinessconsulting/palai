@@ -276,6 +276,19 @@ function computeWorkload(
     }
   }
 
+  // Averages: based on actual email data, not analytics API
+  // Days since first email (or 30 days max for meaningful averages)
+  const dates = actionable.map(e => new Date(e.received_at).getTime())
+  const oldestEmail = dates.length > 0 ? Math.min(...dates) : todayStart.getTime()
+  const daysSinceFirst = Math.max(Math.ceil((now.getTime() - oldestEmail) / 86400000), 1)
+  const daysForAvg = Math.min(daysSinceFirst, 30)
+  const weeksForAvg = Math.max(daysForAvg / 7, 1)
+
+  // Use last 30 days of email counts for averages
+  const last30Start = new Date(todayStart); last30Start.setDate(last30Start.getDate() - 30)
+  const inboundLast30 = actionable.filter(e => new Date(e.received_at) >= last30Start).length
+  const resolvedLast30 = actionable.filter(e => e.status === 'sent' && new Date(e.received_at) >= last30Start).length
+
   const daysInData = Math.max(daily.length, 1)
   const totalIncoming = daily.reduce((s, d) => s + d.total, 0)
   const totalSent = daily.reduce((s, d) => s + d.sent, 0)
@@ -304,15 +317,15 @@ function computeWorkload(
     backlog,
     inbound: { today: inboundToday, week: inboundWeek, month: inboundMonth },
     inboundAvg: {
-      day: Math.round((totalIncoming / daysInData) * 10) / 10,
-      week: Math.round(totalIncoming / weeksInData),
-      month: Math.round(totalIncoming / monthsInData),
+      day: Math.round((inboundLast30 / daysForAvg) * 10) / 10,
+      week: Math.round(inboundLast30 / weeksForAvg),
+      month: inboundLast30,
     },
     resolved: { today: resolvedToday, week: resolvedWeek, month: resolvedMonth },
     resolvedAvg: {
-      day: Math.round((totalSent / daysInData) * 10) / 10,
-      week: Math.round(totalSent / weeksInData),
-      month: Math.round(totalSent / monthsInData),
+      day: Math.round((resolvedLast30 / daysForAvg) * 10) / 10,
+      week: Math.round(resolvedLast30 / weeksForAvg),
+      month: resolvedLast30,
     },
     trend: { inboundVsLastWeek, resolvedVsLastWeek },
   }

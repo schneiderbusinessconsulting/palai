@@ -22,6 +22,8 @@ import {
   Check,
   Users,
   UserCog,
+  ClipboardList,
+  Briefcase,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
@@ -34,7 +36,9 @@ const dashboards = [
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
+  { name: 'Aufgaben', href: '/tasks', icon: ClipboardList, badgeKey: 'openTasks' },
   { name: 'Insights', href: '/insights', icon: BarChart3, badgeKey: 'escalations' },
+  { name: 'Deals', href: '/deals', icon: Briefcase },
   { name: 'Kunden', href: '/customers', icon: Users },
   { name: 'Team', href: '/agents', icon: UserCog },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
@@ -57,9 +61,10 @@ export function Sidebar() {
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const [emailRes, learningRes] = await Promise.all([
+        const [emailRes, learningRes, tasksRes] = await Promise.all([
           fetch('/api/emails?limit=100'),
           fetch('/api/learning?status=pending'),
+          fetch('/api/tasks?status=open'),
         ])
 
         const newBadges: Record<string, number> = {}
@@ -87,6 +92,11 @@ export function Sidebar() {
         if (learningRes.ok) {
           const data = await learningRes.json()
           newBadges.learningPending = data.pending || 0
+        }
+
+        if (tasksRes.ok) {
+          const data = await tasksRes.json()
+          newBadges.openTasks = (data.tasks || []).length
         }
 
         setBadges(newBadges)
@@ -226,8 +236,8 @@ export function Sidebar() {
         <nav className="flex-1 overflow-y-auto py-4 px-3">
           {(() => {
             const groups = [
-              { label: 'Support', items: ['Dashboard', 'Inbox'] },
-              { label: 'Insights', items: ['Insights', 'Kunden', 'Team'] },
+              { label: 'Support', items: ['Dashboard', 'Inbox', 'Aufgaben'] },
+              { label: 'Insights', items: ['Insights', 'Deals', 'Kunden', 'Team'] },
               { label: 'Wissen', items: ['Knowledge Base', 'Chat', 'AI Learning', 'Templates', 'Kurse & Preise'] },
               { label: 'System', items: ['Einstellungen'] },
             ]

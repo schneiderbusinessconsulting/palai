@@ -31,7 +31,6 @@ import {
   BookOpen,
   RefreshCw,
   Lightbulb,
-  Users,
   CheckCircle,
   Clock,
   ExternalLink,
@@ -41,7 +40,6 @@ import {
   User,
   Sparkles,
   Search,
-  Package,
 } from 'lucide-react'
 import {
   PieChart, Pie, Cell,
@@ -61,14 +59,6 @@ const COLORS = {
   purple: '#8b5cf6',
 }
 
-const CHART_COLORS = {
-  primary: '#3b82f6',    // blue-500
-  secondary: '#10b981',  // emerald-500
-  tertiary: '#f59e0b',   // amber-500
-  quaternary: '#ef4444',  // red-500
-  quinary: '#8b5cf6',    // violet-500
-  senary: '#06b6d4',     // cyan-500
-}
 const CHART_PALETTE = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6']
 
 const darkTooltipStyle = {
@@ -595,7 +585,13 @@ export default function InsightsPage() {
                   ].filter(d => d.value > 0)
                   const biPieColors = [COLORS.green, COLORS.amber, COLORS.gray]
                   return biPieData.length === 0 ? (
-                    <p className="text-sm text-slate-500">Noch keine Daten verfügbar.</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                        <TrendingUp className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine Daten verfügbar</p>
+                      <p className="text-xs text-slate-400">Wird automatisch befüllt wenn E-Mails eintreffen</p>
+                    </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={240}>
                       <PieChart>
@@ -641,7 +637,13 @@ export default function InsightsPage() {
                       fill: category === 'buying_signal' ? COLORS.green : category === 'churn_risk' ? COLORS.red : COLORS.amber,
                     }))
                   return biBarData.length === 0 ? (
-                    <p className="text-sm text-slate-500">Noch keine BI-Signale erfasst.</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                        <BarChart3 className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine BI-Signale erfasst</p>
+                      <p className="text-xs text-slate-400">Wird automatisch befüllt wenn E-Mails eintreffen</p>
+                    </div>
                   ) : (
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={biBarData} layout="vertical" margin={{ left: 20, right: 20, top: 5, bottom: 5 }}>
@@ -671,7 +673,13 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 {topTopics.length === 0 ? (
-                  <p className="text-sm text-slate-500">Noch keine Daten verfügbar.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <MessageSquare className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine Daten verfügbar</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn E-Mails eintreffen</p>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={topTopics.length * 44 + 20}>
                     <BarChart
@@ -877,7 +885,13 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 {product.knowledgeGaps.length === 0 ? (
-                  <p className="text-sm text-slate-500">Keine Knowledge Gaps erkannt.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <Search className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Keine Knowledge Gaps erkannt</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn Entwürfe stark nachbearbeitet werden</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {product.knowledgeGaps.map(gap => (
@@ -911,7 +925,13 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent>
                 {topTopics.length === 0 ? (
-                  <p className="text-sm text-slate-500">Noch keine Daten.</p>
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <BarChart3 className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine Daten</p>
+                    <p className="text-xs text-slate-400">Wird automatisch befüllt wenn E-Mails eintreffen</p>
+                  </div>
                 ) : (
                   <ResponsiveContainer width="100%" height={topTopics.length * 44 + 20}>
                     <BarChart
@@ -949,7 +969,13 @@ export default function InsightsPage() {
                   ].filter(d => d.value > 0)
                   const kbColors = [COLORS.blue, COLORS.amber]
                   return kbPieData.length === 0 ? (
-                    <p className="text-sm text-slate-500">Noch keine KB-Daten.</p>
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                        <BookOpen className="h-6 w-6 text-slate-400" />
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine KB-Daten</p>
+                      <p className="text-xs text-slate-400">Wird automatisch befüllt wenn Knowledge Base Einträge erstellt werden</p>
+                    </div>
                   ) : (
                     <>
                       <ResponsiveContainer width="100%" height={200}>
@@ -1069,20 +1095,33 @@ export default function InsightsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center">
-                  <p className="text-5xl font-bold text-amber-500">
-                    {sentiment.csatAvg ? sentiment.csatAvg.toFixed(1) : '—'}
-                  </p>
-                  <p className="text-sm text-slate-500 mt-1">von 5 Sternen</p>
-                  <div className="flex justify-center gap-1 mt-2">
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <span
-                        key={star}
-                        className={`text-2xl ${star <= Math.round(sentiment.csatAvg || 0) ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700'}`}
-                      >
-                        ★
-                      </span>
-                    ))}
-                  </div>
+                  {sentiment.csatAvg ? (
+                    <>
+                      <p className="text-5xl font-bold text-amber-500">
+                        {sentiment.csatAvg.toFixed(1)}
+                      </p>
+                      <p className="text-sm text-slate-500 mt-1">von 5 Sternen</p>
+                      <div className="flex justify-center gap-1 mt-2">
+                        {[1, 2, 3, 4, 5].map(star => (
+                          <span
+                            key={star}
+                            className={`text-2xl ${star <= Math.round(sentiment.csatAvg || 0) ? 'text-amber-400' : 'text-slate-200 dark:text-slate-700'}`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  ) : summary.happinessCsat !== null ? (
+                    <>
+                      <p className="text-5xl font-bold text-amber-500">
+                        {summary.happinessCsat}%
+                      </p>
+                      <p className="text-sm text-slate-500 mt-1">CSAT aus Happiness Scores</p>
+                    </>
+                  ) : (
+                    <p className="text-5xl font-bold text-slate-300 dark:text-slate-600">—</p>
+                  )}
                 </div>
 
                 {sentiment.csatTrend.length > 0 && (
@@ -1113,12 +1152,14 @@ export default function InsightsPage() {
                   </div>
                 )}
 
-                {sentiment.csatTrend.length === 0 && !sentiment.csatAvg && (
-                  <p className="text-sm text-slate-500 text-center">
-                    Noch keine CSAT-Bewertungen vorhanden.
-                    <br />
-                    <span className="text-xs">Werden beim Senden von Antworten gesammelt.</span>
-                  </p>
+                {sentiment.csatTrend.length === 0 && !sentiment.csatAvg && !summary.happinessCsat && (
+                  <div className="flex flex-col items-center justify-center py-4 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                      <Star className="h-6 w-6 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Noch keine CSAT-Bewertungen vorhanden</p>
+                    <p className="text-xs text-slate-400">Werden beim Senden von Antworten gesammelt</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1170,14 +1211,19 @@ export default function InsightsPage() {
                     <button onClick={() => openDrilldown('SLA verletzt', dd.slaBreached)} className="text-left hover:ring-2 hover:ring-red-200 rounded-lg transition-all">
                       <StatCard icon={AlertTriangle} label="SLA verletzt" value={summary.slaBreached} color={summary.slaBreached > 0 ? 'text-red-500' : 'text-slate-500'} />
                     </button>
-                    <StatCard
-                      icon={BarChart3}
-                      label="Compliance Rate"
-                      value={summary.slaOk + summary.slaBreached > 0
-                        ? `${Math.round(summary.slaOk / (summary.slaOk + summary.slaBreached) * 100)}%`
-                        : '—'}
-                      color="text-blue-600"
-                    />
+                    {(() => {
+                      const slaTotal = summary.slaOk + summary.slaBreached
+                      const slaPercent = slaTotal > 0 ? Math.round(summary.slaOk / slaTotal * 100) : null
+                      const slaColor = slaPercent === null ? 'text-slate-500' : slaPercent === 100 ? 'text-green-600' : slaPercent >= 90 ? 'text-amber-500' : 'text-red-500'
+                      return (
+                        <StatCard
+                          icon={BarChart3}
+                          label="Compliance Rate"
+                          value={slaPercent !== null ? `${slaPercent}%` : '—'}
+                          color={slaColor}
+                        />
+                      )
+                    })()}
                     <button onClick={() => openDrilldown('Noch offen', dd.pending)} className="text-left hover:ring-2 hover:ring-amber-200 rounded-lg transition-all">
                       <StatCard icon={Clock} label="Noch offen" value={summary.pendingEmails} color="text-amber-600" />
                     </button>

@@ -91,6 +91,9 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { Email, EmailDraft, EmailNote, Agent, SavedView } from '@/types/email'
+import { CategoryTabs } from '@/components/inbox/category-tabs'
+import { DensityToggle, type Density } from '@/components/inbox/density-toggle'
+import { StarPicker } from '@/components/inbox/star-picker'
 
 interface HubSpotOwner {
   id: string
@@ -105,6 +108,10 @@ function InboxPageContent() {
   const [filter, setFilter] = useState(initialFilter)
   const [showSpam, setShowSpam] = useState(false) // Spam view toggle
   const [topicFilter, setTopicFilter] = useState('') // Filter by topic tag
+  const [density, setDensity] = useState<Density>(() => {
+    if (typeof window !== 'undefined') return (localStorage.getItem('palai_density') as Density) || 'default'
+    return 'default'
+  })
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
@@ -190,6 +197,8 @@ function InboxPageContent() {
 
   // Undo-send timer ref
   const sendTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Ref to track sortedEmails for auto-advance (avoids declaration-order issues)
+  const sortedEmailsRef = useRef<Email[]>([])
 
   // Sync filter state to URL search params
   const updateFilter = useCallback((newFilter: string) => {
@@ -340,6 +349,25 @@ function InboxPageContent() {
   const handleAutoDraftChange = (enabled: boolean) => {
     setAutoDraftEnabled(enabled)
     localStorage.setItem('autoDraftEnabled', String(enabled))
+  }
+
+  const handleDensityChange = (d: Density) => {
+    setDensity(d)
+    localStorage.setItem('palai_density', d)
+  }
+
+  // Star update handler
+  const handleStarChange = async (emailId: string, starType: string | null) => {
+    setEmails(prev => prev.map(e => e.id === emailId ? { ...e, star_type: starType ?? undefined } : e))
+    try {
+      await fetch(`/api/emails/${emailId}/star`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ star_type: starType }),
+      })
+    } catch {
+      fetchEmails()
+    }
   }
 
   // Realtime subscription for new emails
@@ -840,16 +868,16 @@ function InboxPageContent() {
   // Auto-advance: select next email after send/close
   const autoAdvanceToNext = useCallback(() => {
     if (!selectedEmail) return
-    const currentIndex = sortedEmails.findIndex(e => e.id === selectedEmail.id)
+    const list = sortedEmailsRef.current
+    const currentIndex = list.findIndex(e => e.id === selectedEmail.id)
     if (currentIndex === -1) return
-    // Pick next, or previous if at end
-    const nextIndex = currentIndex < sortedEmails.length - 1 ? currentIndex + 1 : currentIndex - 1
-    if (nextIndex >= 0 && nextIndex < sortedEmails.length) {
-      openEmailDetail(sortedEmails[nextIndex])
+    const nextIndex = currentIndex < list.length - 1 ? currentIndex + 1 : currentIndex - 1
+    if (nextIndex >= 0 && nextIndex < list.length) {
+      openEmailDetail(list[nextIndex])
     } else {
       setIsDetailOpen(false)
     }
-  }, [selectedEmail, sortedEmails])
+  }, [selectedEmail])
 
   // Send via Resend + HubSpot (full send pipeline) — with 5s undo
   const handleSend = async () => {
@@ -1112,6 +1140,9 @@ function InboxPageContent() {
     }
     return sortDir === 'desc' ? -cmp : cmp
   }), [filteredEmails, sortBy, sortDir])
+
+  // Keep ref in sync for auto-advance (avoids block-scoped declaration order issues)
+  sortedEmailsRef.current = sortedEmails
 
   // Pagination
   const totalPages = useMemo(() => Math.max(1, Math.ceil(sortedEmails.length / PAGE_SIZE)), [sortedEmails.length])
@@ -1485,7 +1516,24 @@ function InboxPageContent() {
         </div>
       </div>
 
-      {/* Sort Controls + Email Count */}
+      {/* Category Tabs */}
+      {!showSpam && (
+        <CategoryTabs
+          selectedCategory={topicFilter}
+          onCategoryChange={(cat) => setTopicFilter(cat)}
+          emailCounts={(() => {
+            const counts: Record<string, number> = {}
+            for (const e of emails) {
+              for (const tag of e.topic_tags || []) {
+                counts[tag] = (counts[tag] || 0) + 1
+              }
+            }
+            return counts
+          })()}
+        />
+      )}
+
+      {/* Sort Controls + Email Count + Density */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
@@ -1510,10 +1558,13 @@ function InboxPageContent() {
             {sortDir === 'desc' ? '↓ Absteigend' : '↑ Aufsteigend'}
           </Button>
         </div>
-        <span className="text-xs text-slate-500">
-          {sortedEmails.length} E-Mail{sortedEmails.length !== 1 ? 's' : ''}
-          {sortedEmails.length !== filteredEmails.length && ` (${filteredEmails.length} total)`}
-        </span>
+        <div className="flex items-center gap-3">
+          <DensityToggle density={density} onDensityChange={handleDensityChange} />
+          <span className="text-xs text-slate-500">
+            {sortedEmails.length} E-Mail{sortedEmails.length !== 1 ? 's' : ''}
+            {sortedEmails.length !== filteredEmails.length && ` (${filteredEmails.length} total)`}
+          </span>
+        </div>
       </div>
 
       {/* Bulk Action Bar */}
@@ -1685,19 +1736,26 @@ function InboxPageContent() {
                     <ShieldAlert className="h-3.5 w-3.5 text-red-500" />
                   </button>
                 </div>
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Bulk Checkbox */}
-                    <button
-                      onClick={(e) => toggleSelect(email.id, e)}
-                      className="mt-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
-                    >
-                      {selectedIds.has(email.id) ? (
-                        <CheckSquare className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <Square className="h-4 w-4 text-slate-400" />
-                      )}
-                    </button>
+                <CardContent className={density === 'compact' ? 'p-2' : density === 'comfortable' ? 'p-5' : 'p-4'}>
+                  <div className={`flex items-start gap-${density === 'compact' ? '2' : '4'}`}>
+                    {/* Star + Checkbox */}
+                    <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                      <button
+                        onClick={(e) => toggleSelect(email.id, e)}
+                        className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                      >
+                        {selectedIds.has(email.id) ? (
+                          <CheckSquare className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Square className="h-4 w-4 text-slate-400" />
+                        )}
+                      </button>
+                      <StarPicker
+                        starType={email.star_type}
+                        onStarChange={(st) => handleStarChange(email.id, st)}
+                        size="sm"
+                      />
+                    </div>
                     {/* Confidence Indicator */}
                     <div
                       className={`w-2 h-full min-h-[60px] rounded-full ${

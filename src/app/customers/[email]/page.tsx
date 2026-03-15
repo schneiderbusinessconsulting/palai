@@ -15,7 +15,9 @@ import {
   ExternalLink,
   CheckCircle,
   Clock,
+  Heart,
 } from 'lucide-react'
+import { getSegmentConfig, calculateHealthScore, determineSegment } from '@/lib/customer-scoring'
 
 interface CustomerDetail {
   email: string
@@ -140,12 +142,51 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ email
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <Header title={customer.name} description={customer.email} />
-        <Button variant="outline" size="sm" onClick={() => router.push('/customers')}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Zurück
-        </Button>
-      </div>
+      {(() => {
+        const daysSinceLastContact = customer.lastContact
+          ? Math.floor((Date.now() - new Date(customer.lastContact).getTime()) / (1000 * 60 * 60 * 24))
+          : 999
+        const healthScore = calculateHealthScore(3, customer.totalEmails, customer.resolvedCount / Math.max(customer.totalEmails, 1), daysSinceLastContact)
+        const segment = determineSegment(healthScore, customer.totalEmails, daysSinceLastContact, customer.avgBuyingIntent)
+        const segConfig = getSegmentConfig(segment)
+
+        return (
+          <>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Header title={customer.name} description={customer.email} />
+                <Badge className={`${segConfig.color} text-xs`}>
+                  {segConfig.icon} {segConfig.label}
+                </Badge>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => router.push('/customers')}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Zurück
+              </Button>
+            </div>
+
+            {/* Health Score Bar */}
+            <Card>
+              <CardContent className="p-4 flex items-center gap-4">
+                <Heart className={`h-5 w-5 ${healthScore >= 70 ? 'text-green-500' : healthScore >= 40 ? 'text-amber-500' : 'text-red-500'}`} />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">Health Score</span>
+                    <span className="text-sm font-bold">{healthScore}/100</span>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2.5">
+                    <div
+                      className={`h-2.5 rounded-full transition-all ${
+                        healthScore >= 70 ? 'bg-green-500' : healthScore >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${healthScore}%` }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )
+      })()}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

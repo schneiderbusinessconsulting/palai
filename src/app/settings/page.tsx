@@ -553,6 +553,34 @@ export default function SettingsPage() {
     }
   }
 
+  // ── Historical HubSpot Import ────────────────────────────────────────────────
+  const [histImportRunning, setHistImportRunning] = useState(false)
+  const [histImportResult, setHistImportResult] = useState<{ imported: number; skipped: number; errors: number; message: string } | null>(null)
+  const [histImportError, setHistImportError] = useState<string | null>(null)
+
+  const handleHistoricalImport = async () => {
+    setHistImportRunning(true)
+    setHistImportResult(null)
+    setHistImportError(null)
+    try {
+      const res = await fetch('/api/hubspot/historical-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daysBack: 365, maxEmails: 500 }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setHistImportError(data.error || 'Import fehlgeschlagen')
+      } else {
+        setHistImportResult(data)
+      }
+    } catch (e) {
+      setHistImportError(String(e))
+    } finally {
+      setHistImportRunning(false)
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
@@ -1337,6 +1365,63 @@ export default function SettingsPage() {
                     <div className="text-center">
                       <p className="text-2xl font-bold text-purple-700">{backfillResult.knowledgeChunksCreated}</p>
                       <p className="text-xs text-slate-500">KB Einträge</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Historical HubSpot Email Import */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-indigo-500" />
+                Historische E-Mails importieren
+              </CardTitle>
+              <CardDescription>
+                Importiere alle historischen E-Mails aus HubSpot (bis 1 Jahr zurück, max. 500).
+                Die Emails werden mit AI-Klassifikation, Tone-Analyse und Buying-Intent analysiert
+                und füllen die Dashboard-KPIs und Trends.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button
+                onClick={handleHistoricalImport}
+                disabled={histImportRunning}
+                className="gap-2"
+              >
+                {histImportRunning ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Importiere historische E-Mails…</>
+                ) : (
+                  <><RefreshCw className="h-4 w-4" />Historischen Import starten</>
+                )}
+              </Button>
+
+              {histImportError && (
+                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <p>{histImportError}</p>
+                </div>
+              )}
+
+              {histImportResult && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg space-y-2">
+                  <p className="font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />{histImportResult.message}
+                  </p>
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-blue-700">{histImportResult.imported}</p>
+                      <p className="text-xs text-slate-500">Importiert</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-slate-500">{histImportResult.skipped}</p>
+                      <p className="text-xs text-slate-500">Übersprungen</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600">{histImportResult.errors}</p>
+                      <p className="text-xs text-slate-500">Fehler</p>
                     </div>
                   </div>
                 </div>

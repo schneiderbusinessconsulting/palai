@@ -29,9 +29,29 @@ import {
   MailCheck,
   Star,
   Zap,
+  Users,
 } from 'lucide-react'
 import Link from 'next/link'
 import { formatRelativeDate } from '@/lib/utils'
+
+interface AgentPerf {
+  id: string
+  name: string
+  role: string
+  emails_assigned: number
+  emails_resolved: number
+  resolution_rate: number
+  avg_response_minutes: number | null
+  csat_avg: number | null
+}
+
+interface AgentTeamTotals {
+  total_emails_assigned: number
+  total_emails_resolved: number
+  team_resolution_rate: number
+  team_avg_response_minutes: number | null
+  team_csat_avg: number | null
+}
 
 interface Email {
   id: string
@@ -438,16 +458,19 @@ export default function DashboardPage() {
   const [dailyKPIs, setDailyKPIs] = useState<DailyKPI[]>([])
   const [periodComparison, setPeriodComparison] = useState<Record<string, number>>({})
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [agentPerfs, setAgentPerfs] = useState<AgentPerf[]>([])
+  const [agentTeam, setAgentTeam] = useState<AgentTeamTotals | null>(null)
 
   const fetchData = useCallback(async () => {
     setIsLoading(true)
     setFetchError(null)
     try {
-      const [emailRes, insightsRes, analyticsRes, csatRes] = await Promise.all([
+      const [emailRes, insightsRes, analyticsRes, csatRes, agentPerfRes] = await Promise.all([
         fetch('/api/emails?limit=200'),
         fetch('/api/insights'),
         fetch('/api/analytics?period=30d'),
         fetch('/api/csat'),
+        fetch('/api/agents/performance?period=30d'),
       ])
 
       let allEmails: Email[] = []
@@ -541,6 +564,13 @@ export default function DashboardPage() {
         const ins = await insightsRes.json()
         const leads: HotLead[] = ins.sales?.hotLeads?.slice(0, 5) || []
         setHotLeads(leads)
+      }
+
+      // Agent performance
+      if (agentPerfRes.ok) {
+        const perfData = await agentPerfRes.json()
+        setAgentPerfs(perfData.agents || [])
+        setAgentTeam(perfData.team || null)
       }
     } catch (error) {
       console.error('Dashboard fetch error:', error)
@@ -993,6 +1023,112 @@ export default function DashboardPage() {
                   <span>Heute</span>
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ═══════════════════════════════════════════════════
+          LEVEL 2.7 — Team Performance (Total, Philipp, Rafi...)
+          ═══════════════════════════════════════════════════ */}
+      {!isLoading && agentTeam && agentPerfs.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-indigo-500" />
+                Team Performance (30 Tage)
+              </span>
+              <Link href="/agents">
+                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                  Details <ArrowRight className="h-3 w-3" />
+                </Button>
+              </Link>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50">
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">Agent</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Zugewiesen</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Gelöst</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Resolution</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500 hidden sm:table-cell">Ø FRT</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500 hidden sm:table-cell">CSAT</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {/* Team Total Row */}
+                  <tr className="bg-blue-50/50 dark:bg-blue-900/10 font-semibold">
+                    <td className="px-4 py-2.5 text-slate-800 dark:text-slate-200">Total</td>
+                    <td className="px-3 py-2.5 text-right text-slate-800 dark:text-slate-200">{agentTeam.total_emails_assigned}</td>
+                    <td className="px-3 py-2.5 text-right text-green-700 dark:text-green-400">{agentTeam.total_emails_resolved}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        agentTeam.team_resolution_rate >= 80 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' :
+                        agentTeam.team_resolution_rate >= 50 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' :
+                        'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                      }`}>
+                        {agentTeam.team_resolution_rate}%
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-800 dark:text-slate-200 hidden sm:table-cell">
+                      {agentTeam.team_avg_response_minutes !== null
+                        ? agentTeam.team_avg_response_minutes < 60
+                          ? `${Math.round(agentTeam.team_avg_response_minutes)}min`
+                          : `${Math.round(agentTeam.team_avg_response_minutes / 60 * 10) / 10}h`
+                        : '--'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-800 dark:text-slate-200 hidden sm:table-cell">
+                      {agentTeam.team_csat_avg !== null ? agentTeam.team_csat_avg.toFixed(1) : '--'}
+                    </td>
+                  </tr>
+                  {/* Per-Agent Rows */}
+                  {agentPerfs.map(agent => (
+                    <tr key={agent.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <span className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</span>
+                        <Badge className={`ml-2 text-[10px] px-1.5 py-0 ${
+                          agent.role === 'L1' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          agent.role === 'L2' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                        }`}>{agent.role}</Badge>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-medium text-slate-800 dark:text-slate-200">{agent.emails_assigned}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-600 dark:text-slate-400">{agent.emails_resolved}</td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          agent.resolution_rate >= 80 ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' :
+                          agent.resolution_rate >= 50 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' :
+                          'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                        }`}>
+                          {agent.resolution_rate}%
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2.5 text-right hidden sm:table-cell font-medium ${
+                        agent.avg_response_minutes !== null && agent.avg_response_minutes <= 60 ? 'text-green-700 dark:text-green-400' :
+                        agent.avg_response_minutes !== null && agent.avg_response_minutes <= 240 ? 'text-amber-700 dark:text-amber-400' :
+                        agent.avg_response_minutes !== null ? 'text-red-700 dark:text-red-400' : 'text-slate-500'
+                      }`}>
+                        {agent.avg_response_minutes !== null
+                          ? agent.avg_response_minutes < 60
+                            ? `${Math.round(agent.avg_response_minutes)}min`
+                            : `${Math.round(agent.avg_response_minutes / 60 * 10) / 10}h`
+                          : '--'}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right hidden sm:table-cell font-medium ${
+                        agent.csat_avg !== null && agent.csat_avg >= 4.0 ? 'text-green-700 dark:text-green-400' :
+                        agent.csat_avg !== null && agent.csat_avg >= 3.0 ? 'text-amber-700 dark:text-amber-400' :
+                        agent.csat_avg !== null ? 'text-red-700 dark:text-red-400' : 'text-slate-500'
+                      }`}>
+                        {agent.csat_avg !== null ? agent.csat_avg.toFixed(1) : '--'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>

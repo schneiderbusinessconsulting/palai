@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -134,10 +134,7 @@ interface Level1Stats {
   csatAvg: number | null
 }
 
-const isActionable = (e: Email) =>
-  e.email_type !== 'system_alert' &&
-  e.email_type !== 'notification' &&
-  (e.email_type !== 'form_submission' || e.needs_response)
+import { isActionableEmail as isActionable } from '@/lib/email-utils'
 
 const SLA_RESOLUTION_MINUTES: Record<string, number> = {
   critical: 240,   // 4h
@@ -154,9 +151,7 @@ function computeSlaStats(allEmails: Email[]): SlaStats {
   const openActionable = allEmails.filter(e =>
     e.status !== 'sent' &&
     e.status !== 'rejected' &&
-    e.email_type !== 'system_alert' &&
-    e.email_type !== 'notification' &&
-    (e.email_type !== 'form_submission' || e.needs_response)
+    isActionable(e)
   )
 
   const overdue: SlaEmail[] = []
@@ -474,16 +469,24 @@ export default function DashboardPage() {
   const [agentPerfs, setAgentPerfs] = useState<AgentPerf[]>([])
   const [agentTeam, setAgentTeam] = useState<AgentTeamTotals | null>(null)
 
+  const abortRef = useRef<AbortController | null>(null)
+
   const fetchData = useCallback(async () => {
+    // Cancel any in-flight request before starting a new one
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const signal = controller.signal
+
     setIsLoading(true)
     setFetchError(null)
     try {
       const [emailRes, insightsRes, analyticsRes, csatRes, agentPerfRes] = await Promise.all([
-        fetch('/api/emails?limit=200'),
-        fetch('/api/insights'),
-        fetch('/api/analytics?period=30d'),
-        fetch('/api/csat?period=30d'),
-        fetch('/api/agents/performance?period=30d'),
+        fetch('/api/emails?limit=200', { signal }),
+        fetch('/api/insights', { signal }),
+        fetch('/api/analytics?period=30d', { signal }),
+        fetch('/api/csat?period=30d', { signal }),
+        fetch('/api/agents/performance?period=30d', { signal }),
       ])
 
       let allEmails: Email[] = []
@@ -586,6 +589,7 @@ export default function DashboardPage() {
         setAgentTeam(perfData.team || null)
       }
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
       console.error('Dashboard fetch error:', error)
       setFetchError('Daten konnten nicht geladen werden. Bitte Seite aktualisieren.')
     } finally {
@@ -594,7 +598,10 @@ export default function DashboardPage() {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+    return () => { abortRef.current?.abort() }
+  }, [fetchData])
 
   // Auto-refresh every 2 minutes
   useEffect(() => {

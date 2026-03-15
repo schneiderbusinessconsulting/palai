@@ -85,12 +85,12 @@ describe('POST /api/deals', () => {
   beforeEach(resetMocks)
 
   it('creates a new deal', async () => {
-    const deal = { id: '1', name: 'New Deal', stage: 'open' }
+    const deal = { id: '1', title: 'New Deal', stage: 'lead' }
     setupChainResult(deal)
 
     const req = new NextRequest('http://localhost/api/deals', {
       method: 'POST',
-      body: JSON.stringify({ name: 'New Deal', stage: 'open' }),
+      body: JSON.stringify({ title: 'New Deal', stage: 'lead' }),
     })
     const res = await POST(req)
     expect(res.status).toBe(200)
@@ -98,12 +98,21 @@ describe('POST /api/deals', () => {
     expect(body.deal).toEqual(deal)
   })
 
+  it('returns 400 when title is missing', async () => {
+    const req = new NextRequest('http://localhost/api/deals', {
+      method: 'POST',
+      body: JSON.stringify({ stage: 'lead' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+  })
+
   it('returns 500 on insert error', async () => {
     setupChainResult(null, { message: 'Insert failed' })
 
     const req = new NextRequest('http://localhost/api/deals', {
       method: 'POST',
-      body: JSON.stringify({ name: 'Deal' }),
+      body: JSON.stringify({ title: 'Deal' }),
     })
     const res = await POST(req)
     expect(res.status).toBe(500)

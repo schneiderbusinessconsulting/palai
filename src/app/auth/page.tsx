@@ -18,8 +18,25 @@ export default function AuthPage() {
     setError('')
     setIsLoading(true)
 
-    // Redirect with password param - middleware will validate and set cookie
-    router.push(`/?pw=${encodeURIComponent(password)}`)
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+
+      if (res.ok) {
+        router.push('/')
+        router.refresh()
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Falsches Passwort')
+        setIsLoading(false)
+      }
+    } catch {
+      setError('Netzwerkfehler — bitte erneut versuchen')
+      setIsLoading(false)
+    }
   }
 
   return (

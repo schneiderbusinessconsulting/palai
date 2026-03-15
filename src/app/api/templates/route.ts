@@ -8,7 +8,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from('email_templates')
-      .select('*')
+      .select('id, name, subject, body, category, variables, is_favorite, usage_count, created_at, updated_at')
       .order('is_favorite', { ascending: false })
       .order('usage_count', { ascending: false })
 

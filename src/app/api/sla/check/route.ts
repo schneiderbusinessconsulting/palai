@@ -1,16 +1,29 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { runAutomationRules } from '@/lib/automation/engine'
+import { calculateBusinessMinutes, BusinessHoursConfig } from '@/lib/business-hours'
 
 /**
  * SLA Auto-Update: Checks all open emails and updates sla_status
- * based on elapsed time vs SLA target.
+ * based on elapsed business minutes vs SLA target.
  * - ok → at_risk (>80% of target elapsed)
  * - at_risk → breached (>100% of target elapsed)
+ *
+ * Uses business hours from DB (if available) to only count working time.
  */
 export async function POST() {
   try {
     const supabase = await createClient()
+
+    // Fetch business hours (optional — uses defaults if table doesn't exist)
+    let businessHours: BusinessHoursConfig[] | undefined
+    try {
+      const { data: bh } = await supabase
+        .from('business_hours')
+        .select('day_of_week, start_time, end_time, is_active')
+        .order('day_of_week')
+      if (bh?.length) businessHours = bh as BusinessHoursConfig[]
+    } catch { /* table may not exist — use defaults */ }
 
     // Fetch open emails that need response with their SLA targets
     const { data: emails, error } = await supabase
@@ -41,7 +54,7 @@ export async function POST() {
     // Also build priority-based lookup
     const priorityMap = new Map(slaTargets.map(t => [t.priority, t]))
 
-    const now = Date.now()
+    const now = new Date()
     let updated = 0
 
     for (const email of emails) {
@@ -51,7 +64,12 @@ export async function POST() {
 
       if (!target) continue
 
-      const elapsedMinutes = (now - new Date(email.received_at).getTime()) / (1000 * 60)
+      // Use business hours for elapsed time calculation
+      const elapsedMinutes = calculateBusinessMinutes(
+        new Date(email.received_at),
+        now,
+        businessHours
+      )
       const targetMinutes = target.first_response_minutes
 
       let newStatus: string | null = null

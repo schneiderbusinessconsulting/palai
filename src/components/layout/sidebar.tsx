@@ -33,7 +33,7 @@ const dashboards = [
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
-  { name: 'Insights', href: '/insights', icon: BarChart3 },
+  { name: 'Insights', href: '/insights', icon: BarChart3, badgeKey: 'escalations' },
   { name: 'Kunden', href: '/customers', icon: Users },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
@@ -65,13 +65,21 @@ export function Sidebar() {
         if (emailRes.ok) {
           const data = await emailRes.json()
           const emails = data.emails || []
-          const pending = emails.filter((e: { status: string; email_type?: string; needs_response?: boolean }) =>
-            (e.status === 'pending' || e.status === 'draft_ready') &&
+          const actionable = emails.filter((e: { status: string; email_type?: string; needs_response?: boolean }) =>
             e.email_type !== 'system_alert' &&
             e.email_type !== 'notification' &&
             (e.email_type !== 'form_submission' || e.needs_response)
+          )
+          const pending = actionable.filter((e: { status: string }) =>
+            e.status === 'pending' || e.status === 'draft_ready'
           ).length
           newBadges.pendingEmails = pending
+
+          // Escalation count (L2 + still open)
+          const escalated = actionable.filter((e: { status: string; support_level?: string }) =>
+            e.support_level === 'L2' && e.status !== 'sent' && e.status !== 'rejected'
+          ).length
+          newBadges.escalations = escalated
         }
 
         if (learningRes.ok) {

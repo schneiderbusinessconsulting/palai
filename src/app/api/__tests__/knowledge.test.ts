@@ -63,8 +63,8 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
 
 import { GET, POST, DELETE } from '@/app/api/knowledge/route'
 
-function makeRequest(url: string, options: RequestInit = {}) {
-  return new NextRequest(url, options)
+function makeRequest(url: string, options: RequestInit & { method?: string; body?: string } = {}) {
+  return new NextRequest(url, options as never)
 }
 
 function setupChainResult(data: unknown, error: unknown = null) {

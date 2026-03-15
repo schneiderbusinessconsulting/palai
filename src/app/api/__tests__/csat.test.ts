@@ -34,8 +34,8 @@ vi.mock('@/lib/supabase/server', () => ({
 
 import { POST, GET } from '@/app/api/csat/route'
 
-function makeRequest(url: string, options: RequestInit = {}) {
-  return new NextRequest(url, options)
+function makeRequest(url: string, options: RequestInit & { method?: string; body?: string } = {}) {
+  return new NextRequest(url, options as never)
 }
 
 function setupChainResult(data: unknown, error: unknown = null) {

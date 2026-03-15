@@ -9,8 +9,6 @@ export function useRelativeTime(date: string | Date): string {
   );
 
   useEffect(() => {
-    setRelativeTime(formatRelativeTime(date));
-
     const d = typeof date === "string" ? new Date(date) : date;
     const diffMs = Date.now() - d.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);

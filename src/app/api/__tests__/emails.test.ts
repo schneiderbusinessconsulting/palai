@@ -51,6 +51,8 @@ vi.mock('@/lib/text-utils', () => ({
   analyzeTone: vi.fn(() => ({ formality: 'formal', sentiment: 'positive', urgency: 'medium' })),
   determinePriority: vi.fn(() => 'medium'),
   calculateHappinessScore: vi.fn(() => 3),
+  detectSpam: vi.fn(() => ({ isSpam: false, spamScore: 0 })),
+  detectTopicTags: vi.fn(() => []),
 }))
 
 // Mock global fetch for HubSpot calls
@@ -60,8 +62,8 @@ vi.stubGlobal('fetch', mockFetch)
 // Import route handlers after mocks are set up
 import { GET, POST, PATCH } from '@/app/api/emails/route'
 
-function makeRequest(url: string, options: RequestInit = {}) {
-  return new NextRequest(url, options)
+function makeRequest(url: string, options: RequestInit & { method?: string; body?: string } = {}) {
+  return new NextRequest(url, options as never)
 }
 
 describe('GET /api/emails', () => {

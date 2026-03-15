@@ -1900,16 +1900,193 @@ function InboxPageContent() {
                 </div>
               )}
 
-              {/* Subject heading — prominent, Gmail-style */}
-              <div className="px-6 pt-5 pb-3">
-                <h2 className="text-2xl font-normal text-slate-900 dark:text-slate-100 leading-snug">
-                  {selectedEmail.subject}
-                </h2>
+              {/* Subject heading + metadata toolbar — Gmail-style */}
+              <div className="px-6 pt-5 pb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <h2 className="text-xl font-normal text-slate-900 dark:text-slate-100 leading-snug flex-1">
+                    {selectedEmail.subject}
+                  </h2>
+                  <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
+                    {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
+                    {customerEmailCount !== null && (
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        customerEmailCount === 1
+                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+                      }`}>
+                        {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              {/* Sender row — Gmail style with avatar */}
-              <div className="flex items-start gap-3 px-6 pb-5">
-                {/* Avatar circle with initials — color derived from sender name */}
+              {/* Compact metadata toolbar */}
+              <div className="px-6 py-2 flex items-center gap-3 flex-wrap text-xs text-slate-500 dark:text-slate-400">
+                {/* Agent Assignment */}
+                <div className="flex items-center gap-1">
+                  <UserCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <Select
+                    value={selectedEmail.assigned_agent_id || 'none'}
+                    onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
+                  >
+                    <SelectTrigger className="w-32 h-6 text-xs border-none shadow-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700 px-1">
+                      <SelectValue placeholder="Nicht zugewiesen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nicht zugewiesen</SelectItem>
+                      {agents.map((agent) => (
+                        <SelectItem key={agent.id} value={agent.id}>
+                          {agent.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
+
+                {/* Tags */}
+                <div className="flex items-center gap-1 flex-wrap">
+                  <Bookmark className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  {(selectedEmail.tags || []).map(tag => (
+                    <span key={tag} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                      {tag}
+                      <button
+                        onClick={() => handleRemoveTag(selectedEmail.id, tag)}
+                        className="hover:text-slate-900 dark:hover:text-slate-200"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); handleAddTag(selectedEmail.id, tagInput) }}
+                    className="inline-flex"
+                  >
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      placeholder="+ Tag"
+                      className="h-5 w-16 text-xs px-1 border-none shadow-none bg-transparent placeholder:text-slate-400"
+                    />
+                  </form>
+                </div>
+
+                <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
+
+                {/* Snooze */}
+                <div className="flex items-center gap-1">
+                  <EyeOff className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  {[
+                    { label: '1h', hours: 1 },
+                    { label: '4h', hours: 4 },
+                    { label: 'Morgen', hours: 20 },
+                    { label: '1W', hours: 168 },
+                  ].map(opt => (
+                    <Button
+                      key={opt.label}
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-5 px-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Thin separator */}
+              <div className="border-t border-slate-200 dark:border-slate-700" />
+
+              {/* Thread History — Gmail-style, chronological (oldest first, ABOVE current email) */}
+              {threadEmails.length > 0 && (
+                <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                  {[...threadEmails].reverse().map((tEmail) => {
+                    const isExpanded = expandedThreadIds.has(tEmail.id)
+                    return (
+                      <div key={tEmail.id}>
+                        <button
+                          className="w-full px-6 py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors text-left"
+                          onClick={() => setExpandedThreadIds(prev => {
+                            const next = new Set(prev)
+                            next.has(tEmail.id) ? next.delete(tEmail.id) : next.add(tEmail.id)
+                            return next
+                          })}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Compact avatar */}
+                            <div
+                              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium"
+                              style={{
+                                backgroundColor: (() => {
+                                  const name = tEmail.from_name || tEmail.from_email || '?'
+                                  const colors = ['#5f6368', '#70757a', '#80868b', '#9aa0a6', '#616161', '#757575', '#898989', '#6d7278']
+                                  let hash = 0
+                                  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+                                  return colors[Math.abs(hash) % colors.length]
+                                })()
+                              }}
+                            >
+                              {(tEmail.from_name || tEmail.from_email || '?').split(/[\s@]+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('')}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
+                                  {tEmail.from_name || tEmail.from_email}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${tEmail.status === 'sent' ? 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400' : 'bg-slate-50 text-slate-400 dark:bg-slate-800 dark:text-slate-500'}`}>
+                                  {tEmail.status === 'sent' ? 'Antwort' : 'Eingang'}
+                                </span>
+                              </div>
+                              {!isExpanded && (
+                                <p className="text-xs text-slate-400 truncate mt-0.5">
+                                  {tEmail.body_text?.slice(0, 100) || '…'}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
+                            {new Date(tEmail.received_at).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <div className="px-6 pb-4 pl-[4.25rem]">
+                            {tEmail.body_html ? (
+                              <iframe
+                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 10px 0;}</style></head><body>${tEmail.body_html}</body></html>`}
+                                className="w-full border-0"
+                                style={{ minHeight: '60px' }}
+                                onLoad={(e) => {
+                                  const iframe = e.currentTarget
+                                  if (iframe.contentDocument?.body) {
+                                    iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
+                                  }
+                                }}
+                                sandbox=""
+                                title="Thread email content"
+                              />
+                            ) : (
+                              <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {tEmail.body_text || <span className="italic text-slate-400">Kein Inhalt</span>}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Separator before current email */}
+              {threadEmails.length > 0 && (
+                <div className="border-t-2 border-slate-200 dark:border-slate-600" />
+              )}
+
+              {/* Current Email — most recent message (sender + body) */}
+              <div className="flex items-start gap-3 px-6 pt-4 pb-2">
                 <div
                   className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium"
                   style={{
@@ -1934,33 +2111,20 @@ function InboxPageContent() {
                     <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                       {selectedEmail.from_name || selectedEmail.from_email}
                     </span>
-                    {customerEmailCount !== null && (
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ml-2 ${
-                        customerEmailCount === 1
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                      }`}>
-                        {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
-                      </span>
-                    )}
-                    {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
-                    <span className="text-xs text-slate-500 dark:text-slate-500 whitespace-nowrap flex-shrink-0">
+                    <span className="text-xs text-slate-400 whitespace-nowrap flex-shrink-0">
                       {new Date(selectedEmail.received_at).toLocaleString('de-CH', { dateStyle: 'medium', timeStyle: 'short' })}
                     </span>
                   </div>
                   {selectedEmail.from_name && (
-                    <p className="text-xs text-slate-500 dark:text-slate-500 truncate mt-0.5">
+                    <p className="text-xs text-slate-400 truncate mt-0.5">
                       {selectedEmail.from_email}
                     </p>
                   )}
                 </div>
               </div>
 
-              {/* Thin separator */}
-              <div className="border-t border-slate-100 dark:border-slate-800" />
-
-              {/* Email Body — clean, spacious, no label */}
-              <div className="px-6 py-6 pl-[4.25rem]">
+              {/* Email Body — clean, full-width below avatar row */}
+              <div className="px-6 py-4 pl-[4.25rem]">
                 {selectedEmail.body_html ? (
                   <iframe
                     srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
@@ -1984,158 +2148,16 @@ function InboxPageContent() {
                 )}
               </div>
 
-              {/* Thin separator */}
-              <div className="border-t border-slate-100 dark:border-slate-800" />
-
-              {/* Metadata toolbar — compact horizontal bar */}
-              <div className="px-6 py-3 flex items-center gap-4 flex-wrap text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30">
-                {/* Agent Assignment */}
-                <div className="flex items-center gap-1.5">
-                  <UserCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  <Select
-                    value={selectedEmail.assigned_agent_id || 'none'}
-                    onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
-                  >
-                    <SelectTrigger className="w-36 h-7 text-xs border-none shadow-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700 px-1.5">
-                      <SelectValue placeholder="Nicht zugewiesen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nicht zugewiesen</SelectItem>
-                      {agents.map((agent) => (
-                        <SelectItem key={agent.id} value={agent.id}>
-                          {agent.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-
-                {/* Tags */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <Bookmark className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  {(selectedEmail.tags || []).map(tag => (
-                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                      {tag}
-                      <button
-                        onClick={() => handleRemoveTag(selectedEmail.id, tag)}
-                        className="hover:text-indigo-900 dark:hover:text-indigo-200"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  <form
-                    onSubmit={(e) => { e.preventDefault(); handleAddTag(selectedEmail.id, tagInput) }}
-                    className="inline-flex"
-                  >
-                    <Input
-                      value={tagInput}
-                      onChange={(e) => setTagInput(e.target.value)}
-                      placeholder="+ Tag"
-                      className="h-6 w-20 text-xs px-1.5 border-none shadow-none bg-transparent placeholder:text-slate-400"
-                    />
-                  </form>
-                </div>
-
-                <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
-
-                {/* Snooze */}
-                <div className="flex items-center gap-1.5">
-                  <EyeOff className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
-                  {[
-                    { label: '1h', hours: 1 },
-                    { label: '4h', hours: 4 },
-                    { label: 'Morgen', hours: 20 },
-                    { label: '1 Woche', hours: 168 },
-                  ].map(opt => (
-                    <Button
-                      key={opt.label}
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs h-6 px-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                      onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
-                    >
-                      {opt.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Thread History — Outlook-style conversation view */}
-              {threadEmails.length > 0 && (
-                <div className="space-y-2 px-6 py-4">
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide px-1">
-                    Gesprächsverlauf ({threadEmails.length} weitere Nachrichten)
-                  </p>
-                  {threadEmails.map((tEmail) => {
-                    const isExpanded = expandedThreadIds.has(tEmail.id)
-                    return (
-                      <div key={tEmail.id} className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                        {/* Collapsed header — click to expand */}
-                        <button
-                          className="w-full px-4 py-2.5 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-left"
-                          onClick={() => setExpandedThreadIds(prev => {
-                            const next = new Set(prev)
-                            next.has(tEmail.id) ? next.delete(tEmail.id) : next.add(tEmail.id)
-                            return next
-                          })}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className={`text-xs font-medium ${tEmail.status === 'sent' ? 'text-green-600' : 'text-blue-600'}`}>
-                              {tEmail.status === 'sent' ? '↩ Antwort' : '→ Eingang'}
-                            </span>
-                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                              {tEmail.from_name || tEmail.from_email}
-                            </span>
-                            {!isExpanded && (
-                              <span className="text-xs text-slate-400 truncate hidden sm:block">
-                                {tEmail.body_text?.slice(0, 80) || '…'}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-slate-400 flex-shrink-0 ml-2">
-                            {new Date(tEmail.received_at).toLocaleString('de-CH', { dateStyle: 'short', timeStyle: 'short' })}
-                          </span>
-                        </button>
-                        {/* Expanded body */}
-                        {isExpanded && (
-                          <div className="p-4 bg-white dark:bg-slate-900">
-                            {tEmail.body_html ? (
-                              <iframe
-                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:system-ui,-apple-system,sans-serif;font-size:13px;color:#374151;line-height:1.6;margin:0;padding:0;word-wrap:break-word;}a{color:#2563eb;}blockquote{border-left:3px solid #e5e7eb;margin-left:0;padding-left:12px;color:#6b7280;}</style></head><body>${tEmail.body_html}</body></html>`}
-                                className="w-full border-0"
-                                style={{ minHeight: '80px' }}
-                                onLoad={(e) => {
-                                  const iframe = e.currentTarget
-                                  if (iframe.contentDocument?.body) {
-                                    iframe.style.height = Math.min(iframe.contentDocument.body.scrollHeight + 16, 400) + 'px'
-                                  }
-                                }}
-                                sandbox=""
-                                title="Thread email content"
-                              />
-                            ) : (
-                              <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-                                {tEmail.body_text || <span className="italic text-slate-400">Kein Inhalt</span>}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+              {/* Separator before AI section */}
+              <div className="border-t border-slate-200 dark:border-slate-700" />
 
               {/* AI Draft */}
               {currentDraft ? (
                 <div className="space-y-3 px-6 py-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-amber-500" />
-                      <h4 className="font-medium">AI Antwortvorschlag</h4>
+                      <Sparkles className="h-4 w-4 text-slate-400" />
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">AI Antwortvorschlag</h4>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
                       {/* Formality Toggle */}
@@ -2291,7 +2313,7 @@ function InboxPageContent() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg overflow-hidden">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                       <div className="text-sm whitespace-pre-wrap break-all max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {currentDraft.edited_response || currentDraft.ai_generated_response}
                       </div>
@@ -2436,7 +2458,7 @@ function InboxPageContent() {
           )}
 
           {(currentDraft || isManualMode) && (
-            <DialogFooter className="flex-col sm:flex-row gap-3 px-6 pb-5 pt-2">
+            <DialogFooter className="flex-col sm:flex-row gap-3 px-6 pb-5 pt-3 sticky bottom-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 z-10">
               {/* Owner Selection */}
               {owners.length > 0 && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -2535,7 +2557,7 @@ function InboxPageContent() {
                   </Tooltip>
                 </TooltipProvider>
                 <Button
-                  className="bg-blue-600 hover:bg-blue-700"
+                  className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
                   onClick={handleSend}
                   disabled={isSending || (isManualMode && !editedResponse.trim())}
                 >

@@ -48,6 +48,7 @@ import {
 } from 'lucide-react'
 import { AutomationTab } from '@/components/settings/automation-tab'
 import { AuditTrailTab } from '@/components/settings/audit-trail-tab'
+import { BusinessHoursTab } from '@/components/settings/business-hours-tab'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -524,6 +525,7 @@ export default function SettingsPage() {
           <TabsTrigger value="team" className="gap-2" onClick={fetchAgents}><Shield className="h-4 w-4" />Team</TabsTrigger>
           <TabsTrigger value="training" className="gap-2" onClick={fetchTrainingStats}><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
+          <TabsTrigger value="business-hours" className="gap-2"><Clock className="h-4 w-4" />Geschäftszeiten</TabsTrigger>
           <TabsTrigger value="automation" className="gap-2"><Workflow className="h-4 w-4" />Automatisierung</TabsTrigger>
           <TabsTrigger value="audit" className="gap-2"><ScrollText className="h-4 w-4" />Audit Trail</TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2" onClick={fetchIntegrationStatus}><Database className="h-4 w-4" />Integrationen</TabsTrigger>
@@ -1428,6 +1430,10 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* ── INTEGRATIONEN ──────────────────────────────────────────────────── */}
+        <TabsContent value="business-hours" className="space-y-6">
+          <BusinessHoursTab />
+        </TabsContent>
+
         <TabsContent value="automation" className="space-y-6">
           <AutomationTab />
         </TabsContent>

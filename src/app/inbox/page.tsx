@@ -92,6 +92,7 @@ interface Email {
   support_level?: string
   snoozed_until?: string
   tags?: string[]
+  hubspot_thread_id?: string
 }
 
 interface Agent {
@@ -221,6 +222,7 @@ export default function InboxPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [hideSent, setHideSent] = useState(true) // Hide closed/sent by default
   const [hideSystemMails, setHideSystemMails] = useState(true) // Hide system/transactional mails by default
+  const [threadView, setThreadView] = useState(false) // Group by thread
   const [autoDraftEnabled, setAutoDraftEnabled] = useState(false) // Auto-draft disabled by default to save credits
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -1055,6 +1057,16 @@ export default function InboxPage() {
             System-Mails ausblenden
           </Label>
         </div>
+        <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-background">
+          <Switch
+            id="thread-view"
+            checked={threadView}
+            onCheckedChange={setThreadView}
+          />
+          <Label htmlFor="thread-view" className="text-sm cursor-pointer flex items-center gap-1.5">
+            Thread-Ansicht
+          </Label>
+        </div>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1257,9 +1269,39 @@ export default function InboxPage() {
         </div>
       ) : (
         <div className="space-y-3">
+          {/* Thread grouping header when thread view is enabled */}
+          {threadView && (() => {
+            const threadGroups = new Map<string, Email[]>()
+            const noThread: Email[] = []
+            for (const email of filteredEmails) {
+              if (email.hubspot_thread_id) {
+                const existing = threadGroups.get(email.hubspot_thread_id) || []
+                existing.push(email)
+                threadGroups.set(email.hubspot_thread_id, existing)
+              } else {
+                noThread.push(email)
+              }
+            }
+            const threads = [...threadGroups.entries()]
+              .filter(([, emails]) => emails.length > 1)
+              .sort(([, a], [, b]) => new Date(b[0].received_at).getTime() - new Date(a[0].received_at).getTime())
+            if (threads.length > 0) {
+              return (
+                <div className="text-xs text-slate-500 bg-slate-50 dark:bg-slate-800/50 rounded px-3 py-1.5">
+                  {threads.length} Threads erkannt ({filteredEmails.length - noThread.length} E-Mails gruppiert)
+                </div>
+              )
+            }
+            return null
+          })()}
           {filteredEmails.map((email) => {
             const draft = email.email_drafts?.[0]
             const emailConfidence = draft?.confidence_score || 0
+
+            // In thread view, show thread indicator
+            const threadCount = threadView && email.hubspot_thread_id
+              ? filteredEmails.filter(e => e.hubspot_thread_id === email.hubspot_thread_id).length
+              : 0
 
             return (
               <Card
@@ -1314,6 +1356,11 @@ export default function InboxPage() {
                           {getBuyingIntentBadge(email.buying_intent_score)}
                           {getEmailTypeBadge(email.email_type, email.needs_response)}
                           {getStatusBadge(email.status)}
+                          {threadCount > 1 && (
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600">
+                              {threadCount} in Thread
+                            </Badge>
+                          )}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
                             {formatDate(email.received_at)}
                           </span>

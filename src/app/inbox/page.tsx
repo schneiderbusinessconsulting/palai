@@ -155,6 +155,10 @@ function InboxPageContent() {
   const [splitRatio, setSplitRatio] = useState(0.5)
   const panelRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+
+  // Clean up drag listeners if component unmounts mid-drag
+  useEffect(() => () => { dragCleanupRef.current?.() }, [])
 
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
@@ -871,17 +875,19 @@ function InboxPageContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Update selected email with new draft
-        if (selectedEmail) {
-          setSelectedEmail({
-            ...selectedEmail,
-            status: 'draft_ready',
-            email_drafts: [data.draft],
-          })
-          // Update formality from detected
+        // Update selected email with new draft — only if user is still viewing this email
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev =>
+            prev?.id === emailId
+              ? { ...prev, status: 'draft_ready', email_drafts: [data.draft] }
+              : prev
+          )
           if (data.detectedFormality) {
             setFormality(data.detectedFormality)
           }
+          // Populate editor with the new draft text (converted to HTML)
+          const draftText = data.draft?.edited_response || data.draft?.ai_generated_response || ''
+          if (draftText) setEditedResponse(plainToHtml(draftText))
         }
         fetchEmails()
         // Close regenerate dialog
@@ -899,12 +905,20 @@ function InboxPageContent() {
   // Convert plain text to HTML for RichTextEditor
   const plainToHtml = (text: string): string => {
     if (!text) return ''
-    // Already HTML
-    if (text.trimStart().startsWith('<')) return text
+    // Already HTML — but be strict: must start with < followed by a tag name
+    if (/^<[a-zA-Z]/.test(text.trimStart())) return text
     return text
       .split(/\n{2,}/)
       .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
       .join('')
+  }
+
+  // Check if rich-text HTML is effectively empty (no visible text)
+  const htmlIsEmpty = (html: string): boolean => {
+    if (!html) return true
+    const div = document.createElement('div')
+    div.innerHTML = html
+    return (div.textContent ?? div.innerText ?? '').trim() === ''
   }
 
   // Drag handle for split-pane resizing
@@ -917,55 +931,27 @@ function InboxPageContent() {
       const ratio = (ev.clientY - rect.top) / rect.height
       setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)))
     }
-    const onUp = () => {
+    const cleanup = () => {
       isDraggingRef.current = false
       document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
+      document.removeEventListener('mouseup', cleanup)
+      dragCleanupRef.current = null
     }
+    dragCleanupRef.current = cleanup
     document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
+    document.addEventListener('mouseup', cleanup)
   }, [])
-
-  // Format selected text in compose textarea
-  const formatText = (type: 'bold' | 'italic' | 'underline' | 'bullet' | 'number' | 'quote') => {
-    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[data-compose]')
-    if (!textarea) return
-    const start = textarea.selectionStart
-    const end = textarea.selectionEnd
-    const selected = editedResponse.substring(start, end)
-    const before = editedResponse.substring(0, start)
-    const after = editedResponse.substring(end)
-    let replacement = selected
-    let cursorOffset = 0
-    if (type === 'bold') { replacement = `**${selected || 'Fett'}**`; cursorOffset = selected ? 0 : 2 }
-    else if (type === 'italic') { replacement = `_${selected || 'Kursiv'}_`; cursorOffset = selected ? 0 : 1 }
-    else if (type === 'underline') { replacement = `__${selected || 'Unterstrichen'}__`; cursorOffset = selected ? 0 : 2 }
-    else if (type === 'bullet') {
-      const lines = (selected || 'Punkt').split('\n').map(l => `• ${l}`).join('\n')
-      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
-    } else if (type === 'number') {
-      const lines = (selected || 'Punkt').split('\n').map((l, i) => `${i + 1}. ${l}`).join('\n')
-      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
-    } else if (type === 'quote') {
-      const lines = (selected || 'Zitat').split('\n').map(l => `> ${l}`).join('\n')
-      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
-    }
-    const newValue = before + replacement + after
-    setEditedResponse(newValue)
-    setTimeout(() => {
-      textarea.focus()
-      const newCursor = start + replacement.length - cursorOffset
-      textarea.setSelectionRange(newCursor, newCursor)
-    }, 0)
-  }
 
   // Copy to clipboard
   const handleCopy = async () => {
     if (!selectedEmail?.email_drafts?.[0]) return
     const draft = selectedEmail.email_drafts[0]
-    const text = isEditing ? editedResponse : (draft.edited_response || draft.ai_generated_response)
-
-    await navigator.clipboard.writeText(text)
+    const raw = editedResponse || draft.edited_response || draft.ai_generated_response || ''
+    // Strip HTML so the clipboard gets clean plain text
+    const div = document.createElement('div')
+    div.innerHTML = raw
+    const plain = (div.textContent ?? div.innerText ?? raw).trim()
+    await navigator.clipboard.writeText(plain)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
   }
@@ -2610,7 +2596,7 @@ function InboxPageContent() {
                       size="sm"
                       className="h-8 px-4 gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium"
                       onClick={handleSend}
-                      disabled={isSending || !editedResponse.trim()}
+                      disabled={isSending || htmlIsEmpty(editedResponse)}
                     >
                       {isSending ? (
                         <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sende...</>
@@ -2669,7 +2655,7 @@ function InboxPageContent() {
                     )}
 
                     {/* Save */}
-                    <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500" onClick={handleSaveDraft} disabled={isSaving || !editedResponse.trim()}>
+                    <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500" onClick={handleSaveDraft} disabled={isSaving || htmlIsEmpty(editedResponse)}>
                       {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                       Speichern
                     </Button>
@@ -2749,7 +2735,7 @@ function InboxPageContent() {
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || !editedResponse.trim()}>
+                        <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || htmlIsEmpty(editedResponse)}>
                           {isSavingToKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
                         </Button>
                       </TooltipTrigger>

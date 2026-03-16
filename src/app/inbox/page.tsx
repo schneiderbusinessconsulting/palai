@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -398,6 +399,7 @@ function InboxPageContent() {
   }, [])
 
   // Fetch emails (with optional loading indicator)
+  // Falls server-side API fails (e.g. network restrictions), falls back to direct browser Supabase client
   const fetchEmails = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true)
     try {
@@ -406,17 +408,44 @@ function InboxPageContent() {
       if (topicFilter) params.set('topic', topicFilter)
       const response = await fetch(`/api/emails?${params.toString()}`)
       const data = await response.json()
-      if (response.ok) {
+      if (response.ok && !data.unconfigured) {
         setEmails(data.emails || [])
         setFetchError('')
-        setDbUnconfigured(!!data.unconfigured)
-      } else {
-        console.error('Email API error:', data)
-        setFetchError(data.details ? `${data.error}: ${data.details}` : (data.error || `Fehler beim Laden (HTTP ${response.status})`))
+        setDbUnconfigured(false)
+        return
       }
-    } catch (error) {
-      console.error('Failed to fetch emails:', error)
-      setFetchError('Verbindung zum Server fehlgeschlagen')
+      // Server API failed or DB unconfigured — try direct browser client
+      throw new Error(data.error || 'Server API failed')
+    } catch (serverError) {
+      console.warn('Server API unavailable, trying direct Supabase client:', serverError)
+      try {
+        const supabase = createBrowserClient()
+        let query = supabase
+          .from('incoming_emails')
+          .select('*, email_drafts(id, ai_generated_response, edited_response, confidence_score, status, formality)', { count: 'exact' })
+          .order('received_at', { ascending: false })
+          .range(0, 99)
+        if (showSpam) {
+          query = query.eq('is_spam', true)
+        } else {
+          query = query.or('is_spam.eq.false,is_spam.is.null')
+        }
+        if (topicFilter) {
+          query = query.contains('topic_tags', [topicFilter])
+        }
+        if (filter && filter !== 'all') {
+          query = query.eq('status', filter)
+        }
+        const { data: emails, error } = await query
+        if (error) throw error
+        setEmails(emails || [])
+        setFetchError('')
+        setDbUnconfigured(false)
+      } catch (clientError) {
+        console.error('Direct Supabase client also failed:', clientError)
+        setFetchError('Verbindung zu Supabase fehlgeschlagen')
+        setDbUnconfigured(true)
+      }
     } finally {
       if (showLoading) setIsLoading(false)
     }

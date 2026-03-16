@@ -71,10 +71,10 @@ export default function ReportsPage() {
     setReportData([])
 
     try {
-      const res = await fetch(`/api/insights?type=${reportId}&period=${selectedPeriod}`)
+      const res = await fetch(`/api/reports/export?type=${reportId}&format=json&period=${selectedPeriod}`)
       if (!res.ok) throw new Error('Fehler beim Laden')
       const data = await res.json()
-      setReportData(Array.isArray(data) ? data : data.rows ?? [])
+      setReportData(Array.isArray(data) ? data : [])
     } catch {
       setReportData([])
     } finally {

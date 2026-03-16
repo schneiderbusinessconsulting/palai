@@ -60,6 +60,7 @@ import {
   ShieldAlert,
   Clock,
   Settings,
+  Reply,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
 import {
@@ -918,7 +919,7 @@ function InboxPageContent() {
   const handleSend = async () => {
     if (!selectedEmail) return
 
-    const finalText = isEditing ? editedResponse : (currentDraft?.edited_response || currentDraft?.ai_generated_response || editedResponse)
+    const finalText = editedResponse || currentDraft?.edited_response || currentDraft?.ai_generated_response
 
     if (!finalText?.trim()) {
       toast.error('Antwort darf nicht leer sein')
@@ -1013,7 +1014,7 @@ function InboxPageContent() {
     if (!selectedEmail || !currentDraft) return
     setIsSavingToKb(true)
     try {
-      const text = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const text = editedResponse || currentDraft.edited_response || currentDraft.ai_generated_response
       const res = await fetch('/api/knowledge/from-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2397,251 +2398,202 @@ function InboxPageContent() {
                 )}
               </div>
 
-              {/* Separator before AI section */}
+              {/* Separator before reply section */}
               <div className="border-t border-slate-200 dark:border-slate-700" />
 
-              {/* AI Draft */}
-              {currentDraft ? (
-                <div className="space-y-3 px-6 py-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-slate-400" />
-                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">AI Antwortvorschlag</h4>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
+              {/* Gmail-style Inline Compose — always visible */}
+              <div className="px-6 py-4 space-y-3">
+
+                {/* Smart Reply Chips */}
+                {!editedResponse && (
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'Vielen Dank für Ihre Nachricht.',
+                      'Gerne helfe ich Ihnen weiter!',
+                      'Ich schaue das für Sie nach.',
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        onClick={() => setEditedResponse(chip + '\n\n')}
+                        className="px-3 py-1.5 text-xs rounded-full border border-slate-300 dark:border-slate-600 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-slate-600 dark:text-slate-400 transition-colors"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Compose Box */}
+                <div className="border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/30 transition-all">
+
+                  {/* Recipient bar */}
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap">
+                    <Reply className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-500">An:</span>
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
+                      {selectedEmail.from_email}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                       {/* Formality Toggle */}
-                      <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md">
+                      <div className="flex items-center gap-0.5 px-1 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md">
                         <button
                           onClick={() => setFormality('sie')}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            formality === 'sie'
-                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
-                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                          }`}
-                        >
-                          Sie
-                        </button>
+                          className={`px-1.5 py-0.5 text-xs rounded transition-colors ${formality === 'sie' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >Sie</button>
                         <button
                           onClick={() => setFormality('du')}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            formality === 'du'
-                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
-                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                          }`}
-                        >
-                          Du
-                        </button>
+                          className={`px-1.5 py-0.5 text-xs rounded transition-colors ${formality === 'du' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >Du</button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500">Confidence:</span>
-                        <Badge className={getConfidenceColor(confidence)}>
+                      {currentDraft && (
+                        <Badge className={`text-xs ${getConfidenceColor(confidence)}`}>
+                          <Sparkles className="h-2.5 w-2.5 mr-1" />
                           {Math.round(confidence * 100)}%
                         </Badge>
-                      </div>
+                      )}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => setShowRegenerateDialog(true)}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Neu generieren mit Feedback</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
+                            <button
                               onClick={handleCopy}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 transition-colors"
                             >
-                              {isCopied ? (
-                                <Check className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </Button>
+                              {isCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </button>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{isCopied ? 'Kopiert!' : 'In Zwischenablage kopieren'}</p>
-                          </TooltipContent>
+                          <TooltipContent><p>{isCopied ? 'Kopiert!' : 'Kopieren'}</p></TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </div>
                   </div>
 
-                  {/* Regenerate Dialog */}
+                  {/* Regenerate feedback panel */}
                   {showRegenerateDialog && (
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <div className="flex items-start gap-2 mb-3">
-                        <MessageSquare className="h-4 w-4 text-amber-600 mt-0.5" />
-                        <div>
-                          <h5 className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                            Was soll verbessert werden?
-                          </h5>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            Beschreibe, was an der Antwort geändert werden soll
-                          </p>
-                        </div>
+                    <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
+                        <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Was soll verbessert werden?</span>
                       </div>
-                      <Textarea
-                        value={regenerateFeedback}
-                        onChange={(e) => setRegenerateFeedback(e.target.value)}
-                        placeholder="z.B. 'Freundlicher formulieren', 'Mehr Details zu Preisen', 'Kürzer fassen'..."
-                        rows={2}
-                        className="text-sm mb-3"
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setShowRegenerateDialog(false)
-                            setRegenerateFeedback('')
-                          }}
-                        >
-                          Abbrechen
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={regenerateFeedback}
+                          onChange={(e) => setRegenerateFeedback(e.target.value)}
+                          placeholder="z.B. 'Kürzer', 'Freundlicher', 'Mehr Details zu Preisen'..."
+                          className="flex-1 text-xs px-2 py-1.5 border border-amber-200 dark:border-amber-700 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateDraft(selectedEmail!.id, true) }}
+                          autoFocus
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleGenerateDraft(selectedEmail!.id, true)} disabled={isRegenerating}>
+                          {isRegenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleGenerateDraft(selectedEmail!.id, true)}
-                          disabled={isRegenerating}
-                        >
-                          {isRegenerating ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Generiere...
-                            </>
-                          ) : (
-                            <>
-                              <RotateCcw className="h-3 w-3 mr-1" />
-                              Neu generieren
-                            </>
-                          )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowRegenerateDialog(false); setRegenerateFeedback('') }}>
+                          <X className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                   )}
 
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Textarea
-                        value={editedResponse}
-                        onChange={(e) => setEditedResponse(e.target.value)}
-                        rows={10}
-                        className="font-mono text-sm"
-                      />
-                      <div className="flex justify-end">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1 text-xs text-slate-500"
-                                onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
-                              >
-                                <Wand2 className="h-3 w-3" />
-                                Variablen ersetzen
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                      <div className="text-sm whitespace-pre-wrap break-all max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        {currentDraft.edited_response || currentDraft.ai_generated_response}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : isManualMode ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Edit className="h-4 w-4 text-gold-500" />
-                    <h4 className="font-medium">Manuelle Antwort</h4>
-                  </div>
+                  {/* Editable textarea — always writable */}
                   <Textarea
                     value={editedResponse}
                     onChange={(e) => setEditedResponse(e.target.value)}
-                    rows={10}
-                    className="font-mono text-sm"
-                    placeholder="Antwort hier eingeben..."
-                    autoFocus
+                    placeholder="Schreib deine Antwort... (oder klicke auf AI Vorschlag)"
+                    rows={8}
+                    className="border-0 rounded-none shadow-none resize-none focus-visible:ring-0 text-sm leading-relaxed px-4 py-3"
                   />
-                  <div className="flex justify-end">
+
+                  {/* Toolbar */}
+                  <div className="flex items-center gap-1 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap gap-y-2">
+                    {/* Formatting buttons */}
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1 text-xs text-slate-500"
+                          <button
                             onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
+                            className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
                           >
-                            <Wand2 className="h-3 w-3" />
-                            Variablen ersetzen
-                          </Button>
+                            <Wand2 className="h-3.5 w-3.5" />
+                          </button>
                         </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
-                        </TooltipContent>
+                        <TooltipContent><p>{'Variablen ersetzen ({{name}}, {{email}}, ...)'}</p></TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                  </div>
-                </div>
-              ) : (
-                <div className="mx-6 my-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center bg-slate-50/50 dark:bg-slate-800/20">
-                  <Mail className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                  <p className="text-sm text-slate-400 dark:text-slate-500 mb-5">Wie möchtest du antworten?</p>
-                  <div className="flex gap-4 justify-center">
+
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+                    {/* AI button */}
                     <Button
-                      size="lg"
-                      className="gap-2 px-6 h-12 text-base"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       onClick={() => handleGenerateDraft(selectedEmail.id)}
                       disabled={isGenerating}
                     >
                       {isGenerating ? (
-                        <>
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                          Generiere...
-                        </>
+                        <><Loader2 className="h-3 w-3 animate-spin" />Generiere...</>
                       ) : (
-                        <>
-                          <Sparkles className="h-5 w-5" />
-                          AI Vorschlag
-                        </>
+                        <><Sparkles className="h-3 w-3" />{currentDraft ? 'Neu generieren' : 'AI Vorschlag'}</>
                       )}
                     </Button>
+
+                    {currentDraft && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1 text-slate-500 hover:text-amber-600"
+                        onClick={() => setShowRegenerateDialog(!showRegenerateDialog)}
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        Feedback
+                      </Button>
+                    )}
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Owner Selection */}
+                    {owners.length > 0 && (
+                      <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
+                        <SelectTrigger className="h-7 w-36 text-xs border-slate-200 dark:border-slate-600">
+                          <SelectValue placeholder="Senden als..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {owners.map((owner) => (
+                            <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {/* Save draft */}
                     <Button
-                      size="lg"
-                      variant="outline"
-                      className="gap-2 px-6 h-12 text-base"
-                      onClick={() => {
-                        setIsManualMode(true)
-                        setEditedResponse('')
-                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1 text-slate-500"
+                      onClick={handleSaveDraft}
+                      disabled={isSaving || !editedResponse.trim()}
                     >
-                      <Edit className="h-5 w-5" />
-                      Manuell antworten
+                      {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                      Speichern
+                    </Button>
+
+                    {/* Send button */}
+                    <Button
+                      size="sm"
+                      className="h-7 px-3 text-xs gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900"
+                      onClick={handleSend}
+                      disabled={isSending || !editedResponse.trim()}
+                    >
+                      {isSending ? (
+                        <><Loader2 className="h-3 w-3 animate-spin" />Sende...</>
+                      ) : (
+                        <><Send className="h-3 w-3" />Senden</>
+                      )}
                     </Button>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Interne Notizen */}
               <div className="border rounded-lg mx-6 mb-4">
@@ -2709,125 +2661,34 @@ function InboxPageContent() {
             </div>
           )}
 
-          {(currentDraft || isManualMode) && (
-            <DialogFooter className="flex-col sm:flex-row gap-3 px-6 pb-5 pt-3 sticky bottom-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 z-10">
-              {/* Owner Selection */}
-              {owners.length > 0 && (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-sm text-slate-500 whitespace-nowrap">Senden als:</span>
-                  <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="Owner wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {owners.map((owner) => (
-                        <SelectItem key={owner.id} value={owner.id}>
-                          {owner.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
-                <Button variant="outline" onClick={handleClose}>
-                  Schliessen
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleSaveToKb}
-                        disabled={isSavingToKb}
-                      >
-                        {isSavingToKb ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <BookOpen className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Antwort in die Knowledge Base speichern</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {(isEditing || isManualMode) && (
-                  <Button
-                    variant="outline"
-                    className="border-gold-300 text-gold-600 hover:bg-gold-50"
-                    onClick={handleSaveDraft}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                    )}
-                    Speichern
-                  </Button>
-                )}
-                {currentDraft && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (isEditing) {
-                        handleSaveDraft()
-                      } else {
-                        setEditedResponse(
-                          currentDraft.edited_response || currentDraft.ai_generated_response
-                        )
-                      }
-                      setIsEditing(!isEditing)
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    {isEditing ? 'Vorschau' : 'Bearbeiten'}
-                  </Button>
-                )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        onClick={handleMarkAsSent}
-                        disabled={isSending}
-                      >
-                        {isSending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Nur als gesendet markieren (kein echtes Senden)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button
-                  className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
-                  onClick={handleSend}
-                  disabled={isSending || (isManualMode && !editedResponse.trim())}
-                >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sende...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Senden
-                    </>
-                  )}
-                </Button>
-              </div>
-            </DialogFooter>
-          )}
+          {/* Secondary action bar — always visible */}
+          <div className="flex items-center gap-2 px-6 pb-4 pt-1 justify-between">
+            <Button variant="outline" size="sm" onClick={handleClose}>
+              Schliessen
+            </Button>
+            <div className="flex items-center gap-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || !editedResponse.trim()}>
+                      {isSavingToKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>In Knowledge Base speichern</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={handleMarkAsSent} disabled={isSending}>
+                      {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Nur als gesendet markieren (kein echtes Senden)</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          </div>
       </div>
 
     </div>

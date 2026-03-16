@@ -890,6 +890,39 @@ function InboxPageContent() {
     }
   }
 
+  // Format selected text in compose textarea
+  const formatText = (type: 'bold' | 'italic' | 'underline' | 'bullet' | 'number' | 'quote') => {
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea[data-compose]')
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const selected = editedResponse.substring(start, end)
+    const before = editedResponse.substring(0, start)
+    const after = editedResponse.substring(end)
+    let replacement = selected
+    let cursorOffset = 0
+    if (type === 'bold') { replacement = `**${selected || 'Fett'}**`; cursorOffset = selected ? 0 : 2 }
+    else if (type === 'italic') { replacement = `_${selected || 'Kursiv'}_`; cursorOffset = selected ? 0 : 1 }
+    else if (type === 'underline') { replacement = `__${selected || 'Unterstrichen'}__`; cursorOffset = selected ? 0 : 2 }
+    else if (type === 'bullet') {
+      const lines = (selected || 'Punkt').split('\n').map(l => `• ${l}`).join('\n')
+      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
+    } else if (type === 'number') {
+      const lines = (selected || 'Punkt').split('\n').map((l, i) => `${i + 1}. ${l}`).join('\n')
+      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
+    } else if (type === 'quote') {
+      const lines = (selected || 'Zitat').split('\n').map(l => `> ${l}`).join('\n')
+      replacement = (before.endsWith('\n') || !before ? '' : '\n') + lines + '\n'
+    }
+    const newValue = before + replacement + after
+    setEditedResponse(newValue)
+    setTimeout(() => {
+      textarea.focus()
+      const newCursor = start + replacement.length - cursorOffset
+      textarea.setSelectionRange(newCursor, newCursor)
+    }, 0)
+  }
+
   // Copy to clipboard
   const handleCopy = async () => {
     if (!selectedEmail?.email_drafts?.[0]) return
@@ -2026,7 +2059,7 @@ function InboxPageContent() {
 
       {/* Email Detail Side Panel */}
       {isDetailOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleClose} />}
-      <div className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: 'min(56rem, 100vw - 4rem)' }}>
+      <div className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: 'min(88rem, calc(100vw - 1rem))' }}>
         <div className="sr-only" role="heading" aria-level={2}>{selectedEmail?.subject}</div>
           {/* Close button */}
           <button onClick={handleClose} className="absolute top-4 right-4 z-10 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Schliessen">
@@ -2496,22 +2529,57 @@ function InboxPageContent() {
 
                   {/* Editable textarea — always writable */}
                   <Textarea
+                    data-compose
                     value={editedResponse}
                     onChange={(e) => setEditedResponse(e.target.value)}
                     placeholder="Schreib deine Antwort... (oder klicke auf AI Vorschlag)"
-                    rows={8}
-                    className="border-0 rounded-none shadow-none resize-none focus-visible:ring-0 text-sm leading-relaxed px-4 py-3"
+                    rows={10}
+                    className="border-0 rounded-none shadow-none resize-y focus-visible:ring-0 text-sm leading-relaxed px-4 py-3 min-h-[160px]"
                   />
 
-                  {/* Toolbar */}
-                  <div className="flex items-center gap-1 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap gap-y-2">
-                    {/* Formatting buttons */}
+                  {/* Gmail-style Toolbar */}
+                  <div className="flex items-center gap-0.5 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap gap-y-2">
+                    {/* Formatting buttons — Gmail style */}
+                    <TooltipProvider>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('bold')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold text-sm w-7 h-7 flex items-center justify-center transition-colors">B</button>
+                      </TooltipTrigger><TooltipContent><p>Fett (Selektion)</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('italic')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 italic text-sm w-7 h-7 flex items-center justify-center transition-colors">I</button>
+                      </TooltipTrigger><TooltipContent><p>Kursiv (Selektion)</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('underline')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 underline text-sm w-7 h-7 flex items-center justify-center transition-colors">U</button>
+                      </TooltipTrigger><TooltipContent><p>Unterstrichen (Selektion)</p></TooltipContent></Tooltip>
+                    </TooltipProvider>
+
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+                    <TooltipProvider>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('bullet')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors" title="Aufzählungsliste">
+                          <span className="text-xs leading-none">☰</span>
+                        </button>
+                      </TooltipTrigger><TooltipContent><p>Aufzählungsliste</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('number')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors">
+                          <span className="text-xs leading-none font-mono">1.</span>
+                        </button>
+                      </TooltipTrigger><TooltipContent><p>Nummerierte Liste</p></TooltipContent></Tooltip>
+                      <Tooltip><TooltipTrigger asChild>
+                        <button onClick={() => formatText('quote')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors">
+                          <span className="text-xs leading-none font-serif">&ldquo;</span>
+                        </button>
+                      </TooltipTrigger><TooltipContent><p>Zitat einfügen</p></TooltipContent></Tooltip>
+                    </TooltipProvider>
+
+                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
                             onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
-                            className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors"
+                            className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors"
                           >
                             <Wand2 className="h-3.5 w-3.5" />
                           </button>

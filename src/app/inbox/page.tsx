@@ -1865,7 +1865,7 @@ function InboxPageContent() {
                           {getStatusBadge(email.status)}
                           {threadCount > 1 && (
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600">
-                              {threadCount} in Thread
+                              {threadCount} im Thread
                             </Badge>
                           )}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -2077,13 +2077,23 @@ function InboxPageContent() {
                   <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                     {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
                     {customerEmailCount !== null && (
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        customerEmailCount === 1
-                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                      }`}>
-                        {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
-                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-default ${
+                              customerEmailCount === 1
+                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              <Mail className="h-2.5 w-2.5" />
+                              {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails gesamt`}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{customerEmailCount === 1 ? 'Erster Kontakt von diesem Absender' : `${customerEmailCount} E-Mails von diesem Absender insgesamt`}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                 </div>
@@ -2094,6 +2104,7 @@ function InboxPageContent() {
                 {/* Agent Assignment */}
                 <div className="flex items-center gap-1">
                   <UserCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="text-xs text-slate-400">Zuständig:</span>
                   <Select
                     value={selectedEmail.assigned_agent_id || 'none'}
                     onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
@@ -2143,9 +2154,10 @@ function InboxPageContent() {
 
                 <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
 
-                {/* Snooze */}
+                {/* Snooze / Wiedervorlage */}
                 <div className="flex items-center gap-1">
-                  <EyeOff className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="text-xs text-slate-400 mr-0.5">Wiedervorlage:</span>
                   {[
                     { label: '1h', hours: 1 },
                     { label: '4h', hours: 4 },
@@ -2156,7 +2168,7 @@ function InboxPageContent() {
                       key={opt.label}
                       variant="ghost"
                       size="sm"
-                      className="text-xs h-5 px-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      className="text-xs h-5 px-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                       onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
                     >
                       {opt.label}
@@ -2223,17 +2235,19 @@ function InboxPageContent() {
                           <div className="px-6 pb-4 pl-[4.25rem]">
                             {tEmail.body_html ? (
                               <iframe
-                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 10px 0;}</style></head><body>${tEmail.body_html}</body></html>`}
+                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}table{max-width:100%!important;width:auto!important;}p{margin:0 0 10px 0;}</style></head><body>${tEmail.body_html}</body></html>`}
                                 className="w-full border-0"
-                                style={{ minHeight: '60px' }}
+                                style={{ minHeight: '60px', overflow: 'hidden' }}
                                 onLoad={(e) => {
                                   const iframe = e.currentTarget
                                   if (iframe.contentDocument?.body) {
                                     iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
+                                    iframe.style.overflow = 'hidden'
                                   }
                                 }}
                                 sandbox=""
                                 title="Thread email content"
+                                scrolling="no"
                               />
                             ) : (
                               <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -2295,17 +2309,19 @@ function InboxPageContent() {
               <div className="px-6 py-4 pl-[4.25rem]">
                 {selectedEmail.body_html ? (
                   <iframe
-                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
+                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}table{max-width:100%!important;width:auto!important;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
                     className="w-full border-0 min-h-[120px]"
-                    style={{ minHeight: '120px' }}
+                    style={{ minHeight: '120px', overflow: 'hidden' }}
                     onLoad={(e) => {
                       const iframe = e.currentTarget
                       if (iframe.contentDocument?.body) {
                         iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
+                        iframe.style.overflow = 'hidden'
                       }
                     }}
                     sandbox=""
                     title="Email content"
+                    scrolling="no"
                   />
                 ) : selectedEmail.body_text ? (
                   <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -2524,38 +2540,37 @@ function InboxPageContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-6 px-6">
-                  <p className="text-slate-500 dark:text-slate-400 mb-4">
-                    Noch keine Antwort verfasst
-                  </p>
-                  <div className="flex gap-3 justify-center">
-                    <Button
-                      onClick={() => handleGenerateDraft(selectedEmail.id)}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generiere...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          AI Vorschlag
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsManualMode(true)
-                        setEditedResponse('')
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Manuell antworten
-                    </Button>
-                  </div>
+                <div className="flex gap-3 justify-center py-6 px-6">
+                  <Button
+                    size="lg"
+                    className="flex-1 max-w-[200px] gap-2"
+                    onClick={() => handleGenerateDraft(selectedEmail.id)}
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Generiere...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5" />
+                        AI Vorschlag
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="flex-1 max-w-[200px] gap-2"
+                    onClick={() => {
+                      setIsManualMode(true)
+                      setEditedResponse('')
+                    }}
+                  >
+                    <Edit className="h-5 w-5" />
+                    Manuell antworten
+                  </Button>
                 </div>
               )}
 

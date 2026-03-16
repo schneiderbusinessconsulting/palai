@@ -135,11 +135,13 @@ export default function CustomersPage() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-10"
-          title={sortDir === 'desc' ? 'Absteigend' : 'Aufsteigend'}
+          className="h-10 gap-1.5"
+          aria-label={sortDir === 'desc' ? 'Sortierung: Absteigend. Klicken für aufsteigend' : 'Sortierung: Aufsteigend. Klicken für absteigend'}
+          title={sortDir === 'desc' ? 'Absteigend sortiert – klicken für aufsteigend' : 'Aufsteigend sortiert – klicken für absteigend'}
           onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
         >
-          {sortDir === 'desc' ? '↓' : '↑'}
+          <ArrowUpDown className="h-4 w-4" />
+          <span className="text-xs">{sortDir === 'desc' ? 'Abst.' : 'Aufst.'}</span>
         </Button>
       </div>
 

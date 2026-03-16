@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createClient } from '@supabase/supabase-js'
+import { processNewEmail } from '@/lib/email-processing'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -180,6 +181,17 @@ export async function POST(request: NextRequest) {
               action: 'received',
               details: { hubspot_email_id: messageId, thread_id: threadId, source: 'webhook' },
             })
+            // Classify email (tone, spam, topics, BI) — fire-and-forget
+            const { data: inserted } = await supabase
+              .from('incoming_emails')
+              .select('id')
+              .eq('hubspot_email_id', String(messageId))
+              .single()
+            if (inserted) {
+              processNewEmail(inserted.id, senderEmail, subject, bodyText).catch(e =>
+                console.error('Classification failed for webhook email:', e)
+              )
+            }
           }
         }
         continue
@@ -287,6 +299,20 @@ export async function POST(request: NextRequest) {
             action: 'received',
             details: { hubspot_email_id: event.objectId, source: 'webhook' },
           })
+          // Classify email (tone, spam, topics, BI) — fire-and-forget
+          const fromEmail = props.hs_email_from_email || 'unknown@example.com'
+          const subjectText = props.hs_email_subject || 'Kein Betreff'
+          const bodyTextContent = props.hs_email_text || ''
+          const { data: inserted } = await supabase
+            .from('incoming_emails')
+            .select('id')
+            .eq('hubspot_email_id', String(event.objectId))
+            .single()
+          if (inserted) {
+            processNewEmail(inserted.id, fromEmail, subjectText, bodyTextContent).catch(e =>
+              console.error('Classification failed for CRM webhook email:', e)
+            )
+          }
         }
       }
     }

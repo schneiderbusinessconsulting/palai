@@ -106,10 +106,6 @@ function chunkText(text: string, maxChunkSize = 6000): string[] {
 
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      return NextResponse.json({ chunks: [], unconfigured: true }, { status: 200 })
-    }
-
     const formData = await request.formData()
     const content = formData.get('content') as string | null
     const file = formData.get('file') as File | null

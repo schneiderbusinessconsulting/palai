@@ -261,8 +261,8 @@ export async function GET(request: NextRequest) {
   try {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       return NextResponse.json(
-        { emails: [], total: 0, hasMore: false, unconfigured: true },
-        { status: 200 }
+        { error: 'Supabase nicht konfiguriert — .env.local prüfen' },
+        { status: 503 }
       )
     }
 
@@ -774,6 +774,8 @@ export async function PATCH(request: NextRequest) {
       success: true,
       total: (unanalyzedEmails || []).length,
       processed,
+      classified: processed,
+      toneAnalyzed: processed,
       errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
       message: `${processed} E-Mails über Pipeline verarbeitet (Klassifikation, Tone, Spam, BI)`,
     })

@@ -143,14 +143,19 @@ export async function POST(
       })
       .eq('id', draftId)
 
-    // 6. Update email status + SLA resolution time
+    // 6. Update email status + SLA resolution time + first_response_at
     const now = new Date().toISOString()
+    const firstResponseUpdate = draftOnly ? {} : {
+      resolved_at: now,
+      // Set first_response_at only if not already set (first reply wins)
+      ...(email.first_response_at ? {} : { first_response_at: now }),
+    }
     await supabase
       .from('incoming_emails')
       .update({
         status: draftOnly ? 'draft_saved' : 'sent',
-        // Phase 4: SLA tracking — mark resolved when sent
-        ...(draftOnly ? {} : { resolved_at: now }),
+        sync_source: 'app',
+        ...firstResponseUpdate,
       })
       .eq('id', emailId)
 

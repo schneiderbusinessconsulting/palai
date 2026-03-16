@@ -511,13 +511,30 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Skip outgoing emails (team replies) — but mark their thread as resolved
+      // Skip outgoing emails (team replies) — but mark their thread as resolved with reply data
       if (props.hs_email_direction === 'EMAIL' && props.hs_email_thread_id) {
+        const replyTs = props.hs_timestamp || props.hs_createdate
+        let replyAt: string = new Date().toISOString()
+        if (replyTs) {
+          replyAt = /^\d+$/.test(String(replyTs))
+            ? new Date(parseInt(String(replyTs))).toISOString()
+            : new Date(replyTs).toISOString()
+        }
         await supabase
           .from('incoming_emails')
-          .update({ status: 'sent', updated_at: new Date().toISOString() })
+          .update({
+            status: 'sent',
+            hubspot_reply_email_id: String(email.id),
+            hubspot_reply_text: props.hs_email_text || null,
+            hubspot_reply_at: replyAt,
+            hubspot_reply_from: props.hs_email_from_email || null,
+            sync_source: 'polling',
+            last_hubspot_sync_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq('hubspot_thread_id', props.hs_email_thread_id)
           .in('status', ['pending', 'draft_ready'])
+          .lt('received_at', replyAt)
         skipped++
         continue
       }

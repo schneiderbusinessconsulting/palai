@@ -51,9 +51,9 @@ interface LearningCase {
 
 function EditDistanceBadge({ value }: { value: number }) {
   const pct = Math.round(value * 100)
-  if (pct < 20) return <Badge className="bg-green-500">+{pct}% geändert</Badge>
-  if (pct < 50) return <Badge className="bg-amber-500">+{pct}% geändert</Badge>
-  return <Badge className="bg-red-500">+{pct}% geändert</Badge>
+  if (pct < 20) return <Badge className="bg-green-500 text-white">{pct}% Änderung</Badge>
+  if (pct < 50) return <Badge className="bg-amber-500 text-white">{pct}% Änderung</Badge>
+  return <Badge className="bg-red-500 text-white">{pct}% Änderung</Badge>
 }
 
 function DiffView({ original, corrected }: { original: string; corrected: string }) {
@@ -347,6 +347,7 @@ export default function LearningPage() {
                   {lc.status === 'pending' && (
                     <button
                       onClick={() => toggleSelectCase(lc.id)}
+                      aria-label={selectedCaseIds.has(lc.id) ? 'Auswahl aufheben' : 'Auswählen'}
                       className="mt-1 p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 flex-shrink-0"
                     >
                       {selectedCaseIds.has(lc.id) ? (
@@ -370,7 +371,7 @@ export default function LearningPage() {
                       <EditDistanceBadge value={lc.edit_distance} />
                     )}
                     {lc.status === 'extracted' && (
-                      <Badge className="bg-green-500">Extrahiert</Badge>
+                      <Badge className="bg-green-500 text-white">Extrahiert</Badge>
                     )}
                     {lc.status === 'dismissed' && (
                       <Badge variant="secondary">Verworfen</Badge>

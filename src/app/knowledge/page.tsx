@@ -655,7 +655,7 @@ export default function KnowledgePage() {
                 Noch keine Einträge vorhanden
               </p>
               <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">
-                Klicke auf &quot;Hinzufügen&quot; um Wissen hochzuladen
+                Klicke auf &quot;Wissen hinzufügen&quot; um Inhalte hochzuladen
               </p>
             </div>
           ) : (
@@ -709,7 +709,7 @@ export default function KnowledgePage() {
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" aria-label="Weitere Optionen">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

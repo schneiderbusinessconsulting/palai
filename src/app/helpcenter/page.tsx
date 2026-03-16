@@ -208,9 +208,10 @@ function HelpCenterContent() {
           </p>
 
           {/* Mode Toggle */}
-          <div className="flex justify-center gap-2 mb-6">
+          <div className="flex justify-center gap-2 mb-6" role="group" aria-label="Suchmodus wählen">
             <button
               onClick={() => { setMode('search'); setAiAnswer(null); }}
+              aria-pressed={mode === 'search'}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                 mode === 'search'
                   ? 'bg-[#B9965A] text-white shadow-md'
@@ -222,6 +223,7 @@ function HelpCenterContent() {
             </button>
             <button
               onClick={() => { setMode('ask'); setSearchQuery(''); }}
+              aria-pressed={mode === 'ask'}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
                 mode === 'ask'
                   ? 'bg-[#B9965A] text-white shadow-md'

@@ -241,10 +241,7 @@ export function Header({ title, description }: HeaderProps) {
             <DropdownMenuLabel>Mein Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push('/settings')}>
-              Profil
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => router.push('/settings')}>
-              Einstellungen
+              Einstellungen & Profil
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

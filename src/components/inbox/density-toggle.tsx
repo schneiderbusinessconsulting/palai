@@ -11,9 +11,9 @@ interface DensityToggleProps {
 }
 
 const options: { value: Density; label: string; icon: React.ElementType }[] = [
-  { value: 'compact', label: 'Compact', icon: AlignJustify },
-  { value: 'default', label: 'Default', icon: LayoutList },
-  { value: 'comfortable', label: 'Comfortable', icon: StretchHorizontal },
+  { value: 'compact', label: 'Kompakt', icon: AlignJustify },
+  { value: 'default', label: 'Standard', icon: LayoutList },
+  { value: 'comfortable', label: 'Komfortabel', icon: StretchHorizontal },
 ]
 
 export function DensityToggle({ density, onDensityChange }: DensityToggleProps) {

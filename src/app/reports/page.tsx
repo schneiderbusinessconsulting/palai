@@ -97,6 +97,7 @@ export default function ReportsPage() {
             size="sm"
             variant={selectedPeriod === p.value ? 'default' : 'outline'}
             onClick={() => setSelectedPeriod(p.value)}
+            aria-pressed={selectedPeriod === p.value}
           >
             {p.label}
           </Button>
@@ -124,7 +125,7 @@ export default function ReportsPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
-                  <Badge variant="secondary">{selectedPeriod}</Badge>
+                  <Badge variant="secondary">{periods.find(p => p.value === selectedPeriod)?.label ?? selectedPeriod}</Badge>
                   <Button
                     size="sm"
                     onClick={() => generateReport(tpl.id)}

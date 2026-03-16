@@ -50,6 +50,8 @@ import {
   UserCircle,
   Wand2,
   ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
@@ -1590,11 +1592,16 @@ function InboxPageContent() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2"
+            className="h-8 px-2 gap-1"
             onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            title={sortDir === 'desc' ? 'Absteigend sortiert' : 'Aufsteigend sortiert'}
+            aria-label={sortDir === 'desc' ? 'Absteigend sortiert – klicken für aufsteigend' : 'Aufsteigend sortiert – klicken für absteigend'}
+            title={sortDir === 'desc' ? 'Absteigend sortiert – klicken für aufsteigend' : 'Aufsteigend sortiert – klicken für absteigend'}
           >
-            {sortDir === 'desc' ? '↓ Absteigend' : '↑ Aufsteigend'}
+            {sortDir === 'desc' ? (
+              <><ArrowDown className="h-3.5 w-3.5" /><span className="text-xs">Absteigend</span></>
+            ) : (
+              <><ArrowUp className="h-3.5 w-3.5" /><span className="text-xs">Aufsteigend</span></>
+            )}
           </Button>
         </div>
         <div className="flex items-center gap-3">

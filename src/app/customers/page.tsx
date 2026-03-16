@@ -180,7 +180,7 @@ export default function CustomersPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <MessageSquare className="h-5 w-5 text-purple-500" />
             <div>
-              <p className="text-sm text-slate-500">Emails total</p>
+              <p className="text-sm text-slate-500">E-Mails total</p>
               <p className="text-xl font-bold">{customers.reduce((s, c) => s + c.totalEmails, 0)}</p>
             </div>
           </CardContent>
@@ -189,7 +189,7 @@ export default function CustomersPage() {
           <CardContent className="p-4 flex items-center gap-3">
             <TrendingUp className="h-5 w-5 text-emerald-500" />
             <div>
-              <p className="text-sm text-slate-500">Avg Buying Intent</p>
+              <p className="text-sm text-slate-500">Ø Kaufabsicht</p>
               <p className="text-xl font-bold">
                 {customers.length > 0
                   ? Math.round(customers.reduce((s, c) => s + c.avgBuyingIntent, 0) / customers.length)
@@ -234,7 +234,19 @@ export default function CustomersPage() {
       ) : displayCustomers.length === 0 ? (
         <div className="text-center py-12">
           <Users className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-          <p className="text-slate-500">Keine Kunden gefunden</p>
+          <p className="text-slate-500 font-medium">Keine Kunden gefunden</p>
+          {(search || sentimentFilter !== 'all') && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm text-slate-400">Filter anpassen oder zurücksetzen</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setSearch(''); setSentimentFilter('all') }}
+              >
+                Filter zurücksetzen
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <Card>
@@ -275,7 +287,7 @@ export default function CustomersPage() {
                         customer.avgBuyingIntent >= 30 ? 'text-amber-600 border-amber-300' :
                         'text-slate-500'
                       }>
-                        {customer.avgBuyingIntent}% BI
+                        {customer.avgBuyingIntent}% Kaufabsicht
                       </Badge>
                     )}
                     {sentimentBadge(customer.dominantSentiment)}

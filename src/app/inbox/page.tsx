@@ -63,6 +63,7 @@ import {
   Reply,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
+import RichTextEditor from '@/components/inbox/rich-text-editor'
 import {
   getConfidenceColor,
   getStatusBadge,
@@ -149,6 +150,11 @@ function InboxPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   // saveMessage replaced by toast notifications
   const [isManualMode, setIsManualMode] = useState(false)
+
+  // Split-pane resize state
+  const [splitRatio, setSplitRatio] = useState(0.5)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef = useRef(false)
 
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
@@ -890,6 +896,36 @@ function InboxPageContent() {
     }
   }
 
+  // Convert plain text to HTML for RichTextEditor
+  const plainToHtml = (text: string): string => {
+    if (!text) return ''
+    // Already HTML
+    if (text.trimStart().startsWith('<')) return text
+    return text
+      .split(/\n{2,}/)
+      .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+      .join('')
+  }
+
+  // Drag handle for split-pane resizing
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    const onMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current || !panelRef.current) return
+      const rect = panelRef.current.getBoundingClientRect()
+      const ratio = (ev.clientY - rect.top) / rect.height
+      setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)))
+    }
+    const onUp = () => {
+      isDraggingRef.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [])
+
   // Format selected text in compose textarea
   const formatText = (type: 'bold' | 'italic' | 'underline' | 'bullet' | 'number' | 'quote') => {
     const textarea = document.querySelector<HTMLTextAreaElement>('textarea[data-compose]')
@@ -1119,7 +1155,9 @@ function InboxPageContent() {
     setIsEditing(false)
     setIsManualMode(false)
     setIsCopied(false)
-    setEditedResponse(email.email_drafts?.[0]?.ai_generated_response || '')
+    const existingDraft = email.email_drafts?.[0]
+    const rawText = existingDraft?.edited_response || existingDraft?.ai_generated_response || ''
+    setEditedResponse(plainToHtml(rawText))
     // Set formality from draft if available
     if (email.email_drafts?.[0]?.formality) {
       setFormality(email.email_drafts[0].formality)
@@ -1156,6 +1194,10 @@ function InboxPageContent() {
           setThreadEmails(siblings)
         })
         .catch(() => {})
+    }
+    // Auto-generate AI draft if none exists and email needs a response
+    if (!email.email_drafts?.[0] && email.status !== 'sent') {
+      setTimeout(() => handleGenerateDraft(email.id), 400)
     }
   }
 
@@ -2059,7 +2101,11 @@ function InboxPageContent() {
 
       {/* Email Detail Side Panel */}
       {isDetailOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleClose} />}
-      <div className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: 'min(88rem, calc(100vw - 1rem))' }}>
+      <div
+        ref={panelRef}
+        className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-hidden flex flex-col ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ width: 'min(88rem, calc(100vw - 1rem))' }}
+      >
         <div className="sr-only" role="heading" aria-level={2}>{selectedEmail?.subject}</div>
           {/* Close button */}
           <button onClick={handleClose} className="absolute top-4 right-4 z-10 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Schliessen">
@@ -2067,6 +2113,12 @@ function InboxPageContent() {
           </button>
 
           {selectedEmail && (
+            <>
+              {/* ── TOP PANE: email content, resizable ── */}
+              <div
+                style={{ height: `${splitRatio * 100}%`, minHeight: '15%', maxHeight: '85%' }}
+                className="overflow-y-auto overflow-x-hidden flex-shrink-0"
+              >
             <div className="flex flex-col">
               {/* Alerts — sticky at top */}
               {(lockWarning || selectedEmail.support_level === 'L2' || ((selectedEmail.status === 'pending' || selectedEmail.status === 'draft_ready') && new Date(selectedEmail.received_at) < new Date(Date.now() - 48 * 60 * 60 * 1000))) && (
@@ -2431,8 +2483,24 @@ function InboxPageContent() {
                 )}
               </div>
 
-              {/* Separator before reply section */}
-              <div className="border-t border-slate-200 dark:border-slate-700" />
+            </div>{/* end inner flex-col */}
+              </div>{/* end TOP PANE */}
+
+              {/* ── DRAG HANDLE ── */}
+              <div
+                className="flex-shrink-0 h-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 cursor-row-resize flex items-center justify-center border-y border-slate-200 dark:border-slate-700 group select-none z-10"
+                onMouseDown={handleDragStart}
+                title="Ziehen zum Anpassen"
+              >
+                <div className="flex gap-1">
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 group-hover:bg-amber-400 dark:group-hover:bg-amber-500 transition-colors" />
+                  ))}
+                </div>
+              </div>
+
+              {/* ── BOTTOM PANE: compose + notes ── */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-[15%] flex flex-col">
 
               {/* Gmail-style Inline Compose — always visible */}
               <div className="px-6 py-4 space-y-3">
@@ -2527,103 +2595,69 @@ function InboxPageContent() {
                     </div>
                   )}
 
-                  {/* Editable textarea — always writable */}
-                  <Textarea
-                    data-compose
+                  {/* Rich Text Editor — Gmail-style with full formatting toolbar */}
+                  <RichTextEditor
                     value={editedResponse}
-                    onChange={(e) => setEditedResponse(e.target.value)}
-                    placeholder="Schreib deine Antwort... (oder klicke auf AI Vorschlag)"
-                    rows={10}
-                    className="border-0 rounded-none shadow-none resize-y focus-visible:ring-0 text-sm leading-relaxed px-4 py-3 min-h-[160px]"
+                    onChange={setEditedResponse}
+                    placeholder="Schreib deine Antwort..."
+                    minHeight={12}
                   />
 
-                  {/* Gmail-style Toolbar */}
-                  <div className="flex items-center gap-0.5 px-3 py-2 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap gap-y-2">
-                    {/* Formatting buttons — Gmail style */}
-                    <TooltipProvider>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('bold')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 font-bold text-sm w-7 h-7 flex items-center justify-center transition-colors">B</button>
-                      </TooltipTrigger><TooltipContent><p>Fett (Selektion)</p></TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('italic')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 italic text-sm w-7 h-7 flex items-center justify-center transition-colors">I</button>
-                      </TooltipTrigger><TooltipContent><p>Kursiv (Selektion)</p></TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('underline')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 underline text-sm w-7 h-7 flex items-center justify-center transition-colors">U</button>
-                      </TooltipTrigger><TooltipContent><p>Unterstrichen (Selektion)</p></TooltipContent></Tooltip>
-                    </TooltipProvider>
+                  {/* ── Action Bar (Gmail bottom row) ── */}
+                  <div className="flex items-center gap-1.5 pt-2 flex-wrap">
+                    {/* Send button — primary action */}
+                    <Button
+                      size="sm"
+                      className="h-8 px-4 gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium"
+                      onClick={handleSend}
+                      disabled={isSending || !editedResponse.trim()}
+                    >
+                      {isSending ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sende...</>
+                      ) : (
+                        <><Send className="h-3.5 w-3.5" />Senden</>
+                      )}
+                    </Button>
 
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-                    <TooltipProvider>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('bullet')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors" title="Aufzählungsliste">
-                          <span className="text-xs leading-none">☰</span>
-                        </button>
-                      </TooltipTrigger><TooltipContent><p>Aufzählungsliste</p></TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('number')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors">
-                          <span className="text-xs leading-none font-mono">1.</span>
-                        </button>
-                      </TooltipTrigger><TooltipContent><p>Nummerierte Liste</p></TooltipContent></Tooltip>
-                      <Tooltip><TooltipTrigger asChild>
-                        <button onClick={() => formatText('quote')} className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors">
-                          <span className="text-xs leading-none font-serif">&ldquo;</span>
-                        </button>
-                      </TooltipTrigger><TooltipContent><p>Zitat einfügen</p></TooltipContent></Tooltip>
-                    </TooltipProvider>
-
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
-                            className="p-1.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 w-7 h-7 flex items-center justify-center transition-colors"
-                          >
-                            <Wand2 className="h-3.5 w-3.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>{'Variablen ersetzen ({{name}}, {{email}}, ...)'}</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-                    {/* AI button */}
+                    {/* AI */}
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-xs gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                      className="h-8 px-2 gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       onClick={() => handleGenerateDraft(selectedEmail.id)}
                       disabled={isGenerating}
                     >
                       {isGenerating ? (
-                        <><Loader2 className="h-3 w-3 animate-spin" />Generiere...</>
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generiere...</>
                       ) : (
-                        <><Sparkles className="h-3 w-3" />{currentDraft ? 'Neu generieren' : 'AI Vorschlag'}</>
+                        <><Sparkles className="h-3.5 w-3.5" />{currentDraft ? 'Neu' : 'AI'}</>
                       )}
                     </Button>
 
                     {currentDraft && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs gap-1 text-slate-500 hover:text-amber-600"
-                        onClick={() => setShowRegenerateDialog(!showRegenerateDialog)}
-                      >
-                        <MessageSquare className="h-3 w-3" />
-                        Feedback
+                      <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500 hover:text-amber-600" onClick={() => setShowRegenerateDialog(!showRegenerateDialog)}>
+                        <MessageSquare className="h-3.5 w-3.5" />
                       </Button>
                     )}
 
-                    {/* Spacer */}
+                    {/* Variables */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500" onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}>
+                            <Wand2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>{'Variablen ersetzen ({{name}}, ...)'}</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
                     <div className="flex-1" />
 
                     {/* Owner Selection */}
                     {owners.length > 0 && (
                       <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
-                        <SelectTrigger className="h-7 w-36 text-xs border-slate-200 dark:border-slate-600">
+                        <SelectTrigger className="h-8 w-38 text-xs border-slate-200 dark:border-slate-600">
                           <SelectValue placeholder="Senden als..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -2634,30 +2668,10 @@ function InboxPageContent() {
                       </Select>
                     )}
 
-                    {/* Save draft */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs gap-1 text-slate-500"
-                      onClick={handleSaveDraft}
-                      disabled={isSaving || !editedResponse.trim()}
-                    >
-                      {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                    {/* Save */}
+                    <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500" onClick={handleSaveDraft} disabled={isSaving || !editedResponse.trim()}>
+                      {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
                       Speichern
-                    </Button>
-
-                    {/* Send button */}
-                    <Button
-                      size="sm"
-                      className="h-7 px-3 text-xs gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900"
-                      onClick={handleSend}
-                      disabled={isSending || !editedResponse.trim()}
-                    >
-                      {isSending ? (
-                        <><Loader2 className="h-3 w-3 animate-spin" />Sende...</>
-                      ) : (
-                        <><Send className="h-3 w-3" />Senden</>
-                      )}
                     </Button>
                   </div>
                 </div>
@@ -2726,37 +2740,38 @@ function InboxPageContent() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
+              {/* Secondary action bar — inside bottom pane, sticky bottom */}
+              <div className="flex items-center gap-2 px-6 py-2.5 mt-auto justify-between flex-shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 sticky bottom-0">
+                <Button variant="outline" size="sm" onClick={handleClose}>
+                  Schliessen
+                </Button>
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || !editedResponse.trim()}>
+                          {isSavingToKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>In Knowledge Base speichern</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={handleMarkAsSent} disabled={isSending}>
+                          {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Nur als gesendet markieren (kein echtes Senden)</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
 
-          {/* Secondary action bar — always visible */}
-          <div className="flex items-center gap-2 px-6 pb-4 pt-1 justify-between">
-            <Button variant="outline" size="sm" onClick={handleClose}>
-              Schliessen
-            </Button>
-            <div className="flex items-center gap-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || !editedResponse.trim()}>
-                      {isSavingToKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>In Knowledge Base speichern</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={handleMarkAsSent} disabled={isSending}>
-                      {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Nur als gesendet markieren (kein echtes Senden)</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
+              </div>
+            </>
+          )}
       </div>
 
     </div>

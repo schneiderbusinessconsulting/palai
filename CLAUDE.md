@@ -16,3 +16,6 @@ Dieses Projekt erlaubt automatisch:
 - `/src/components` - React Komponenten
 - `/src/lib` - Utilities und API-Helfer
 - `/supabase` - Datenbank-Schema
+
+---
+

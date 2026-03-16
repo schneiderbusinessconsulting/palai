@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 export async function POST(
   request: NextRequest,
@@ -8,7 +17,7 @@ export async function POST(
   try {
     const { emailId } = await params
     const { star_type } = await request.json()
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     const { error } = await supabase
       .from('incoming_emails')

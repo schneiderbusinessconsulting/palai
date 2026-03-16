@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 export async function GET(
   request: NextRequest,
@@ -11,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Thread ID required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     const { data: emails, error } = await supabase
       .from('incoming_emails')

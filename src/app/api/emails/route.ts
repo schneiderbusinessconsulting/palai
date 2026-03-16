@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
+
+// Admin client that bypasses RLS (uses service_role key)
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    // Fallback to server client if service role key not configured
+    return null
+  }
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 import { analyzeTone, determinePriority, calculateHappinessScore, detectSpam, detectTopicTags } from '@/lib/text-utils'
 import { runAutomationRules } from '@/lib/automation/engine'
 
@@ -13,7 +26,7 @@ async function scanEmailForBiInsights(
   tone?: { urgency?: string; sentiment?: string }
 ): Promise<number> {
   try {
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
     const { data: triggerWords } = await supabase
       .from('bi_trigger_words')
       .select('word, category, weight')
@@ -84,7 +97,7 @@ async function scanEmailForBiInsights(
 // Phase 4: Fetch SLA targets once per import batch
 async function getSlaTargets(): Promise<Record<string, string>> {
   try {
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
     const { data } = await supabase.from('sla_targets').select('id, priority')
     if (!data) return {}
     return Object.fromEntries(data.map(t => [t.priority, t.id]))
@@ -102,7 +115,7 @@ async function generateDraftForEmail(
   hubspotThreadId?: string | null
 ) {
   try {
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     // Check if draft already exists
     const { data: existingDraft } = await supabase
@@ -261,7 +274,7 @@ export async function GET(request: NextRequest) {
     const showSpam = searchParams.get('spam')
     const topicFilter = searchParams.get('topic')
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     let query = supabase
       .from('incoming_emails')
@@ -402,7 +415,7 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const autoDraftEnabled = searchParams.get('autoDraft') === 'true'
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     // Use CRM Search API to find recent incoming emails (last 30 days)
     const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000)
@@ -595,7 +608,7 @@ export async function POST(request: NextRequest) {
             scanEmailForBiInsights(newEmail.id, subject, bodyText, { urgency: tone.urgency, sentiment: tone.sentiment })
               .then(async (intentScore) => {
                 if (intentScore > 0) {
-                  const supabase2 = await createClient()
+                  const supabase2 = getSupabaseAdmin() || await createClient()
                   await supabase2
                     .from('incoming_emails')
                     .update({ buying_intent_score: intentScore })
@@ -647,7 +660,7 @@ export async function PATCH(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action') || 'classify'
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     // Action: sync-status - Check HubSpot for closed conversations
     if (action === 'sync-status') {

@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 const LOCK_TTL_MINUTES = 10
 
@@ -15,7 +24,7 @@ export async function GET(
 ) {
   try {
     const { emailId } = await params
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     await purgeStaleLocks(supabase)
 
@@ -45,7 +54,7 @@ export async function POST(
       return NextResponse.json({ error: 'agent_name required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
     await purgeStaleLocks(supabase)
 
     // Check for existing lock held by someone else
@@ -91,7 +100,7 @@ export async function DELETE(
     const { emailId } = await params
     const { agent_name } = await request.json()
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     const query = supabase.from('email_locks').delete().eq('email_id', emailId)
     // Only release own lock (don't let someone else's delete cancel another's lock)

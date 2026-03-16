@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 // PATCH — set tags (replace all)
 export async function PATCH(
@@ -14,7 +23,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'tags must be an array' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
     const { error } = await supabase
       .from('incoming_emails')
       .update({ tags })
@@ -48,7 +57,7 @@ export async function POST(
       return NextResponse.json({ error: 'tag must be a non-empty string' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     // Get current tags
     const { data: email } = await supabase
@@ -95,7 +104,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'tag must be a non-empty string' }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     const { data: email } = await supabase
       .from('incoming_emails')

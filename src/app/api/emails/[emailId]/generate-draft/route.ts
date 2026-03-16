@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding, generateEmailDraft, Formality } from '@/lib/ai/openai'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
+
+function getSupabaseAdmin() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+  return createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
+}
 
 export async function POST(
   request: NextRequest,
@@ -16,7 +25,7 @@ export async function POST(
       senderName?: string
     }
 
-    const supabase = await createClient()
+    const supabase = getSupabaseAdmin() || await createClient()
 
     // 1. Get the email
     const { data: email, error: emailError } = await supabase

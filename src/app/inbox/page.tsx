@@ -2242,12 +2242,38 @@ function InboxPageContent() {
                           <div className="px-6 pb-4 pl-[4.25rem]">
                             {tEmail.body_html ? (
                               <iframe
-                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}table{max-width:100%!important;width:auto!important;}p{margin:0 0 10px 0;}</style></head><body>${tEmail.body_html}</body></html>`}
+                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                                  @media (prefers-color-scheme: dark) {
+                                    body { color: #e2e8f0 !important; background: transparent !important; }
+                                    a { color: #60a5fa !important; }
+                                    blockquote { border-left-color: #475569 !important; color: #94a3b8 !important; }
+                                    * { background-color: transparent !important; color: inherit !important; }
+                                    a { color: #60a5fa !important; }
+                                  }
+                                  body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;background:transparent;}
+                                  a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}
+                                  img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}
+                                  table{max-width:100%!important;width:auto!important;}p{margin:0 0 10px 0;}
+                                  ::-webkit-scrollbar{display:none;}html{scrollbar-width:none;}
+                                </style></head><body>${tEmail.body_html}</body></html>`}
                                 className="w-full border-0"
                                 style={{ minHeight: '60px', overflow: 'hidden' }}
                                 onLoad={(e) => {
                                   const iframe = e.currentTarget
                                   if (iframe.contentDocument?.body) {
+                                    const isDark = document.documentElement.classList.contains('dark')
+                                    if (isDark && iframe.contentDocument) {
+                                      iframe.contentDocument.body.style.color = '#e2e8f0'
+                                      iframe.contentDocument.body.style.background = 'transparent'
+                                      iframe.contentDocument.querySelectorAll('*').forEach(el => {
+                                        const htmlEl = el as HTMLElement
+                                        htmlEl.style.backgroundColor = 'transparent'
+                                        if (htmlEl.tagName !== 'A') htmlEl.style.color = 'inherit'
+                                      })
+                                      iframe.contentDocument.querySelectorAll('a').forEach(a => {
+                                        (a as HTMLElement).style.color = '#60a5fa'
+                                      })
+                                    }
                                     iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
                                     iframe.style.overflow = 'hidden'
                                   }
@@ -2316,12 +2342,44 @@ function InboxPageContent() {
               <div className="px-6 py-4 pl-[4.25rem]">
                 {selectedEmail.body_html ? (
                   <iframe
-                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}table{max-width:100%!important;width:auto!important;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
+                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                      @media (prefers-color-scheme: dark) {
+                        body { color: #e2e8f0 !important; background: transparent !important; }
+                        a { color: #60a5fa !important; }
+                        blockquote { border-left-color: #475569 !important; color: #94a3b8 !important; }
+                        table, td, th { border-color: #334155 !important; }
+                        * { background-color: transparent !important; color: inherit !important; }
+                        a { color: #60a5fa !important; }
+                      }
+                      body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;background:transparent;}
+                      a{color:#1a73e8;}
+                      blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}
+                      img{max-width:100%;height:auto;display:block;}
+                      img[src=""]{display:none;}img:not([src]){display:none;}
+                      table{max-width:100%!important;width:auto!important;}
+                      p{margin:0 0 12px 0;}
+                      ::-webkit-scrollbar{display:none;}
+                      html{scrollbar-width:none;}
+                    </style></head><body>${selectedEmail.body_html}</body></html>`}
                     className="w-full border-0 min-h-[120px]"
                     style={{ minHeight: '120px', overflow: 'hidden' }}
                     onLoad={(e) => {
                       const iframe = e.currentTarget
                       if (iframe.contentDocument?.body) {
+                        // Inject dark mode based on parent
+                        const isDark = document.documentElement.classList.contains('dark')
+                        if (isDark && iframe.contentDocument) {
+                          iframe.contentDocument.body.style.color = '#e2e8f0'
+                          iframe.contentDocument.body.style.background = 'transparent'
+                          iframe.contentDocument.querySelectorAll('*').forEach(el => {
+                            const htmlEl = el as HTMLElement
+                            htmlEl.style.backgroundColor = 'transparent'
+                            if (htmlEl.tagName !== 'A') htmlEl.style.color = 'inherit'
+                          })
+                          iframe.contentDocument.querySelectorAll('a').forEach(a => {
+                            (a as HTMLElement).style.color = '#60a5fa'
+                          })
+                        }
                         iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
                         iframe.style.overflow = 'hidden'
                       }
@@ -2547,37 +2605,41 @@ function InboxPageContent() {
                   </div>
                 </div>
               ) : (
-                <div className="flex gap-3 justify-center py-6 px-6">
-                  <Button
-                    size="lg"
-                    className="flex-1 max-w-[200px] gap-2"
-                    onClick={() => handleGenerateDraft(selectedEmail.id)}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        Generiere...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-5 w-5" />
-                        AI Vorschlag
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="flex-1 max-w-[200px] gap-2"
-                    onClick={() => {
-                      setIsManualMode(true)
-                      setEditedResponse('')
-                    }}
-                  >
-                    <Edit className="h-5 w-5" />
-                    Manuell antworten
-                  </Button>
+                <div className="mx-6 my-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center bg-slate-50/50 dark:bg-slate-800/20">
+                  <Mail className="h-8 w-8 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                  <p className="text-sm text-slate-400 dark:text-slate-500 mb-5">Wie möchtest du antworten?</p>
+                  <div className="flex gap-4 justify-center">
+                    <Button
+                      size="lg"
+                      className="gap-2 px-6 h-12 text-base"
+                      onClick={() => handleGenerateDraft(selectedEmail.id)}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Generiere...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-5 w-5" />
+                          AI Vorschlag
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="gap-2 px-6 h-12 text-base"
+                      onClick={() => {
+                        setIsManualMode(true)
+                        setEditedResponse('')
+                      }}
+                    >
+                      <Edit className="h-5 w-5" />
+                      Manuell antworten
+                    </Button>
+                  </div>
                 </div>
               )}
 

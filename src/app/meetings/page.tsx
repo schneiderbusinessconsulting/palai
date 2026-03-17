@@ -156,7 +156,10 @@ export default function MeetingsPage() {
         </CardHeader>
         <CardContent>
           {upcoming.length === 0 ? (
-            <p className="text-sm text-slate-500 py-4 text-center">Keine anstehenden Termine</p>
+            <div className="py-8 text-center">
+              <p className="text-sm font-medium text-slate-500">Keine anstehenden Termine</p>
+              <p className="text-xs text-slate-400 mt-1">Erstelle einen neuen Termin mit dem Button oben rechts</p>
+            </div>
           ) : (
             <div className="space-y-2">
               {upcoming.map(m => {

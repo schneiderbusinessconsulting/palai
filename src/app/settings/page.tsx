@@ -33,6 +33,7 @@ import {
   Brain,
   BookOpen,
   GraduationCap,
+  Calendar,
   CheckCircle2,
   Circle,
   Zap,
@@ -641,12 +642,12 @@ export default function SettingsPage() {
           <TabsTrigger value="profile" className="gap-2"><User className="h-4 w-4" />Profil</TabsTrigger>
           <TabsTrigger value="ai-instructions" className="gap-2"><Brain className="h-4 w-4" />AI Anweisungen</TabsTrigger>
           <TabsTrigger value="ai-style" className="gap-2"><Zap className="h-4 w-4" />AI & Lernen</TabsTrigger>
-          <TabsTrigger value="sla" className="gap-2"><Clock className="h-4 w-4" />SLA</TabsTrigger>
-          <TabsTrigger value="bi" className="gap-2"><ShoppingCart className="h-4 w-4" />BI Trigger</TabsTrigger>
+          <TabsTrigger value="sla" className="gap-2"><Clock className="h-4 w-4" />SLA-Ziele</TabsTrigger>
+          <TabsTrigger value="bi" className="gap-2"><ShoppingCart className="h-4 w-4" />Kaufabsicht</TabsTrigger>
           <TabsTrigger value="team" className="gap-2"><Shield className="h-4 w-4" />Team</TabsTrigger>
           <TabsTrigger value="training" className="gap-2"><GraduationCap className="h-4 w-4" />Training</TabsTrigger>
           <TabsTrigger value="onboarding" className="gap-2"><BookOpen className="h-4 w-4" />Onboarding</TabsTrigger>
-          <TabsTrigger value="business-hours" className="gap-2"><Clock className="h-4 w-4" />Geschäftszeiten</TabsTrigger>
+          <TabsTrigger value="business-hours" className="gap-2"><Calendar className="h-4 w-4" />Geschäftszeiten</TabsTrigger>
           <TabsTrigger value="automation" className="gap-2"><Workflow className="h-4 w-4" />Automatisierung</TabsTrigger>
           <TabsTrigger value="audit" className="gap-2"><ScrollText className="h-4 w-4" />Audit Trail</TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2"><Database className="h-4 w-4" />Integrationen</TabsTrigger>

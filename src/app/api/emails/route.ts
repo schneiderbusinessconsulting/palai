@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createEmbedding, generateEmailDraft, classifyEmail } from '@/lib/ai/openai'
+import { processNewEmail } from '@/lib/email-processing'
 
 // Admin client that bypasses RLS (uses service_role key)
 function getSupabaseAdmin() {
@@ -260,8 +261,8 @@ export async function GET(request: NextRequest) {
   try {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       return NextResponse.json(
-        { emails: [], total: 0, hasMore: false, unconfigured: true },
-        { status: 200 }
+        { error: 'Supabase nicht konfiguriert — .env.local prüfen' },
+        { status: 503 }
       )
     }
 
@@ -511,13 +512,30 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      // Skip outgoing emails (team replies) — but mark their thread as resolved
+      // Skip outgoing emails (team replies) — but mark their thread as resolved with reply data
       if (props.hs_email_direction === 'EMAIL' && props.hs_email_thread_id) {
+        const replyTs = props.hs_timestamp || props.hs_createdate
+        let replyAt: string = new Date().toISOString()
+        if (replyTs) {
+          replyAt = /^\d+$/.test(String(replyTs))
+            ? new Date(parseInt(String(replyTs))).toISOString()
+            : new Date(replyTs).toISOString()
+        }
         await supabase
           .from('incoming_emails')
-          .update({ status: 'sent', updated_at: new Date().toISOString() })
+          .update({
+            status: 'sent',
+            hubspot_reply_email_id: String(email.id),
+            hubspot_reply_text: props.hs_email_text || null,
+            hubspot_reply_at: replyAt,
+            hubspot_reply_from: props.hs_email_from_email || null,
+            sync_source: 'polling',
+            last_hubspot_sync_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
           .eq('hubspot_thread_id', props.hs_email_thread_id)
           .in('status', ['pending', 'draft_ready'])
+          .lt('received_at', replyAt)
         skipped++
         continue
       }
@@ -720,11 +738,10 @@ export async function PATCH(request: NextRequest) {
       })
     }
 
-    // Default action: full backfill analysis for all emails missing data
-    // Get emails without classification OR without tone analysis
+    // Default action: full backfill analysis using shared pipeline
     const { data: unanalyzedEmails, error: fetchError } = await supabase
       .from('incoming_emails')
-      .select('id, from_email, subject, body_text, email_type, tone_sentiment, buying_intent_score')
+      .select('id, from_email, subject, body_text')
       .or('email_type.is.null,tone_sentiment.is.null')
       .limit(200)
 
@@ -736,89 +753,31 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    let classified = 0
-    let toneAnalyzed = 0
-    let biScanned = 0
-    let systemMails = 0
-
-    // Fetch SLA targets once for the batch
-    const slaTargets = await getSlaTargets()
+    let processed = 0
+    const errors: string[] = []
 
     for (const email of unanalyzedEmails || []) {
-      const updates: Record<string, unknown> = {}
-
-      // Step 1: Classify if missing
-      if (!email.email_type) {
-        const classification = await classifyEmail(
-          email.from_email,
-          email.subject,
+      try {
+        await processNewEmail(
+          email.id,
+          email.from_email || 'unknown@example.com',
+          email.subject || '',
           email.body_text || ''
         )
-        updates.email_type = classification.emailType
-        updates.needs_response = classification.needsResponse
-        updates.classification_reason = classification.reason
-        classified++
-        if (classification.emailType === 'system_alert' || classification.emailType === 'notification') {
-          systemMails++
-        }
-      }
-
-      // Step 2: Tone analysis if missing
-      if (!email.tone_sentiment) {
-        const tone = analyzeTone(email.subject, email.body_text || '')
-        updates.tone_formality = tone.formality
-        updates.tone_sentiment = tone.sentiment
-        updates.tone_urgency = tone.urgency
-
-        // Step 3: Priority + SLA (depends on classification + tone)
-        const emailType = (updates.email_type || email.email_type) as string
-        const priority = determinePriority(emailType, tone.urgency, (updates.needs_response ?? true) as boolean)
-        updates.priority = priority
-        updates.sla_target_id = slaTargets[priority] || null
-        updates.sla_status = (updates.needs_response ?? true) ? 'ok' : null
-        toneAnalyzed++
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await supabase
-          .from('incoming_emails')
-          .update(updates)
-          .eq('id', email.id)
-      }
-
-      // Step 4: BI scan if no buying intent yet (for customer inquiries only)
-      const emailType = (updates.email_type || email.email_type) as string
-      if (
-        (email.buying_intent_score === null || email.buying_intent_score === 0) &&
-        (emailType === 'customer_inquiry' || emailType === 'form_submission')
-      ) {
-        const tone = email.tone_sentiment
-          ? { urgency: undefined, sentiment: email.tone_sentiment }
-          : undefined
-        const intentScore = await scanEmailForBiInsights(
-          email.id,
-          email.subject,
-          email.body_text || '',
-          tone
-        )
-        if (intentScore > 0) {
-          await supabase
-            .from('incoming_emails')
-            .update({ buying_intent_score: intentScore })
-            .eq('id', email.id)
-        }
-        biScanned++
+        processed++
+      } catch (e) {
+        errors.push(`${email.id}: ${String(e).substring(0, 80)}`)
       }
     }
 
     return NextResponse.json({
       success: true,
       total: (unanalyzedEmails || []).length,
-      classified,
-      toneAnalyzed,
-      biScanned,
-      systemMails,
-      message: `${classified} klassifiziert, ${toneAnalyzed} Tone-Analyse, ${biScanned} BI-Scan, ${systemMails} System-Mails`,
+      processed,
+      classified: processed,
+      toneAnalyzed: processed,
+      errors: errors.length > 0 ? errors.slice(0, 10) : undefined,
+      message: `${processed} E-Mails über Pipeline verarbeitet (Klassifikation, Tone, Spam, BI)`,
     })
   } catch (error) {
     console.error('PATCH error:', error)

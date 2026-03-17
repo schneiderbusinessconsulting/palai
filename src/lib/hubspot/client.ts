@@ -480,6 +480,78 @@ class HubSpotClient {
       return false
     }
   }
+  // Get outbound replies sent directly in HubSpot for a thread
+  async getOutboundRepliesForThread(
+    threadId: string
+  ): Promise<{ id: string; text: string; fromEmail: string; sentAt: string }[]> {
+    try {
+      const response = await this.request<{
+        results: Array<{
+          id: string
+          properties: {
+            hs_email_direction?: string
+            hs_email_text?: string
+            hs_email_from_email?: string
+            hs_timestamp?: string
+            hs_createdate?: string
+          }
+        }>
+      }>('/crm/v3/objects/emails/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          filterGroups: [
+            {
+              filters: [
+                { propertyName: 'hs_email_thread_id', operator: 'EQ', value: threadId },
+                { propertyName: 'hs_email_direction', operator: 'EQ', value: 'EMAIL' },
+              ],
+            },
+          ],
+          properties: ['hs_email_direction', 'hs_email_text', 'hs_email_from_email', 'hs_timestamp', 'hs_createdate'],
+          sorts: [{ propertyName: 'hs_timestamp', direction: 'ASCENDING' }],
+          limit: 10,
+        }),
+      })
+
+      return (response.results || []).map((e) => {
+        const ts = e.properties.hs_timestamp || e.properties.hs_createdate || ''
+        const sentAt = ts
+          ? /^\d+$/.test(String(ts))
+            ? new Date(parseInt(String(ts))).toISOString()
+            : new Date(ts).toISOString()
+          : new Date().toISOString()
+        return {
+          id: e.id,
+          text: e.properties.hs_email_text || '',
+          fromEmail: e.properties.hs_email_from_email || '',
+          sentAt,
+        }
+      })
+    } catch (e) {
+      console.error('Failed to fetch outbound replies for thread:', e)
+      return []
+    }
+  }
+
+  // Get conversation thread status from HubSpot Conversations API
+  async getConversationThread(
+    conversationId: string
+  ): Promise<{ status: 'OPEN' | 'CLOSED'; assignedTo?: string } | null> {
+    try {
+      const response = await this.request<{
+        id: string
+        status: string
+        assignedTo?: { actorId?: string }
+      }>(`/conversations/v3/conversations/threads/${conversationId}`)
+      return {
+        status: response.status === 'CLOSED' ? 'CLOSED' : 'OPEN',
+        assignedTo: response.assignedTo?.actorId,
+      }
+    } catch (e) {
+      console.error('Failed to fetch conversation thread:', e)
+      return null
+    }
+  }
 }
 
 export function createHubSpotClient(): HubSpotClient {

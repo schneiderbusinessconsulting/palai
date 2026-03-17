@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -101,6 +102,7 @@ export default function AgentsPage() {
   const [period, setPeriod] = useState<string>('30d')
   const [sortKey, setSortKey] = useState<SortKey>('emails_assigned')
   const [sortAsc, setSortAsc] = useState(false)
+  const router = useRouter()
 
   const fetchData = useCallback(async (selectedPeriod: string) => {
     setIsLoading(true)
@@ -179,15 +181,21 @@ export default function AgentsPage() {
       {/* Controls */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
-          {['7d', '30d', '90d'].map(p => (
+          {[
+            { value: '7d', label: '7 Tage' },
+            { value: '30d', label: '30 Tage' },
+            { value: '90d', label: '90 Tage' },
+          ].map(p => (
             <Button
-              key={p}
-              variant={period === p ? 'default' : 'ghost'}
+              key={p.value}
+              variant={period === p.value ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => handlePeriodChange(p)}
-              className={period === p ? '' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}
+              onClick={() => handlePeriodChange(p.value)}
+              aria-label={`Zeitraum: ${p.label}`}
+              aria-pressed={period === p.value}
+              className={period === p.value ? '' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}
             >
-              {p}
+              {p.label}
             </Button>
           ))}
         </div>
@@ -297,7 +305,8 @@ export default function AgentsPage() {
               {sortedAgents.length === 0 ? (
                 <div className="text-center py-10">
                   <Users className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                  <p className="text-sm text-slate-500">Keine aktiven Agents gefunden</p>
+                  <p className="text-sm font-medium text-slate-500">Keine aktiven Agents gefunden</p>
+                  <p className="text-xs text-slate-400 mt-1">Agents können unter Einstellungen hinzugefügt werden</p>
                 </div>
               ) : (
                 <>
@@ -307,29 +316,29 @@ export default function AgentsPage() {
                       <thead>
                         <tr className="sticky top-0 bg-white dark:bg-slate-900 z-10">
                           <th className="text-left px-4 py-3 text-xs font-medium text-slate-500">
-                            <button onClick={() => handleSort('name')} className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-300">
+                            <button onClick={() => handleSort('name')} aria-label="Nach Agent sortieren" className="flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-300">
                               Agent <SortIcon column="name" />
                             </button>
                           </th>
                           <th className="text-center px-3 py-3 text-xs font-medium text-slate-500">Rolle</th>
                           <th className="text-right px-3 py-3 text-xs font-medium text-slate-500">
-                            <button onClick={() => handleSort('emails_assigned')} className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
+                            <button onClick={() => handleSort('emails_assigned')} aria-label="Nach zugewiesenen E-Mails sortieren" className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
                               Zugewiesen <SortIcon column="emails_assigned" />
                             </button>
                           </th>
                           <th className="text-right px-3 py-3 text-xs font-medium text-slate-500">Gelöst</th>
                           <th className="text-right px-3 py-3 text-xs font-medium text-slate-500">
-                            <button onClick={() => handleSort('resolution_rate')} className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
-                              Resolution % <SortIcon column="resolution_rate" />
+                            <button onClick={() => handleSort('resolution_rate')} aria-label="Nach Lösungsrate sortieren" className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
+                              Lösungsrate <SortIcon column="resolution_rate" />
                             </button>
                           </th>
                           <th className="text-right px-3 py-3 text-xs font-medium text-slate-500">
-                            <button onClick={() => handleSort('avg_response_minutes')} className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
-                              Ø FRT <SortIcon column="avg_response_minutes" />
+                            <button onClick={() => handleSort('avg_response_minutes')} aria-label="Nach Erstantwortzeit sortieren" className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
+                              Ø Erstantwort <SortIcon column="avg_response_minutes" />
                             </button>
                           </th>
                           <th className="text-right px-3 py-3 text-xs font-medium text-slate-500">
-                            <button onClick={() => handleSort('csat_avg')} className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
+                            <button onClick={() => handleSort('csat_avg')} aria-label="Nach CSAT sortieren" className="flex items-center gap-1 ml-auto hover:text-slate-700 dark:hover:text-slate-300">
                               CSAT <SortIcon column="csat_avg" />
                             </button>
                           </th>
@@ -338,7 +347,11 @@ export default function AgentsPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {sortedAgents.map(agent => (
-                          <tr key={agent.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr
+                            key={agent.id}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                            onClick={() => router.push(`/agents/${agent.id}`)}
+                          >
                             <td className="px-4 py-3">
                               <div>
                                 <p className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</p>
@@ -370,14 +383,14 @@ export default function AgentsPage() {
                             <td className="px-3 py-3 text-right text-slate-600 dark:text-slate-400">
                               <span className="text-xs">
                                 {agent.escalations_from > 0 && (
-                                  <span className="text-amber-600" title="Eskaliert an andere">
-                                    {agent.escalations_from} ab
+                                  <span className="text-amber-600" title="An höheren Level eskaliert">
+                                    {agent.escalations_from} weitergegeben
                                   </span>
                                 )}
                                 {agent.escalations_from > 0 && agent.escalations_to > 0 && ' / '}
                                 {agent.escalations_to > 0 && (
-                                  <span className="text-gold-600" title="Erhalten von anderen">
-                                    {agent.escalations_to} an
+                                  <span className="text-gold-600" title="Von anderem Level erhalten">
+                                    {agent.escalations_to} erhalten
                                   </span>
                                 )}
                                 {agent.escalations_from === 0 && agent.escalations_to === 0 && '--'}
@@ -394,7 +407,8 @@ export default function AgentsPage() {
                     {sortedAgents.map(agent => (
                       <div
                         key={agent.id}
-                        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3"
+                        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        onClick={() => router.push(`/agents/${agent.id}`)}
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -429,9 +443,9 @@ export default function AgentsPage() {
                           <div>
                             <p className="text-xs text-slate-500">Eskalationen</p>
                             <p className="text-xs text-slate-600 dark:text-slate-400">
-                              {agent.escalations_from > 0 && <span className="text-amber-600">{agent.escalations_from} ab</span>}
+                              {agent.escalations_from > 0 && <span className="text-amber-600" title="An höheren Level eskaliert">{agent.escalations_from} weitergegeben</span>}
                               {agent.escalations_from > 0 && agent.escalations_to > 0 && ' / '}
-                              {agent.escalations_to > 0 && <span className="text-gold-600">{agent.escalations_to} an</span>}
+                              {agent.escalations_to > 0 && <span className="text-gold-600" title="Von anderem Level erhalten">{agent.escalations_to} erhalten</span>}
                               {agent.escalations_from === 0 && agent.escalations_to === 0 && '--'}
                             </p>
                           </div>

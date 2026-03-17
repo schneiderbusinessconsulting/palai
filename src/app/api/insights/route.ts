@@ -91,22 +91,13 @@ export async function GET(request: NextRequest) {
       else buyingIntentDistribution.low++
     }
 
-    // Topic distribution from subjects (simple keyword clustering)
-    const topicKeywords: Record<string, string[]> = {
-      'Hypnose-Ausbildung': ['hypnose', 'hypnotis'],
-      'Meditation': ['meditation', 'meditier'],
-      'Life Coaching': ['coaching', 'coach'],
-      'Preise & Kosten': ['preis', 'kosten', 'zahlung', 'bezahl', 'rate'],
-      'Anmeldung': ['anmeld', 'registrier', 'einschreib'],
-      'Termine': ['termin', 'datum', 'wann', 'kurs'],
-      'Zertifikat': ['zertifikat', 'diplom', 'abschluss'],
-    }
+    // Topic distribution from topic_tags (populated by classification pipeline)
     const topicCounts: Record<string, number> = {}
     for (const email of emails) {
-      const text = `${email.subject || ''} `.toLowerCase()
-      for (const [topic, keywords] of Object.entries(topicKeywords)) {
-        if (keywords.some(k => text.includes(k))) {
-          topicCounts[topic] = (topicCounts[topic] || 0) + 1
+      const tags = email.topic_tags
+      if (Array.isArray(tags)) {
+        for (const tag of tags as string[]) {
+          if (tag) topicCounts[tag] = (topicCounts[tag] || 0) + 1
         }
       }
     }

@@ -209,6 +209,11 @@ export default function DealsPage() {
 
               {/* Deal Cards */}
               <div className={`${stage.color} rounded-b-lg p-2 space-y-2 min-h-[120px]`}>
+                {stageDeals.length === 0 && (
+                  <div className="flex items-center justify-center min-h-[80px] text-xs text-slate-400 italic">
+                    Hierher ziehen
+                  </div>
+                )}
                 {stageDeals.map(deal => (
                   <Card
                     key={deal.id}
@@ -225,7 +230,7 @@ export default function DealsPage() {
                         <span className="text-sm font-semibold text-slate-900 dark:text-white">
                           {formatCHF(deal.value)}
                         </span>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-xs" title={`Abschlusswahrscheinlichkeit: ${deal.probability}%`}>
                           {deal.probability}%
                         </Badge>
                       </div>

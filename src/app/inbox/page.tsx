@@ -50,6 +50,8 @@ import {
   UserCircle,
   Wand2,
   ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
@@ -58,8 +60,10 @@ import {
   ShieldAlert,
   Clock,
   Settings,
+  Reply,
 } from 'lucide-react'
 import { resolveTemplateVariables, detectCourseName } from '@/lib/template-utils'
+import RichTextEditor from '@/components/inbox/rich-text-editor'
 import {
   getConfidenceColor,
   getStatusBadge,
@@ -146,6 +150,15 @@ function InboxPageContent() {
   const [isSaving, setIsSaving] = useState(false)
   // saveMessage replaced by toast notifications
   const [isManualMode, setIsManualMode] = useState(false)
+
+  // Split-pane resize state
+  const [splitRatio, setSplitRatio] = useState(0.5)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const isDraggingRef = useRef(false)
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+
+  // Clean up drag listeners if component unmounts mid-drag
+  useEffect(() => () => { dragCleanupRef.current?.() }, [])
 
   // Owner selection
   const [owners, setOwners] = useState<HubSpotOwner[]>([])
@@ -862,17 +875,19 @@ function InboxPageContent() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Update selected email with new draft
-        if (selectedEmail) {
-          setSelectedEmail({
-            ...selectedEmail,
-            status: 'draft_ready',
-            email_drafts: [data.draft],
-          })
-          // Update formality from detected
+        // Update selected email with new draft — only if user is still viewing this email
+        if (selectedEmail?.id === emailId) {
+          setSelectedEmail(prev =>
+            prev?.id === emailId
+              ? { ...prev, status: 'draft_ready', email_drafts: [data.draft] }
+              : prev
+          )
           if (data.detectedFormality) {
             setFormality(data.detectedFormality)
           }
+          // Populate editor with the new draft text (converted to HTML)
+          const draftText = data.draft?.edited_response || data.draft?.ai_generated_response || ''
+          if (draftText) setEditedResponse(plainToHtml(draftText))
         }
         fetchEmails()
         // Close regenerate dialog
@@ -887,13 +902,56 @@ function InboxPageContent() {
     }
   }
 
+  // Convert plain text to HTML for RichTextEditor
+  const plainToHtml = (text: string): string => {
+    if (!text) return ''
+    // Already HTML — but be strict: must start with < followed by a tag name
+    if (/^<[a-zA-Z]/.test(text.trimStart())) return text
+    return text
+      .split(/\n{2,}/)
+      .map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`)
+      .join('')
+  }
+
+  // Check if rich-text HTML is effectively empty (no visible text)
+  const htmlIsEmpty = (html: string): boolean => {
+    if (!html) return true
+    const div = document.createElement('div')
+    div.innerHTML = html
+    return (div.textContent ?? div.innerText ?? '').trim() === ''
+  }
+
+  // Drag handle for split-pane resizing
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isDraggingRef.current = true
+    const onMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current || !panelRef.current) return
+      const rect = panelRef.current.getBoundingClientRect()
+      const ratio = (ev.clientY - rect.top) / rect.height
+      setSplitRatio(Math.max(0.15, Math.min(0.85, ratio)))
+    }
+    const cleanup = () => {
+      isDraggingRef.current = false
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', cleanup)
+      dragCleanupRef.current = null
+    }
+    dragCleanupRef.current = cleanup
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', cleanup)
+  }, [])
+
   // Copy to clipboard
   const handleCopy = async () => {
     if (!selectedEmail?.email_drafts?.[0]) return
     const draft = selectedEmail.email_drafts[0]
-    const text = isEditing ? editedResponse : (draft.edited_response || draft.ai_generated_response)
-
-    await navigator.clipboard.writeText(text)
+    const raw = editedResponse || draft.edited_response || draft.ai_generated_response || ''
+    // Strip HTML so the clipboard gets clean plain text
+    const div = document.createElement('div')
+    div.innerHTML = raw
+    const plain = (div.textContent ?? div.innerText ?? raw).trim()
+    await navigator.clipboard.writeText(plain)
     setIsCopied(true)
     setTimeout(() => setIsCopied(false), 2000)
   }
@@ -916,7 +974,7 @@ function InboxPageContent() {
   const handleSend = async () => {
     if (!selectedEmail) return
 
-    const finalText = isEditing ? editedResponse : (currentDraft?.edited_response || currentDraft?.ai_generated_response || editedResponse)
+    const finalText = editedResponse || currentDraft?.edited_response || currentDraft?.ai_generated_response
 
     if (!finalText?.trim()) {
       toast.error('Antwort darf nicht leer sein')
@@ -1011,7 +1069,7 @@ function InboxPageContent() {
     if (!selectedEmail || !currentDraft) return
     setIsSavingToKb(true)
     try {
-      const text = isEditing ? editedResponse : (currentDraft.edited_response || currentDraft.ai_generated_response)
+      const text = editedResponse || currentDraft.edited_response || currentDraft.ai_generated_response
       const res = await fetch('/api/knowledge/from-draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1083,7 +1141,9 @@ function InboxPageContent() {
     setIsEditing(false)
     setIsManualMode(false)
     setIsCopied(false)
-    setEditedResponse(email.email_drafts?.[0]?.ai_generated_response || '')
+    const existingDraft = email.email_drafts?.[0]
+    const rawText = existingDraft?.edited_response || existingDraft?.ai_generated_response || ''
+    setEditedResponse(plainToHtml(rawText))
     // Set formality from draft if available
     if (email.email_drafts?.[0]?.formality) {
       setFormality(email.email_drafts[0].formality)
@@ -1120,6 +1180,10 @@ function InboxPageContent() {
           setThreadEmails(siblings)
         })
         .catch(() => {})
+    }
+    // Auto-generate AI draft if none exists and email needs a response
+    if (!email.email_drafts?.[0] && email.status !== 'sent') {
+      setTimeout(() => handleGenerateDraft(email.id), 400)
     }
   }
 
@@ -1590,11 +1654,16 @@ function InboxPageContent() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2"
+            className="h-8 px-2 gap-1"
             onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            title={sortDir === 'desc' ? 'Absteigend sortiert' : 'Aufsteigend sortiert'}
+            aria-label={sortDir === 'desc' ? 'Absteigend sortiert – klicken für aufsteigend' : 'Aufsteigend sortiert – klicken für absteigend'}
+            title={sortDir === 'desc' ? 'Absteigend sortiert – klicken für aufsteigend' : 'Aufsteigend sortiert – klicken für absteigend'}
           >
-            {sortDir === 'desc' ? '↓ Absteigend' : '↑ Aufsteigend'}
+            {sortDir === 'desc' ? (
+              <><ArrowDown className="h-3.5 w-3.5" /><span className="text-xs">Absteigend</span></>
+            ) : (
+              <><ArrowUp className="h-3.5 w-3.5" /><span className="text-xs">Aufsteigend</span></>
+            )}
           </Button>
         </div>
         <div className="flex items-center gap-3">
@@ -1865,7 +1934,7 @@ function InboxPageContent() {
                           {getStatusBadge(email.status)}
                           {threadCount > 1 && (
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-slate-300 dark:border-slate-600">
-                              {threadCount} in Thread
+                              {threadCount} im Thread
                             </Badge>
                           )}
                           <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -2018,7 +2087,11 @@ function InboxPageContent() {
 
       {/* Email Detail Side Panel */}
       {isDetailOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={handleClose} />}
-      <div className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-y-auto overflow-x-hidden ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`} style={{ width: 'min(56rem, 100vw - 4rem)' }}>
+      <div
+        ref={panelRef}
+        className={`fixed top-0 right-0 h-full z-50 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 shadow-2xl transition-transform duration-300 ease-in-out overflow-hidden flex flex-col ${isDetailOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ width: 'min(88rem, calc(100vw - 1rem))' }}
+      >
         <div className="sr-only" role="heading" aria-level={2}>{selectedEmail?.subject}</div>
           {/* Close button */}
           <button onClick={handleClose} className="absolute top-4 right-4 z-10 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" aria-label="Schliessen">
@@ -2026,6 +2099,12 @@ function InboxPageContent() {
           </button>
 
           {selectedEmail && (
+            <>
+              {/* ── TOP PANE: email content, resizable ── */}
+              <div
+                style={{ height: `${splitRatio * 100}%`, minHeight: '15%', maxHeight: '85%' }}
+                className="overflow-y-auto overflow-x-hidden flex-shrink-0"
+              >
             <div className="flex flex-col">
               {/* Alerts — sticky at top */}
               {(lockWarning || selectedEmail.support_level === 'L2' || ((selectedEmail.status === 'pending' || selectedEmail.status === 'draft_ready') && new Date(selectedEmail.received_at) < new Date(Date.now() - 48 * 60 * 60 * 1000))) && (
@@ -2077,13 +2156,23 @@ function InboxPageContent() {
                   <div className="flex items-center gap-1 flex-shrink-0 mt-0.5">
                     {getHappinessBadge(selectedEmail.happiness_score, 'lg')}
                     {customerEmailCount !== null && (
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        customerEmailCount === 1
-                          ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
-                          : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                      }`}>
-                        {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails`}
-                      </span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium cursor-default ${
+                              customerEmailCount === 1
+                                ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                                : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              <Mail className="h-2.5 w-2.5" />
+                              {customerEmailCount === 1 ? 'Erste E-Mail' : `${customerEmailCount} E-Mails gesamt`}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{customerEmailCount === 1 ? 'Erster Kontakt von diesem Absender' : `${customerEmailCount} E-Mails von diesem Absender insgesamt`}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                 </div>
@@ -2094,6 +2183,7 @@ function InboxPageContent() {
                 {/* Agent Assignment */}
                 <div className="flex items-center gap-1">
                   <UserCircle className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="text-xs text-slate-400">Zuständig:</span>
                   <Select
                     value={selectedEmail.assigned_agent_id || 'none'}
                     onValueChange={(value) => handleAssignAgent(selectedEmail.id, value === 'none' ? '' : value)}
@@ -2143,9 +2233,10 @@ function InboxPageContent() {
 
                 <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700" />
 
-                {/* Snooze */}
+                {/* Snooze / Wiedervorlage */}
                 <div className="flex items-center gap-1">
-                  <EyeOff className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <Clock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                  <span className="text-xs text-slate-400 mr-0.5">Wiedervorlage:</span>
                   {[
                     { label: '1h', hours: 1 },
                     { label: '4h', hours: 4 },
@@ -2156,7 +2247,7 @@ function InboxPageContent() {
                       key={opt.label}
                       variant="ghost"
                       size="sm"
-                      className="text-xs h-5 px-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      className="text-xs h-5 px-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
                       onClick={() => handleSnooze(selectedEmail.id, opt.hours)}
                     >
                       {opt.label}
@@ -2223,17 +2314,45 @@ function InboxPageContent() {
                           <div className="px-6 pb-4 pl-[4.25rem]">
                             {tEmail.body_html ? (
                               <iframe
-                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 10px 0;}</style></head><body>${tEmail.body_html}</body></html>`}
+                                srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                                  @media (prefers-color-scheme: dark) {
+                                    body { color: #e2e8f0 !important; background: transparent !important; }
+                                    a { color: #60a5fa !important; }
+                                    blockquote { border-left-color: #475569 !important; color: #94a3b8 !important; }
+                                    * { background-color: transparent !important; color: inherit !important; }
+                                    a { color: #60a5fa !important; }
+                                  }
+                                  body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#3c4043;line-height:1.6;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;background:transparent;}
+                                  a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}
+                                  img{max-width:100%;height:auto;display:block;}img[src=""]{display:none;}img:not([src]){display:none;}
+                                  table{max-width:100%!important;width:auto!important;}p{margin:0 0 10px 0;}
+                                  ::-webkit-scrollbar{display:none;}html{scrollbar-width:none;}
+                                </style></head><body>${tEmail.body_html}</body></html>`}
                                 className="w-full border-0"
-                                style={{ minHeight: '60px' }}
+                                style={{ minHeight: '60px', overflow: 'hidden' }}
                                 onLoad={(e) => {
                                   const iframe = e.currentTarget
                                   if (iframe.contentDocument?.body) {
+                                    const isDark = document.documentElement.classList.contains('dark')
+                                    if (isDark && iframe.contentDocument) {
+                                      iframe.contentDocument.body.style.color = '#e2e8f0'
+                                      iframe.contentDocument.body.style.background = 'transparent'
+                                      iframe.contentDocument.querySelectorAll('*').forEach(el => {
+                                        const htmlEl = el as HTMLElement
+                                        htmlEl.style.backgroundColor = 'transparent'
+                                        if (htmlEl.tagName !== 'A') htmlEl.style.color = 'inherit'
+                                      })
+                                      iframe.contentDocument.querySelectorAll('a').forEach(a => {
+                                        (a as HTMLElement).style.color = '#60a5fa'
+                                      })
+                                    }
                                     iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
+                                    iframe.style.overflow = 'hidden'
                                   }
                                 }}
                                 sandbox=""
                                 title="Thread email content"
+                                scrolling="no"
                               />
                             ) : (
                               <div className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -2295,17 +2414,51 @@ function InboxPageContent() {
               <div className="px-6 py-4 pl-[4.25rem]">
                 {selectedEmail.body_html ? (
                   <iframe
-                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;}a{color:#1a73e8;}blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}img{max-width:100%;height:auto;}p{margin:0 0 12px 0;}</style></head><body>${selectedEmail.body_html}</body></html>`}
+                    srcDoc={`<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+                      @media (prefers-color-scheme: dark) {
+                        body { color: #e2e8f0 !important; background: transparent !important; }
+                        a { color: #60a5fa !important; }
+                        blockquote { border-left-color: #475569 !important; color: #94a3b8 !important; }
+                        table, td, th { border-color: #334155 !important; }
+                        * { background-color: transparent !important; color: inherit !important; }
+                        a { color: #60a5fa !important; }
+                      }
+                      body{font-family:'Google Sans',Roboto,system-ui,-apple-system,sans-serif;font-size:14px;color:#202124;line-height:1.75;margin:0;padding:0;word-wrap:break-word;overflow-wrap:break-word;overflow:hidden;background:transparent;}
+                      a{color:#1a73e8;}
+                      blockquote{border-left:3px solid #dadce0;margin:8px 0;padding-left:12px;color:#5f6368;}
+                      img{max-width:100%;height:auto;display:block;}
+                      img[src=""]{display:none;}img:not([src]){display:none;}
+                      table{max-width:100%!important;width:auto!important;}
+                      p{margin:0 0 12px 0;}
+                      ::-webkit-scrollbar{display:none;}
+                      html{scrollbar-width:none;}
+                    </style></head><body>${selectedEmail.body_html}</body></html>`}
                     className="w-full border-0 min-h-[120px]"
-                    style={{ minHeight: '120px' }}
+                    style={{ minHeight: '120px', overflow: 'hidden' }}
                     onLoad={(e) => {
                       const iframe = e.currentTarget
                       if (iframe.contentDocument?.body) {
+                        // Inject dark mode based on parent
+                        const isDark = document.documentElement.classList.contains('dark')
+                        if (isDark && iframe.contentDocument) {
+                          iframe.contentDocument.body.style.color = '#e2e8f0'
+                          iframe.contentDocument.body.style.background = 'transparent'
+                          iframe.contentDocument.querySelectorAll('*').forEach(el => {
+                            const htmlEl = el as HTMLElement
+                            htmlEl.style.backgroundColor = 'transparent'
+                            if (htmlEl.tagName !== 'A') htmlEl.style.color = 'inherit'
+                          })
+                          iframe.contentDocument.querySelectorAll('a').forEach(a => {
+                            (a as HTMLElement).style.color = '#60a5fa'
+                          })
+                        }
                         iframe.style.height = (iframe.contentDocument.body.scrollHeight + 16) + 'px'
+                        iframe.style.overflow = 'hidden'
                       }
                     }}
                     sandbox=""
                     title="Email content"
+                    scrolling="no"
                   />
                 ) : selectedEmail.body_text ? (
                   <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -2316,248 +2469,199 @@ function InboxPageContent() {
                 )}
               </div>
 
-              {/* Separator before AI section */}
-              <div className="border-t border-slate-200 dark:border-slate-700" />
+            </div>{/* end inner flex-col */}
+              </div>{/* end TOP PANE */}
 
-              {/* AI Draft */}
-              {currentDraft ? (
-                <div className="space-y-3 px-6 py-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-slate-400" />
-                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">AI Antwortvorschlag</h4>
-                    </div>
-                    <div className="flex items-center gap-3 flex-wrap">
+              {/* ── DRAG HANDLE ── */}
+              <div
+                className="flex-shrink-0 h-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 cursor-row-resize flex items-center justify-center border-y border-slate-200 dark:border-slate-700 group select-none z-10"
+                onMouseDown={handleDragStart}
+                title="Ziehen zum Anpassen"
+              >
+                <div className="flex gap-1">
+                  {[0,1,2,3,4].map(i => (
+                    <div key={i} className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 group-hover:bg-amber-400 dark:group-hover:bg-amber-500 transition-colors" />
+                  ))}
+                </div>
+              </div>
+
+              {/* ── BOTTOM PANE: compose + notes ── */}
+              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-[15%] flex flex-col">
+
+              {/* Gmail-style Inline Compose — always visible */}
+              <div className="px-6 py-4 space-y-3">
+
+                {/* Smart Reply Chips */}
+                {!editedResponse && (
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'Vielen Dank für Ihre Nachricht.',
+                      'Gerne helfe ich Ihnen weiter!',
+                      'Ich schaue das für Sie nach.',
+                    ].map((chip) => (
+                      <button
+                        key={chip}
+                        onClick={() => setEditedResponse(chip + '\n\n')}
+                        className="px-3 py-1.5 text-xs rounded-full border border-slate-300 dark:border-slate-600 hover:border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-slate-600 dark:text-slate-400 transition-colors"
+                      >
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Compose Box */}
+                <div className="border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden shadow-sm focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/30 transition-all">
+
+                  {/* Recipient bar */}
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex-wrap">
+                    <Reply className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
+                    <span className="text-xs text-slate-500">An:</span>
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate max-w-[180px]">
+                      {selectedEmail.from_email}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                       {/* Formality Toggle */}
-                      <div className="flex items-center gap-2 px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded-md">
+                      <div className="flex items-center gap-0.5 px-1 py-0.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md">
                         <button
                           onClick={() => setFormality('sie')}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            formality === 'sie'
-                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
-                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                          }`}
-                        >
-                          Sie
-                        </button>
+                          className={`px-1.5 py-0.5 text-xs rounded transition-colors ${formality === 'sie' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >Sie</button>
                         <button
                           onClick={() => setFormality('du')}
-                          className={`px-2 py-1 text-xs rounded transition-colors ${
-                            formality === 'du'
-                              ? 'bg-white dark:bg-slate-700 shadow-sm font-medium'
-                              : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                          }`}
-                        >
-                          Du
-                        </button>
+                          className={`px-1.5 py-0.5 text-xs rounded transition-colors ${formality === 'du' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 font-medium' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >Du</button>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-500">Confidence:</span>
-                        <Badge className={getConfidenceColor(confidence)}>
+                      {currentDraft && (
+                        <Badge className={`text-xs ${getConfidenceColor(confidence)}`}>
+                          <Sparkles className="h-2.5 w-2.5 mr-1" />
                           {Math.round(confidence * 100)}%
                         </Badge>
-                      </div>
+                      )}
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => setShowRegenerateDialog(true)}
-                            >
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Neu generieren mit Feedback</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
+                            <button
                               onClick={handleCopy}
+                              className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-400 transition-colors"
                             >
-                              {isCopied ? (
-                                <Check className="h-4 w-4 text-green-600" />
-                              ) : (
-                                <Copy className="h-4 w-4" />
-                              )}
-                            </Button>
+                              {isCopied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                            </button>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{isCopied ? 'Kopiert!' : 'In Zwischenablage kopieren'}</p>
-                          </TooltipContent>
+                          <TooltipContent><p>{isCopied ? 'Kopiert!' : 'Kopieren'}</p></TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     </div>
                   </div>
 
-                  {/* Regenerate Dialog */}
+                  {/* Regenerate feedback panel */}
                   {showRegenerateDialog && (
-                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                      <div className="flex items-start gap-2 mb-3">
-                        <MessageSquare className="h-4 w-4 text-amber-600 mt-0.5" />
-                        <div>
-                          <h5 className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                            Was soll verbessert werden?
-                          </h5>
-                          <p className="text-xs text-amber-600 dark:text-amber-400">
-                            Beschreibe, was an der Antwort geändert werden soll
-                          </p>
-                        </div>
+                    <div className="px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageSquare className="h-3.5 w-3.5 text-amber-600" />
+                        <span className="text-xs font-medium text-amber-800 dark:text-amber-300">Was soll verbessert werden?</span>
                       </div>
-                      <Textarea
-                        value={regenerateFeedback}
-                        onChange={(e) => setRegenerateFeedback(e.target.value)}
-                        placeholder="z.B. 'Freundlicher formulieren', 'Mehr Details zu Preisen', 'Kürzer fassen'..."
-                        rows={2}
-                        className="text-sm mb-3"
-                      />
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setShowRegenerateDialog(false)
-                            setRegenerateFeedback('')
-                          }}
-                        >
-                          Abbrechen
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={regenerateFeedback}
+                          onChange={(e) => setRegenerateFeedback(e.target.value)}
+                          placeholder="z.B. 'Kürzer', 'Freundlicher', 'Mehr Details zu Preisen'..."
+                          className="flex-1 text-xs px-2 py-1.5 border border-amber-200 dark:border-amber-700 rounded-md bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleGenerateDraft(selectedEmail!.id, true) }}
+                          autoFocus
+                        />
+                        <Button size="sm" className="h-7 text-xs" onClick={() => handleGenerateDraft(selectedEmail!.id, true)} disabled={isRegenerating}>
+                          {isRegenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
                         </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => handleGenerateDraft(selectedEmail!.id, true)}
-                          disabled={isRegenerating}
-                        >
-                          {isRegenerating ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Generiere...
-                            </>
-                          ) : (
-                            <>
-                              <RotateCcw className="h-3 w-3 mr-1" />
-                              Neu generieren
-                            </>
-                          )}
+                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setShowRegenerateDialog(false); setRegenerateFeedback('') }}>
+                          <X className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                   )}
 
-                  {isEditing ? (
-                    <div className="space-y-2">
-                      <Textarea
-                        value={editedResponse}
-                        onChange={(e) => setEditedResponse(e.target.value)}
-                        rows={10}
-                        className="font-mono text-sm"
-                      />
-                      <div className="flex justify-end">
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="gap-1 text-xs text-slate-500"
-                                onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
-                              >
-                                <Wand2 className="h-3 w-3" />
-                                Variablen ersetzen
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                      <div className="text-sm whitespace-pre-wrap break-all max-w-full" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        {currentDraft.edited_response || currentDraft.ai_generated_response}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : isManualMode ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Edit className="h-4 w-4 text-gold-500" />
-                    <h4 className="font-medium">Manuelle Antwort</h4>
-                  </div>
-                  <Textarea
+                  {/* Rich Text Editor — Gmail-style with full formatting toolbar */}
+                  <RichTextEditor
                     value={editedResponse}
-                    onChange={(e) => setEditedResponse(e.target.value)}
-                    rows={10}
-                    className="font-mono text-sm"
-                    placeholder="Antwort hier eingeben..."
-                    autoFocus
+                    onChange={setEditedResponse}
+                    placeholder="Schreib deine Antwort..."
+                    minHeight={12}
                   />
-                  <div className="flex justify-end">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1 text-xs text-slate-500"
-                            onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}
-                          >
-                            <Wand2 className="h-3 w-3" />
-                            Variablen ersetzen
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{'Ersetzt {{name}}, {{email}}, {{kurs}}, {{datum}} etc.'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center py-6 px-6">
-                  <p className="text-slate-500 dark:text-slate-400 mb-4">
-                    Noch keine Antwort verfasst
-                  </p>
-                  <div className="flex gap-3 justify-center">
+
+                  {/* ── Action Bar (Gmail bottom row) ── */}
+                  <div className="flex items-center gap-1.5 pt-2 flex-wrap">
+                    {/* Send button — primary action */}
                     <Button
+                      size="sm"
+                      className="h-8 px-4 gap-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 font-medium"
+                      onClick={handleSend}
+                      disabled={isSending || htmlIsEmpty(editedResponse)}
+                    >
+                      {isSending ? (
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" />Sende...</>
+                      ) : (
+                        <><Send className="h-3.5 w-3.5" />Senden</>
+                      )}
+                    </Button>
+
+                    {/* AI */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20"
                       onClick={() => handleGenerateDraft(selectedEmail.id)}
                       disabled={isGenerating}
                     >
                       {isGenerating ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Generiere...
-                        </>
+                        <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generiere...</>
                       ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          AI Vorschlag
-                        </>
+                        <><Sparkles className="h-3.5 w-3.5" />{currentDraft ? 'Neu' : 'AI'}</>
                       )}
                     </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsManualMode(true)
-                        setEditedResponse('')
-                      }}
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Manuell antworten
+
+                    {currentDraft && (
+                      <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500 hover:text-amber-600" onClick={() => setShowRegenerateDialog(!showRegenerateDialog)}>
+                        <MessageSquare className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+
+                    {/* Variables */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500" onClick={() => setEditedResponse(resolveTemplateVars(editedResponse))}>
+                            <Wand2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>{'Variablen ersetzen ({{name}}, ...)'}</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <div className="flex-1" />
+
+                    {/* Owner Selection */}
+                    {owners.length > 0 && (
+                      <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
+                        <SelectTrigger className="h-8 w-38 text-xs border-slate-200 dark:border-slate-600">
+                          <SelectValue placeholder="Senden als..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {owners.map((owner) => (
+                            <SelectItem key={owner.id} value={owner.id}>{owner.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+
+                    {/* Save */}
+                    <Button variant="ghost" size="sm" className="h-8 px-2 gap-1 text-slate-500" onClick={handleSaveDraft} disabled={isSaving || htmlIsEmpty(editedResponse)}>
+                      {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                      Speichern
                     </Button>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* Interne Notizen */}
               <div className="border rounded-lg mx-6 mb-4">
@@ -2622,127 +2726,37 @@ function InboxPageContent() {
                   </div>
                 )}
               </div>
-            </div>
-          )}
-
-          {(currentDraft || isManualMode) && (
-            <DialogFooter className="flex-col sm:flex-row gap-3 px-6 pb-5 pt-3 sticky bottom-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 z-10">
-              {/* Owner Selection */}
-              {owners.length > 0 && (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-sm text-slate-500 whitespace-nowrap">Senden als:</span>
-                  <Select value={selectedOwnerId} onValueChange={setSelectedOwnerId}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="Owner wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {owners.map((owner) => (
-                        <SelectItem key={owner.id} value={owner.id}>
-                          {owner.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="flex gap-2 w-full sm:w-auto justify-end flex-wrap items-center">
-                <Button variant="outline" onClick={handleClose}>
+              {/* Secondary action bar — inside bottom pane, sticky bottom */}
+              <div className="flex items-center gap-2 px-6 py-2.5 mt-auto justify-between flex-shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 sticky bottom-0">
+                <Button variant="outline" size="sm" onClick={handleClose}>
                   Schliessen
                 </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={handleSaveToKb}
-                        disabled={isSavingToKb}
-                      >
-                        {isSavingToKb ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <BookOpen className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Antwort in die Knowledge Base speichern</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                {(isEditing || isManualMode) && (
-                  <Button
-                    variant="outline"
-                    className="border-gold-300 text-gold-600 hover:bg-gold-50"
-                    onClick={handleSaveDraft}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                    )}
-                    Speichern
-                  </Button>
-                )}
-                {currentDraft && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      if (isEditing) {
-                        handleSaveDraft()
-                      } else {
-                        setEditedResponse(
-                          currentDraft.edited_response || currentDraft.ai_generated_response
-                        )
-                      }
-                      setIsEditing(!isEditing)
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    {isEditing ? 'Vorschau' : 'Bearbeiten'}
-                  </Button>
-                )}
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        onClick={handleMarkAsSent}
-                        disabled={isSending}
-                      >
-                        {isSending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Nur als gesendet markieren (kein echtes Senden)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Button
-                  className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900"
-                  onClick={handleSend}
-                  disabled={isSending || (isManualMode && !editedResponse.trim())}
-                >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Sende...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Senden
-                    </>
-                  )}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={handleSaveToKb} disabled={isSavingToKb || htmlIsEmpty(editedResponse)}>
+                          {isSavingToKb ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>In Knowledge Base speichern</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={handleMarkAsSent} disabled={isSending}>
+                          {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Nur als gesendet markieren (kein echtes Senden)</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
-            </DialogFooter>
+
+              </div>
+            </>
           )}
       </div>
 

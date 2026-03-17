@@ -16,7 +16,14 @@ function getSupabaseAdmin() {
 
 export async function GET() {
   try {
-    const supabase = await createClient()
+    // Prefer admin client (bypasses RLS), fallback to user client
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let supabase: any
+    try {
+      supabase = getSupabaseAdmin()
+    } catch {
+      supabase = await createClient()
+    }
     const { data, error } = await supabase
       .from('support_agents')
       .select('id, name, email, role, specializations, is_active, max_open_tickets')

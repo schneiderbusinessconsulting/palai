@@ -227,8 +227,17 @@ export default function TasksPage() {
         </div>
       ) : filteredTasks.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
+          <CardContent className="py-12 text-center space-y-3">
             <p className="text-slate-500">Keine Aufgaben gefunden</p>
+            {statusFilter === 'all' && priorityFilter === 'all' ? (
+              <Button size="sm" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" /> Erste Aufgabe erstellen
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={() => { setStatusFilter('all'); setPriorityFilter('all') }}>
+                Filter zurücksetzen
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -244,7 +253,8 @@ export default function TasksPage() {
                   {/* Status badge (clickable) */}
                   <button
                     onClick={() => cycleStatus(task)}
-                    title={`Klick: ${statusConfig[sc.next]?.label || 'Offen'}`}
+                    title={`Status wechseln → ${statusConfig[sc.next]?.label || 'Offen'}`}
+                    aria-label={`Status: ${sc.label}. Klicken um zu ${statusConfig[sc.next]?.label || 'Offen'} zu wechseln`}
                   >
                     <Badge className={`${sc.color} cursor-pointer hover:opacity-80 transition-opacity`}>
                       {sc.label}
@@ -282,8 +292,9 @@ export default function TasksPage() {
 
                   {/* Related email */}
                   {task.related_customer_email && (
-                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                    <span className="flex items-center gap-1 text-xs text-slate-400" title={`Verknüpfte E-Mail: ${task.related_customer_email}`}>
                       <Mail className="h-3 w-3" />
+                      <span className="hidden sm:inline truncate max-w-[120px]">{task.related_customer_email}</span>
                     </span>
                   )}
                 </CardContent>

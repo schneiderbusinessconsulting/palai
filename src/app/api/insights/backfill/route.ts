@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createEmbedding } from '@/lib/ai/openai'
+import { processNewEmail } from '@/lib/email-processing'
 
 // Levenshtein-based normalized edit distance (0.0 = identical, 1.0 = completely different)
 function calculateEditDistance(original: string, edited: string): number {
@@ -36,11 +37,35 @@ export async function POST() {
     const supabase = await createClient()
 
     const stats = {
+      emailsClassified: 0,
       editDistanceCalculated: 0,
       learningCasesCreated: 0,
       csatRatingsCreated: 0,
       knowledgeChunksCreated: 0,
       errors: [] as string[],
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STEP 0: Classify unprocessed emails via shared pipeline
+    // ═══════════════════════════════════════════════════════════════════════
+    const { data: unclassifiedEmails } = await supabase
+      .from('incoming_emails')
+      .select('id, from_email, subject, body_text')
+      .or('email_type.is.null,tone_sentiment.is.null')
+      .limit(100)
+
+    for (const email of unclassifiedEmails || []) {
+      try {
+        await processNewEmail(
+          email.id,
+          email.from_email || 'unknown@example.com',
+          email.subject || '',
+          email.body_text || ''
+        )
+        stats.emailsClassified++
+      } catch (e) {
+        stats.errors.push(`Classify ${email.id}: ${String(e).substring(0, 80)}`)
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -254,11 +279,12 @@ export async function POST() {
       ...stats,
       errors: stats.errors.slice(0, 10),
       message: [
+        stats.emailsClassified > 0 && `${stats.emailsClassified} E-Mails klassifiziert`,
         stats.editDistanceCalculated > 0 && `${stats.editDistanceCalculated} Edit-Distances berechnet`,
         stats.learningCasesCreated > 0 && `${stats.learningCasesCreated} Learning Cases erstellt`,
         stats.csatRatingsCreated > 0 && `${stats.csatRatingsCreated} CSAT-Bewertungen abgeleitet`,
         stats.knowledgeChunksCreated > 0 && `${stats.knowledgeChunksCreated} KB-Einträge erstellt`,
-        stats.editDistanceCalculated === 0 && stats.learningCasesCreated === 0 &&
+        stats.emailsClassified === 0 && stats.editDistanceCalculated === 0 && stats.learningCasesCreated === 0 &&
           stats.csatRatingsCreated === 0 && stats.knowledgeChunksCreated === 0 &&
           'Nichts zu backfillen — alle Daten sind aktuell',
       ].filter(Boolean).join(', '),

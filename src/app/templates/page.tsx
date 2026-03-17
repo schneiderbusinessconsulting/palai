@@ -301,6 +301,8 @@ export default function TemplatesPage() {
                     size="icon"
                     className="h-8 w-8"
                     onClick={() => toggleFavorite(template)}
+                    aria-label={template.is_favorite ? 'Von Favoriten entfernen' : 'Als Favorit markieren'}
+                    title={template.is_favorite ? 'Von Favoriten entfernen' : 'Als Favorit markieren'}
                   >
                     {template.is_favorite ? (
                       <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
@@ -310,7 +312,7 @@ export default function TemplatesPage() {
                   </Button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Weitere Optionen">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>

@@ -26,6 +26,8 @@ import {
   Briefcase,
   Calendar,
   FileBarChart,
+  Brain,
+  ShoppingBag,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
@@ -46,9 +48,9 @@ const navigation = [
   { name: 'Team', href: '/agents', icon: UserCog },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
-  { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },
+  { name: 'AI Learning', href: '/learning', icon: Brain, badgeKey: 'learningPending' },
   { name: 'Templates', href: '/templates', icon: FileText },
-  { name: 'Kurse & Preise', href: '/courses', icon: GraduationCap },
+  { name: 'Kurse & Preise', href: '/courses', icon: ShoppingBag },
   { name: 'Einstellungen', href: '/settings', icon: Settings },
 ]
 
@@ -229,6 +231,7 @@ export function Sidebar() {
           {/* Mobile Close Button */}
           <button
             onClick={() => setMobileOpen(false)}
+            aria-label="Navigation schliessen"
             className="lg:hidden absolute top-4 right-3 p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-5 w-5 text-slate-500" />

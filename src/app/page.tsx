@@ -1075,7 +1075,7 @@ export default function DashboardPage() {
                     <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Zugewiesen</th>
                     <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Gelöst</th>
                     <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500">Resolution</th>
-                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500 hidden sm:table-cell">Ø FRT</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500 hidden sm:table-cell" title="Ø Erstantwortzeit">Ø Erstantwort</th>
                     <th className="text-right px-3 py-2.5 text-xs font-medium text-slate-500 hidden sm:table-cell">CSAT</th>
                   </tr>
                 </thead>

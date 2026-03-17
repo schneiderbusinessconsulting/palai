@@ -192,6 +192,7 @@ export async function GET(
         emails: data.emails,
         resolution_rate: data.emails > 0 ? Math.round((data.resolved / data.emails) * 100) : 0,
       }))
+      .sort((a, b) => a.week.localeCompare(b.week))
       .slice(-4)
 
     const periodLabel = period === '7d' ? '7 Tage' : period === '90d' ? '90 Tage' : '30 Tage'

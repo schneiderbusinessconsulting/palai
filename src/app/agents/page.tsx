@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Header } from '@/components/layout/header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -101,6 +102,7 @@ export default function AgentsPage() {
   const [period, setPeriod] = useState<string>('30d')
   const [sortKey, setSortKey] = useState<SortKey>('emails_assigned')
   const [sortAsc, setSortAsc] = useState(false)
+  const router = useRouter()
 
   const fetchData = useCallback(async (selectedPeriod: string) => {
     setIsLoading(true)
@@ -345,7 +347,11 @@ export default function AgentsPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {sortedAgents.map(agent => (
-                          <tr key={agent.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <tr
+                            key={agent.id}
+                            className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                            onClick={() => router.push(`/agents/${agent.id}`)}
+                          >
                             <td className="px-4 py-3">
                               <div>
                                 <p className="font-medium text-slate-800 dark:text-slate-200">{agent.name}</p>
@@ -401,7 +407,8 @@ export default function AgentsPage() {
                     {sortedAgents.map(agent => (
                       <div
                         key={agent.id}
-                        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3"
+                        className="p-4 rounded-lg border border-slate-200 dark:border-slate-700 space-y-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                        onClick={() => router.push(`/agents/${agent.id}`)}
                       >
                         <div className="flex items-center justify-between">
                           <div>

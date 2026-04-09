@@ -10,8 +10,8 @@
 |---|---|
 | Kunden gesamt (Lifecycle = Customer) | 1.948 |
 | Gewonnene Deals gesamt | 2.662 |
-| Analysierte Kunden (neueste 400) | 400 |
-| Analysierte Deals (neueste 200) | 200 |
+| Analysierte Kunden | 1.000 (51%) |
+| Analysierte Deals | 200 |
 | Gesamtumsatz (200 Deals) | CHF 757.927 |
 | Durchschnittlicher Dealwert | CHF 3.968 |
 
@@ -19,192 +19,236 @@
 
 ## 1. First Touch - Wie kommen die Leads rein?
 
-### Original Traffic Source (First Touch)
+### Original Traffic Source (First Touch) - 1000 Kunden
 
-| Quelle | Kunden | Anteil |
-|---|---|---|
-| OFFLINE (Integrations, CRM, Conversations) | 239 | 59,8% |
-| DIRECT_TRAFFIC | 72 | 18,0% |
-| ORGANIC_SEARCH | 24 | 6,0% |
-| PAID_SEARCH (Google Ads) | 23 | 5,8% |
-| REFERRALS | 14 | 3,5% |
-| OTHER_CAMPAIGNS | 9 | 2,3% |
-| EMAIL_MARKETING | 8 | 2,0% |
-| SOCIAL_MEDIA (organisch) | 7 | 1,8% |
-| PAID_SOCIAL (Meta Ads) | 3 | 0,8% |
-| AI_REFERRALS | 1 | 0,3% |
+| Quelle | Kunden | Anteil | Umsatz (CHF) | Avg. Deal (CHF) |
+|---|---|---|---|---|
+| OFFLINE (Integrations, CRM, CIO) | 593 | 59,3% | 554.963 | 936 |
+| DIRECT_TRAFFIC | 185 | 18,5% | 242.915 | 1.313 |
+| ORGANIC_SEARCH | 55 | 5,5% | 77.368 | 1.407 |
+| PAID_SEARCH (Google Ads) | 43 | 4,3% | 77.877 | 1.811 |
+| EMAIL_MARKETING | 38 | 3,8% | 44.568 | 1.173 |
+| REFERRALS | 38 | 3,8% | 53.338 | 1.404 |
+| OTHER_CAMPAIGNS | 26 | 2,6% | 51.097 | 1.965 |
+| SOCIAL_MEDIA (organisch) | 13 | 1,3% | 5.032 | 387 |
+| PAID_SOCIAL (Meta Ads) | 8 | 0,8% | 14.532 | 1.816 |
+| AI_REFERRALS | 1 | 0,1% | 2.490 | 2.490 |
 
-**Erkenntnis:** Der grosse Anteil "OFFLINE" (59,8%) stammt hauptsaechlich aus Integrationen (z.B. Customer.io), CRM-manuellen Eintraegen und Conversations. Das bedeutet, viele Leads kommen ueber bestehende Kanaele rein, die nicht sauber als Web-Traffic getrackt werden. Google Ads (PAID_SEARCH) und organische Suche zusammen bringen 11,8% der Kunden.
+**Erkenntnisse:**
+- **PAID_SEARCH** hat den hoechsten Avg. Deal (CHF 1.811) nach OTHER_CAMPAIGNS - Google Ads bringt hochwertige Leads
+- **PAID_SOCIAL** (Meta) hat ebenfalls hohe Dealwerte (CHF 1.816) - wenige Leads, aber qualitativ gut
+- **OTHER_CAMPAIGNS** hat den hoechsten Avg. Deal (CHF 1.965)
+- **SOCIAL_MEDIA** (organisch) hat den niedrigsten Avg. Deal (CHF 387) - viele kleine Kaeufe
+- Der grosse OFFLINE-Anteil (59,3%) stammt aus Integrationen (Customer.io), CRM-Eintraegen und Conversations
 
-### First Touch Typ (Custom Property)
-
-| Typ | Anzahl |
-|---|---|
-| form_submit | 7 |
-| ad_click | 3 |
-| (nicht getrackt) | 390 |
-
-**Hinweis:** Das Custom-Property `lead_first_touch` wird erst seit kurzem befuellt (ab ca. Maerz 2026). Die meisten historischen Kunden haben hier keinen Wert.
-
-### Erste Conversion (erstes ausgefuelltes Formular)
+### Erste Conversion (erstes ausgefuelltes Formular) - 1000 Kunden
 
 | Formular | Kunden |
 |---|---|
-| Beratungsgespraech Kevin Danch | 31 |
-| Opt-In Kostenloses Buch | 26 |
-| Kasse Angstfrei Kongress | 34 |
-| HC Funnel (Unterbewusstsein) | 7 |
-| GC Funnel (Life Coaching) | 11 |
-| Hypnose Basisseminar | 13 |
-| Bewusstseinsformel Funnel | 7 |
-| Buchvorstellung Events | 4 |
-| Masterclass-Funnels (div.) | 7 |
-| Meetings Links (diverse) | 10 |
-| (unbekannt) | 74 |
+| Kasse Angstfrei Kongress | 60 |
+| Masterclass Vergebung | 46 |
+| Beratungsgespraech Kevin Danch | 43 |
+| Opt-In Kostenloses Buch (alle Varianten) | 62 |
+| Masterclass Bewusstseinsformel (BF) | 38 |
+| GC Funnel "Life Coaching" | 23 |
+| Hypnose Basisseminar | 22 |
+| Opt-In GE-Formular | 11 |
+| MC Funnel "Annehmen statt kaempfen" | 26 |
+| HC Funnel (div. Varianten) | 27 |
+| Hypnose-Training Funnel (BS) | 14 |
+| Kajabi-Form Gabriel Palacios | 12 |
+| Event Formulare | 11 |
+| Hypnose Uebungen (YouTube) | 15 |
+| Masterclass Selbstliebe (IK) | 7 |
+| (unbekannt) | 198 |
 
 **Top First-Touch-Einstiegspunkte:**
-1. **Angstfrei Kongress** - Groesster einzelner Einstiegspunkt (34 Kunden)
-2. **Beratungsgespraech** - Direkte Terminbuchung (31 Kunden)
-3. **Kostenloses Buch** - Lead Magnet (26 Kunden)
-4. **Hypnose Basisseminar** - Event-basiert (13 Kunden)
+1. **Opt-In Kostenloses Buch** - Groesster Lead Magnet (62 Kunden)
+2. **Angstfrei Kongress** - Event-basiert (60 Kunden)
+3. **Masterclass Vergebung** - Content-Funnel (46 Kunden)
+4. **Beratungsgespraech** - Direkte Terminbuchung (43 Kunden)
+5. **Masterclass BF** - Content-Funnel (38 Kunden)
 
 ---
 
 ## 2. Die Customer Journey
 
-### Zeitspanne Lead-Erstellung bis Kunde
+### Lead-Erstellung nach Monat (1000 Kunden)
 
-Basierend auf der Analyse der Lead-Erstellungsdaten vs. Customer-Datum:
-
-| Lead erstellt | Anzahl | Bemerkung |
+| Zeitraum | Kunden | Bemerkung |
 |---|---|---|
-| 2025-01 und frueher | 67 | Langzeit-Leads (>12 Monate Journey) |
-| 2025-Q1 (Feb-Maerz) | 3 | Mittelfristige Leads |
-| 2025-Q2 (Apr-Jun) | 5 | Mittelfristige Leads |
-| 2025-Q3 (Jul-Sep) | 11 | Kurzfristige Leads |
-| 2025-Q4 (Okt-Dez) | 24 | Schnelle Conversion |
-| 2026-Q1 (Jan-Maerz) | 46 | Schnellste Conversion |
+| Apr 2024 und frueher | 97 | Langzeit-Leads (>2 Jahre) |
+| Mai-Dez 2024 | 114 | Mittelfristige Leads |
+| Jan-Maerz 2025 | 144 | Grosser Lead-Zuwachs |
+| Apr-Jun 2025 | 148 | Peak bei Lead-Generierung |
+| Jul-Sep 2025 | 43 | Sommerloch |
+| Okt-Dez 2025 | 20 | Vorbereitungsphase |
+| Jan-Maerz 2026 | 46 | Schnelle Conversions |
 
-**Erkenntnis:** Viele Kunden haben eine lange Journey. Ein grosser Teil der Leads wurde Monate oder sogar ueber ein Jahr vor dem Kauf erstellt. Gleichzeitig gibt es schnelle Conversions innerhalb von 1-3 Monaten.
+**Erkenntnis:** Die meisten heutigen Kunden wurden als Leads im Fruehling 2025 erstellt (Maerz-Mai). Die Journey dauert typischerweise **6-12 Monate** bis zum Kauf.
 
-### Lifecycle-Phasen (Customer seit)
+### Customer-Conversions nach Monat
 
 | Monat | Neue Kunden |
 |---|---|
+| Nov 2025 | 600 |
 | Dez 2025 | 117 |
 | Jan 2026 | 31 |
 | Feb 2026 | 25 |
 | Maerz 2026 | 20 |
 | April 2026 (bisher) | 7 |
 
-**Peak im Dezember 2025** - vermutlich durch Launch-Events / Jahresendkampagnen.
+**Massiver Peak im November 2025** (600 Kunden!) - vermutlich ein grosses Launch-Event oder Kampagne. Danach normalisiert auf 20-30/Monat.
+
+### Journey: First Source -> Last Source Shift
+
+Wie veraendert sich die Quelle vom ersten zum letzten Kontakt?
+
+| First Touch | -> Last Touch | Kunden | Interpretation |
+|---|---|---|---|
+| OFFLINE (593) | -> DIRECT_TRAFFIC | 187 | Kommen ueber Website zurueck |
+| OFFLINE (593) | -> EMAIL_MARKETING | 123 | E-Mail schliesst den Sale |
+| OFFLINE (593) | -> OFFLINE | 195 | Bleiben im gleichen Kanal |
+| DIRECT_TRAFFIC (185) | -> EMAIL_MARKETING | 65 | 35% werden per Mail konvertiert |
+| DIRECT_TRAFFIC (185) | -> DIRECT_TRAFFIC | 86 | 46% bleiben direkt |
+| ORGANIC_SEARCH (55) | -> DIRECT_TRAFFIC | 28 | Kommen direkt zurueck |
+| PAID_SEARCH (43) | -> DIRECT_TRAFFIC | 19 | Merken sich die Seite |
+| PAID_SEARCH (43) | -> EMAIL_MARKETING | 8 | 19% ueber E-Mail konvertiert |
+| REFERRALS (38) | -> EMAIL_MARKETING | 12 | 32% ueber E-Mail konvertiert |
+| REFERRALS (38) | -> DIRECT_TRAFFIC | 12 | 32% kommen direkt zurueck |
+
+**Kernerkenntnisse Journey:**
+- **E-Mail-Marketing ist der wichtigste "Closer"**: Von 3,8% First Touch auf 24,5% Last Touch
+- **OFFLINE-Leads werden aktiviert** durch E-Mail (21%) und Direct Traffic (32%)
+- **Paid Leads kommen organisch zurueck**: 44% der PAID_SEARCH-Leads haben spaeter Direct Traffic als Last Touch
 
 ---
 
 ## 3. Last Touch - Was war der letzte Kontakt vor dem Kauf?
 
-### Latest Traffic Source (Last Touch)
+### Latest Traffic Source (Last Touch) - 1000 Kunden
 
-| Quelle | Kunden | Anteil |
-|---|---|---|
-| DIRECT_TRAFFIC | 165 | 41,3% |
-| EMAIL_MARKETING | 78 | 19,5% |
-| OFFLINE | 73 | 18,3% |
-| OTHER_CAMPAIGNS | 22 | 5,5% |
-| REFERRALS | 21 | 5,3% |
-| ORGANIC_SEARCH | 20 | 5,0% |
-| PAID_SEARCH | 10 | 2,5% |
-| PAID_SOCIAL | 7 | 1,8% |
-| SOCIAL_MEDIA | 4 | 1,0% |
+| Quelle | Kunden | Anteil | Umsatz (CHF) | Avg. Deal (CHF) |
+|---|---|---|---|---|
+| DIRECT_TRAFFIC | 356 | 35,6% | 472.954 | 1.329 |
+| EMAIL_MARKETING | 245 | 24,5% | 259.721 | 1.060 |
+| OFFLINE | 195 | 19,5% | 166.429 | 853 |
+| OTHER_CAMPAIGNS | 67 | 6,7% | 67.739 | 1.011 |
+| REFERRALS | 50 | 5,0% | 70.088 | 1.402 |
+| ORGANIC_SEARCH | 36 | 3,6% | 41.122 | 1.142 |
+| PAID_SEARCH | 22 | 2,2% | 17.195 | 782 |
+| PAID_SOCIAL | 17 | 1,7% | 20.192 | 1.188 |
+| SOCIAL_MEDIA | 12 | 1,2% | 8.739 | 728 |
 
-**Erkenntnis:** EMAIL_MARKETING steigt von 2% (First Touch) auf 19,5% (Last Touch). E-Mails spielen eine entscheidende Rolle bei der finalen Kaufentscheidung, auch wenn sie selten der erste Kontaktpunkt sind.
+**Source-Shift von First zu Last Touch:**
 
-### Last Touch Typ (Custom Property)
+| Quelle | First Touch | Last Touch | Veraenderung |
+|---|---|---|---|
+| EMAIL_MARKETING | 3,8% | **24,5%** | +20,7 Ppt. (6,5x) |
+| REFERRALS | 3,8% | 5,0% | +1,2 Ppt. |
+| PAID_SOCIAL | 0,8% | 1,7% | +0,9 Ppt. (2x) |
+| OTHER_CAMPAIGNS | 2,6% | 6,7% | +4,1 Ppt. (2,6x) |
+| OFFLINE | 59,3% | **19,5%** | -39,8 Ppt. |
+| PAID_SEARCH | 4,3% | **2,2%** | -2,1 Ppt. |
+| DIRECT_TRAFFIC | 18,5% | **35,6%** | +17,1 Ppt. |
 
-| Typ | Anzahl |
-|---|---|
-| email | 64 |
-| (nicht getrackt) | 336 |
-
-Von den getrackten Last Touches war **100% E-Mail** der letzte Kontakt vor dem Kauf.
-
-### Last Touch Source (Custom)
-
-| Quelle | Kunden |
-|---|---|
-| Meta (Ads) | 9 |
-| Customer.io (E-Mail) | 7 |
-| Facebook | 1 |
-| (nicht befuellt) | 383 |
+**E-Mail wachst am staerksten** von First zu Last Touch (6,5-facher Anstieg). Es ist der Kanal, der Leads in Kunden konvertiert.
 
 ---
 
 ## 4. Funnel-Analyse - Welcher Funnel funktioniert am besten?
 
-### Last Touch Funnels (letzter Funnel vor Kauf)
+### Last Touch Funnels (1000 Kunden)
 
-| Funnel | Kunden | Bemerkung |
-|---|---|---|
-| **HC Live Launch** | 24 | Hypnosecoach Live Launch |
-| **GE Popup Form** | 22 | Geistige Entwicklung Popup |
-| **MC Live Launch** | 16 | Mindfulness Coach Live Launch |
-| **Rauhnachte mit Palacios und Onken** | 15 | Sonder-Event |
-| **Live-Event Bewusstseinsformel** | 12 | BF Live Event |
-| **Funnel MC Formular** | 9 | MC Funnel Formular |
-| **ebook Evergreen** | 7 | Evergreen Lead Magnet |
-| **Testzugang Gespraechscoach (Tel.)** | 6 | Telefonischer Testzugang |
-| **Bewusstseins-Typ HC** | 5 | Quiz-Funnel |
-| **GC Live Launch** | 3 | Gespraechscoach Live Launch |
-| **Kostenloses PDF** | 3 | PDF Lead Magnet |
-| **PR Veranstaltungen Formular** | 3 | Events |
-| **RG-HC-L3** | 3 | Retargeting |
-| **Testzugang GE Fernstudium (Tel.)** | 3 | Telefonisch |
-| **Testzugang HC Fernstudium (Tel.)** | 3 | Telefonisch |
-| **HC Evergreen** | 2 | Evergreen HC Funnel |
-| **Bewusstseins-Typ GC** | 2 | Quiz-Funnel |
-| (nicht getrackt) | 259 | 64,8% |
-
-### Top-Performing Funnels (Ranking)
-
-| Rang | Funnel | Kunden | Kategorie |
+| Funnel | Kunden | Umsatz (CHF) | Avg. Deal (CHF) |
 |---|---|---|---|
-| 1 | HC Live Launch | 24 | Launch-Event |
-| 2 | GE Popup Form | 22 | Evergreen/Popup |
-| 3 | MC Live Launch | 16 | Launch-Event |
-| 4 | Rauhnachte (Special Event) | 15 | Sonder-Event |
-| 5 | Bewusstseinsformel Live | 12 | Launch-Event |
-| 6 | MC Funnel Formular | 9 | Funnel |
-| 7 | ebook Evergreen | 7 | Evergreen |
-| 8 | Testzugang Tel. (alle) | 12 | Telefonisch |
+| **HC Live Launch** | 79 | 96.987 | 1.228 |
+| **GE Popup Form** | 62 | 82.519 | 1.331 |
+| **MC Live Launch** | 61 | 48.315 | 792 |
+| **Rauhnachte mit Palacios und Onken** | 30 | 24.912 | 830 |
+| **Funnel MC Formular** | 25 | 18.976 | 759 |
+| **Bewusstseins-Typ HC** (Quiz) | 16 | 13.086 | 818 |
+| **Live-Event Bewusstseinsformel** | 16 | 7.965 | 498 |
+| **Testzugang GC Fernstudium (Tel.)** | 14 | 9.987 | 713 |
+| **Testzugang HC Fernstudium (Tel.)** | 12 | 26.923 | 2.244 |
+| **GC Live Launch** | 11 | 2.765 | 251 |
+| **ebook Evergreen** | 10 | 27.531 | 2.753 |
+| **Kostenloses PDF (Tel.)** | 10 | 11.177 | 1.118 |
+| **Bewusstseins-Typ GC** (Quiz) | 6 | 13.709 | 2.285 |
+| **Testzugang GE Fernstudium (Tel.)** | 6 | 7.153 | 1.192 |
+| **PR Veranstaltungen Formular** | 5 | 5.309 | 1.062 |
+| **RG-HC-L3** (Retargeting) | 5 | 12.671 | 2.534 |
+| **HC Evergreen** | 4 | 10.634 | 2.659 |
+| **PR Veranstaltung (Tageswahl)** | 3 | 6.832 | 2.277 |
+| **Funnel GC Formular** | 2 | 4.338 | 2.169 |
+| (nicht getrackt) | 619 | - | - |
 
-### Letzte Conversion (letztes Formular vor Kauf)
+### Funnel-Kategorien aggregiert
 
-| Formular | Kunden |
+| Kategorie | Kunden | Umsatz (CHF) | Avg. Deal (CHF) |
+|---|---|---|---|
+| **HC (Hypnosecoach)** | 117 | 160.599 | 1.373 |
+| **GE (Geistige Entwicklung)** | 76 | 101.813 | 1.340 |
+| **MC (Mindfulness Coach)** | 88 | 68.240 | 775 |
+| **Lead Magnets (ebook/PDF)** | 20 | 38.708 | 1.935 |
+| **GC (Gespraechscoach)** | 33 | 30.798 | 933 |
+| **Events (Live/Special)** | 30 | 24.912 | 830 |
+| **BF (Bewusstseinsformel)** | 16 | 7.965 | 498 |
+| Evergreen Funnels | 1 | 40 | 40 |
+
+**Top-Erkenntnisse nach Funnel-Kategorie:**
+
+1. **HC-Funnels** generieren den meisten Umsatz (CHF 160.599) UND die meisten Kunden (117)
+2. **Lead Magnets** (ebook/PDF) haben den hoechsten Avg. Deal (CHF 1.935) - wenige aber hochwertige Leads
+3. **MC-Funnels** bringen viele Kunden (88) aber niedrigeren Avg. Deal (CHF 775)
+4. **GE-Funnels** sind die effizientesten: hoher Umsatz (CHF 101.813) bei hohem Avg. Deal (CHF 1.340)
+
+### Umsatz-Ranking: Top-Funnels
+
+| Rang | Funnel | Kunden | Umsatz (CHF) | Avg. Deal (CHF) |
+|---|---|---|---|---|
+| 1 | HC Live Launch | 79 | 96.987 | 1.228 |
+| 2 | GE Popup Form | 62 | 82.519 | 1.331 |
+| 3 | MC Live Launch | 61 | 48.315 | 792 |
+| 4 | ebook Evergreen | 10 | 27.531 | **2.753** |
+| 5 | Testzugang HC (Tel.) | 12 | 26.923 | **2.244** |
+| 6 | Rauhnachte | 30 | 24.912 | 830 |
+| 7 | Funnel MC Formular | 25 | 18.976 | 759 |
+| 8 | Bewusstseins-Typ GC (Quiz) | 6 | 13.709 | **2.285** |
+| 9 | Bewusstseins-Typ HC (Quiz) | 16 | 13.086 | 818 |
+| 10 | RG-HC-L3 (Retargeting) | 5 | 12.671 | **2.534** |
+
+**Hoechster Avg. Deal-Wert (= wertvollste Leads):**
+1. **ebook Evergreen** - CHF 2.753
+2. **HC Evergreen** - CHF 2.659
+3. **RG-HC-L3 Retargeting** - CHF 2.534
+4. **PR Veranstaltung Tageswahl** - CHF 2.277
+5. **Bewusstseins-Typ GC Quiz** - CHF 2.285
+6. **Testzugang HC Fernstudium** - CHF 2.244
+
+### Funnel -> Letzte Conversion (wohin fuehrt der Funnel?)
+
+| Funnel | Haeufigste letzte Aktion |
 |---|---|
-| **Formular Vertrieb** | 50 |
-| **Angstfrei Kongress (Kasse)** | 24 |
-| **MC Funnel "Annehmen statt kaempfen"** | 22+ |
-| **BF Funnel "Negative Gedankenmuster"** | 18 |
-| **HC Funnel "Unterbewusstsein"** | 22 |
-| **GC Funnel "Life Coaching"** | 19 |
-| **Live-Workshop Anmeldungen** | 10 |
-| **Masterclass-Funnels** | 6 |
-| **Beratungsgespraech Booking** | 3 |
+| **HC Live Launch** | HC Funnel "Unterbewusstsein" (33x), BF Funnel (8x), MC Funnel (7x) |
+| **MC Live Launch** | MC Funnel "Annehmen statt kaempfen" (29x), Workshop-Anmeldung (5x) |
+| **GE Popup Form** | BF Funnel (10x), MC Funnel (8x), GC Funnel (5x) |
+| **Funnel MC Formular** | MC Funnel (6x), GC Funnel (4x), Workshop-Anmeldung (3x) |
+| **GC Live Launch** | GC Funnel (4x), MC Funnel (3x) |
+| **Rauhnachte** | Community-Abend (4x), GC Funnel (3x), Workshop (2x) |
 
-**Erkenntnis:** Das **"Formular Vertrieb"** ist der dominierende letzte Conversion-Punkt (50 Kunden) - das bedeutet, der Vertrieb/Sales-Call ist der finale Schritt. Die **Funnels** (MC, HC, GC, BF) generieren die qualifizierten Leads.
+**Erkenntnis:** Die Funnels arbeiten als **Cross-Selling-System**. HC-Leads konvertieren auch ueber BF und MC Funnels. GE-Popup-Leads werden zu BF, MC und GC Kunden.
 
-### Lead Funnel Source (CIO Campaign)
+### Testzugang-Funnels (telefonisch) - Detail
 
-| Quelle | Kunden |
-|---|---|
-| Email: Aufzeichnung mit Meditationen | 22 |
-| Direct | 12 |
-| Email: Live-Workshop Einladung | 8 |
-| Email: April-Infos Schueler | 3 |
-| Email: Einblick Meditation Protokoll | 3 |
-| Email: Life Coach Live Q&A | 3 |
-| Email: Gamma Meditation Workshop | 2 |
-| (nicht getrackt) | 132 |
+| Funnel | Kunden | Umsatz (CHF) | Avg. Deal | Hauptquelle |
+|---|---|---|---|---|
+| Testzugang HC (Tel.) | 12 | 26.923 | 2.244 | Referrals, Organic |
+| Testzugang GC (Tel.) | 14 | 9.987 | 713 | OFFLINE |
+| Testzugang GE (Tel.) | 6 | 7.153 | 1.192 | OFFLINE |
+| **Gesamt** | **32** | **44.063** | **1.377** | |
+
+**Testzugang HC hat den hoechsten Avg. Deal** - telefonische Beratung fuer Hypnosecoach-Ausbildung fuehrt zu grossen Kaeufen.
 
 ---
 
@@ -212,7 +256,7 @@ Von den getrackten Last Touches war **100% E-Mail** der letzte Kontakt vor dem K
 
 ### Produkt-Kategorien (200 Deals, CHF 757.927)
 
-| Produkt | Deals | Umsatz (CHF) | Avg. Deal |
+| Produkt | Deals | Umsatz (CHF) | Avg. Deal (CHF) |
 |---|---|---|---|
 | **Hypnosetherapie (HTA)** | 65 | 357.169 | 5.495 |
 | **Gespraechscoach (GT/GC)** | 22 | 68.935 | 3.133 |
@@ -220,12 +264,12 @@ Von den getrackten Last Touches war **100% E-Mail** der letzte Kontakt vor dem K
 | **Seminare/Events** | 14 | 12.280 | 877 |
 | **Hypnosecoach (HC)** | 1 | 5.910 | 5.910 |
 | **Praesenz/Mischform** | 2 | 4.230 | 2.115 |
-| **Fernstudium (unspez.)** | 5 | 3.740 | 748 |
 | **Coach Geistige Entwicklung** | 1 | 3.999 | 3.999 |
-| **Outbound/Cold Call Deals** | 6 | 0* | - |
+| **Fernstudium (unspez.)** | 5 | 3.740 | 748 |
+| **Outbound/Cold Call** | 6 | 0* | - |
 | Nicht klassifiziert | 78 | 290.649 | 3.726 |
 
-*Outbound-Deals ohne Amount-Wert (vermutlich in separatem Deal erfasst)
+*Outbound-Deals ohne Amount-Wert
 
 ### Pipeline-Verteilung
 
@@ -235,55 +279,84 @@ Von den getrackten Last Touches war **100% E-Mail** der letzte Kontakt vor dem K
 | **Fulfillment** | 48 | 125.877 |
 | **EC Pipeline** | 2 | 5.910 |
 
+### Deal-Abschluesse nach Monat
+
+| Monat | Deals |
+|---|---|
+| Okt 2025 | 58 |
+| Nov 2025 | 22 |
+| Dez 2025 | 22 |
+| Jan 2026 | 30 |
+| Feb 2026 | 34 |
+| Maerz 2026 | 25 |
+| April 2026 (bisher) | 9 |
+
 ---
 
 ## 6. Kernerkenntnisse & Empfehlungen
 
-### Was funktioniert am besten?
+### Die 5 wichtigsten Erkenntnisse
 
-1. **Live Launch Events** sind der effektivste Funnel-Typ:
-   - HC Live Launch (24 Kunden), MC Live Launch (16), BF Live Event (12), GC Live Launch (3)
-   - **Zusammen: 55 Kunden** ueber Launch-Events
+**1. E-Mail-Marketing ist der entscheidende Closer**
+- Von 3,8% First Touch auf 24,5% Last Touch (6,5x Anstieg)
+- 21% der OFFLINE-Leads werden per E-Mail konvertiert
+- 35% der Direct-Traffic-Leads kaufen nach einer E-Mail
+- **Empfehlung:** E-Mail-Sequenzen weiter ausbauen und optimieren
 
-2. **Evergreen Funnels** funktionieren auch gut:
-   - GE Popup Form (22), ebook Evergreen (7), HC Evergreen (2)
-   - **Zusammen: 31 Kunden** ueber Evergreen
+**2. HC-Funnels dominieren bei Umsatz und Kundenanzahl**
+- 117 Kunden, CHF 160.599 Umsatz
+- HC Live Launch allein: 79 Kunden, CHF 96.987
+- **Empfehlung:** Mehr HC-Launches planen, dieser Funnel skaliert am besten
 
-3. **Sonder-Events** bringen signifikante Ergebnisse:
-   - Rauhnachte (15), Angstfrei Kongress (34 als First Touch, 24 als Recent Conversion)
+**3. Evergreen-Funnels & Lead Magnets bringen die wertvollsten Leads**
+- ebook Evergreen: Avg. Deal CHF 2.753
+- HC Evergreen: Avg. Deal CHF 2.659
+- Weniger Volumen, aber hoehere Qualitaet
+- **Empfehlung:** Evergreen-Budget erhoehen fuer konstanten hochqualitativen Lead-Fluss
 
-4. **E-Mail-Marketing** ist der wichtigste "Closer":
-   - Von 2% First Touch auf 19,5% Last Touch
-   - 100% der getrackten Last Touches sind E-Mails
+**4. Funnels arbeiten als Cross-Selling-System**
+- HC-Leads kaufen auch BF und MC Produkte
+- GE-Popup-Leads werden zu BF, MC und GC Kunden
+- **Empfehlung:** Cross-Funnel-Journeys bewusst aufbauen
 
-5. **Telefonische Testzugaenge** konvertieren gut:
-   - 12 Kunden ueber Testzugang-Funnels (HC, GC, GE)
+**5. Telefonische Testzugaenge haben hohe Conversion-Werte**
+- 32 Kunden, CHF 44.063 Umsatz
+- Testzugang HC: Avg. Deal CHF 2.244
+- **Empfehlung:** Testzugang-Modell auf weitere Produkte ausweiten
 
-### Funnel-Ranking nach Effektivitaet
+### Funnel-Ranking: Volumen vs. Wert
 
-| Rang | Funnel-Typ | Kunden | Empfehlung |
-|---|---|---|---|
-| 1 | Live Launch Events | 55 | Mehr Launches planen, funktioniert am besten |
-| 2 | Sonder-Events (Kongress, Rauhnachte) | 49 | Jedes Quartal ein besonderes Event |
-| 3 | Evergreen Popups & Funnels | 31 | Skalieren - konsistenter Lead-Fluss |
-| 4 | Telefonische Testzugaenge | 12 | Gutes Closing-Instrument |
-| 5 | Quiz-Funnels (Bewusstseins-Typ) | 7 | Ausbauen fuer Segmentierung |
-| 6 | PDF/ebook Lead Magnets | 10 | Guter Top-of-Funnel |
+| Rang | Funnel | Volumen (Kunden) | Wert (Avg. Deal CHF) | Strategie |
+|---|---|---|---|---|
+| 1 | HC Live Launch | 79 | 1.228 | **Scale** - Bestes Volumen |
+| 2 | GE Popup Form | 62 | 1.331 | **Scale** - Starkes Evergreen |
+| 3 | MC Live Launch | 61 | 792 | **Optimize** - Viel Volumen, niedrigerer Wert |
+| 4 | ebook Evergreen | 10 | 2.753 | **Invest** - Hoechster Wert, mehr Budget |
+| 5 | Testzugang HC (Tel.) | 12 | 2.244 | **Invest** - Hoher Wert, telefonisch |
+| 6 | Rauhnachte | 30 | 830 | **Repeat** - Gutes Event-Format |
+| 7 | RG-HC-L3 | 5 | 2.534 | **Invest** - Retargeting funktioniert |
+| 8 | Quiz (Bewusstseins-Typ GC) | 6 | 2.285 | **Invest** - Quiz liefert wertvolle Leads |
+| 9 | Funnel MC Formular | 25 | 759 | **Optimize** - Solides Volumen |
+| 10 | HC Evergreen | 4 | 2.659 | **Invest** - Sehr hoher Wert |
 
-### Datenqualitaets-Hinweise
+### Empfohlene Massnahmen
 
-- **64,8% der Kunden** haben keinen Wert in `Last Touch - Funnels` -> Tracking-Luecke
-- **59,8% Original Source = OFFLINE** -> Viele Kontakte werden ueber Integrationen erstellt, nicht via Web
-- Custom Properties (`lead_first_touch`, `lead_last_touch`) werden erst seit Maerz 2026 befuellt
-- Viele Deals sind nach Kundennamen benannt statt nach Produkten -> erschwert Produkt-Analyse
+**Sofort:**
+1. HC Live Launch-Frequenz erhoehen (derzeit bester Funnel)
+2. ebook Evergreen + HC Evergreen mehr Ads-Budget geben
+3. Quiz-Funnels (Bewusstseins-Typ) auf alle Produkte ausweiten
 
-### Empfehlung: Tracking verbessern
+**Mittelfristig:**
+4. Cross-Selling-Journeys systematisch aufbauen (HC -> MC -> BF)
+5. Telefonische Testzugaenge fuer alle Fernstudium-Produkte einfuehren
+6. Retargeting (RG-HC-L3) auf weitere Segmente ausweiten
 
-1. **UTM-Parameter** konsequent auf allen Links einsetzen
-2. **Funnel-Tracking** lueckenlos machen (aktuell 64,8% ohne Wert)
-3. **Produkt-Property** auf Deals einfuehren statt Freitext-Dealname
-4. **First Touch Attribution** automatisieren (aktuell nur 2,5% befuellt)
+**Tracking verbessern:**
+7. UTM-Parameter konsequent auf allen Links
+8. Funnel-Tracking lueckenlos machen (aktuell 62% ohne Wert)
+9. Produkt-Property auf Deals einfuehren statt Freitext-Dealname
+10. First Touch Attribution automatisieren (aktuell nur 1% befuellt)
 
 ---
 
-*Datengrundlage: 400 neueste Kunden und 200 neueste gewonnene Deals aus HubSpot. Gesamt: 1.948 Kunden, 2.662 gewonnene Deals.*
+*Datengrundlage: 1.000 von 1.948 Kunden (51%) und 200 von 2.662 gewonnenen Deals aus HubSpot. Die Analyse deckt die neuesten Kunden und Deals ab.*

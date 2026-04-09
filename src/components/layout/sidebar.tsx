@@ -20,6 +20,7 @@ import {
   X,
   ChevronsUpDown,
   Check,
+  TrendingUp,
 } from 'lucide-react'
 import { useTheme } from '@/components/providers/theme-provider'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Inbox', href: '/inbox', icon: Inbox, badgeKey: 'pendingEmails' },
   { name: 'Insights', href: '/insights', icon: BarChart3 },
+  { name: 'Buyer Funnel', href: '/buyer-funnel', icon: TrendingUp },
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
   { name: 'AI Learning', href: '/learning', icon: GraduationCap, badgeKey: 'learningPending' },
